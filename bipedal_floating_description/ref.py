@@ -167,6 +167,7 @@ dt = rate.period
 t = 0.0  # [s]
 while True:
     # Update task targets
+    print(pelvis_pose)
     right_wrist_task.set_target(right_wrist_pose.at(t))
     wrist_frame.set_transform(right_wrist_pose.at(t).np)
 

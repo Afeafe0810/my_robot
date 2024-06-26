@@ -4,6 +4,31 @@
 <xacro:include filename="$(find bipedal_floating_description)/urdf/materials.xacro" />
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.trans" />
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.gazebo" />
+
+
+<link name="pelvis_link">
+  <visual>
+    <geometry>
+      <box size="0 0 0"/>
+    </geometry>
+  </visual>
+  <collision>
+    <geometry>
+      <box size="0 0 0"/>
+    </geometry>
+  </collision>
+  <inertial>
+    <mass value="0"/>
+    <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+  </inertial>
+</link>
+
+<joint name="dummy_joint" type="fixed">
+  <parent link="l_hip_yaw_1"/>
+  <child link="pelvis_link"/>
+  <origin xyz="0 -0.049 0" rpy="0 0 0"/>
+</joint>
+
 <link name="base_link">
   <inertial>
     <origin xyz="0.004448787386234898 1.5968454112255015e-14 0.6292535711325027" rpy="0 0 0"/>

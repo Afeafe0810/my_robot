@@ -44,8 +44,6 @@ class UpperLevelController(Node):
 
         self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
 
-
-
         self.joint_states_subscriber = self.create_subscription(
             JointState,
             '/joint_states',
@@ -151,19 +149,24 @@ class UpperLevelController(Node):
 
         # print("-------")
 
-    # def get_base_position(self):
-    #     end_effector_target = end_effector_task.transform_target_to_world
+    def get_position(self,configuration):
+        l_foot_pose = configuration.get_transform_frame_to_world("l_foot_1")
+        # print("l",l_foot_pose)
+        r_foot_pose = configuration.get_transform_frame_to_world("r_foot_1")
+        # print("r",r_foot_pose)
+        pelvis_pose = configuration.get_transform_frame_to_world("pelvis_link")
+        # print("p",pelvis_pose)
+
+        return pelvis_pose
             
     def main_controller_callback(self):
         # print(self.jonit_position)
-        configuration = pink.Configuration(self.robot.model, self.robot.data, self.joint_position)
+        configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
+        pelvis_pose = self.get_position(configuration)
         self.viz.display(configuration.q)
 
         # Task target specifications
-        pelvis_pose = configuration.get_transform_frame_to_world(
-                "base_link"
-            ).copy()
-        
+       
         pelvis_pose.translation[0] -= 0.03
 
         self.tasks['pelvis_task'].set_target(pelvis_pose)
@@ -187,8 +190,8 @@ class UpperLevelController(Node):
             'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
         ]
         point = JointTrajectoryPoint()
-        # print("VEL",list(velocity))
-        # print("POS",(pelvis_pose))
+        print("VEL",list(velocity))
+        print("POS",(pelvis_pose))
 
         point.velocities = list(velocity)
         point.time_from_start = rclpy.duration.Duration(seconds=0.01).to_msg()
