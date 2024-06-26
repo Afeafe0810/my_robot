@@ -36,10 +36,11 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
 
         #init variables as self
-        self.jonit_position = np.zeros(12)
-        self.jonit_velocity = np.zeros(12)
+        self.joint_position = np.zeros(12)
+        self.joint_velocity = np.zeros(12)
 
-        self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
+        # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
+        # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
 
         self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
 
@@ -53,7 +54,7 @@ class UpperLevelController(Node):
         self.joint_states_subscriber  # prevent unused variable warning
 
 
-        self.robot = self.load_URDF('/home/humble/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf')
+        self.robot = self.load_URDF("/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         
         # Initialize meschcat visualizer
         self.viz = pin.visualize.MeshcatVisualizer(
@@ -65,13 +66,13 @@ class UpperLevelController(Node):
 
 
         # Set initial robot configuration
-        self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.Q0)
+        print(self.robot.model)
+        print(self.robot.q0)
+        self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
         self.viz.display(self.init_configuration.q)
 
         # Tasks initialization for IK
         self.tasks = self.tasks_init()
-
-
 
         self.timer_period = 0.01 # seconds
         self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
@@ -81,6 +82,7 @@ class UpperLevelController(Node):
         robot = pin.RobotWrapper.BuildFromURDF(
                         filename=urdf_path,
                         package_dirs=["."],
+                        # root_joint=pin.JointModelFreeFlyer(),
                         root_joint=None,
                         )
         
@@ -135,11 +137,11 @@ class UpperLevelController(Node):
         if len(msg.velocity) == 12:
             velocity_order_dict = {joint: value for joint, value in zip(original_order, np.array(msg.velocity))}
 
-            self.jonit_velocity = np.array([velocity_order_dict[joint] for joint in desired_order])
+            self.joint_velocity = np.array([velocity_order_dict[joint] for joint in desired_order])
 
         if len(msg.position) == 12:
             position_order_dict = {joint: value for joint, value in zip(original_order, np.array(msg.position))}
-            self.jonit_position = np.array([position_order_dict[joint] for joint in desired_order])
+            self.joint_position = np.array([position_order_dict[joint] for joint in desired_order])
 
 
 
@@ -149,12 +151,12 @@ class UpperLevelController(Node):
 
         # print("-------")
 
-            
+    # def get_base_position(self):
+    #     end_effector_target = end_effector_task.transform_target_to_world
             
     def main_controller_callback(self):
         # print(self.jonit_position)
-        
-        configuration = pink.Configuration(self.robot.model, self.robot.data, self.jonit_position)
+        configuration = pink.Configuration(self.robot.model, self.robot.data, self.joint_position)
         self.viz.display(configuration.q)
 
         # Task target specifications
@@ -185,8 +187,8 @@ class UpperLevelController(Node):
             'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
         ]
         point = JointTrajectoryPoint()
-        print("VEL",list(velocity))
-        print("POS",(pelvis_pose))
+        # print("VEL",list(velocity))
+        # print("POS",(pelvis_pose))
 
         point.velocities = list(velocity)
         point.time_from_start = rclpy.duration.Duration(seconds=0.01).to_msg()
