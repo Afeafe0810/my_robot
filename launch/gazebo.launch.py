@@ -97,6 +97,10 @@ def generate_launch_description():
         output='screen'
     )
 
+    velocity_controller = ExecuteProcess(
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','velocity_controller'],
+        output='screen'
+    )
 
     bip_effort_controller = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','bip_effort_controller'],
@@ -135,6 +139,12 @@ def generate_launch_description():
                 on_exit=[joint_state_broadcaster]
             )
         ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=joint_state_broadcaster,
+        #         on_exit=[velocity_controller]
+        #     )
+        # ),
         RegisterEventHandler(
             OnProcessExit(
                 target_action=joint_state_broadcaster,

@@ -29,6 +29,7 @@ from os.path import dirname, join, abspath
 import os
 import copy
 import math
+from scipy.spatial.transform import Rotation as R
 
 
 
@@ -37,6 +38,7 @@ class UpperLevelController(Node):
     def __init__(self):
         super().__init__('upper_level_controllers')
 
+        self.velocity_publisher = self.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
         #init variables as self
         self.jp_sub = np.zeros(12)
         self.jv_sub = np.zeros(12)
@@ -251,8 +253,46 @@ class UpperLevelController(Node):
         self.r_ankle_roll = configuration.get_transform_frame_to_world("r_foot_1")
         self.r_foot = configuration.get_transform_frame_to_world("r_foot")
         # print("r_foot:",r_foot.translation)
+          
+    def get_posture(self):
+        cos = math.cos
+        sin = math.sin
 
-            
+        pelvis_p = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        l_foot_p = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
+        r_foot_p = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
+
+        pelvis_o = copy.deepcopy(self.pelvis.rotation)
+        l_foot_o = copy.deepcopy(self.l_foot.rotation)
+        r_foot_o = copy.deepcopy(self.r_foot.rotation)
+
+        pR = R.from_matrix(pelvis_o).as_euler('zyx', degrees=False)   
+        P_Yaw = pR[0]
+        P_Pitch = pR[1]
+        P_Roll = pR[2]
+
+        lR = R.from_matrix(l_foot_o).as_euler('zyx', degrees=False) 
+        L_Yaw = lR[0]
+        L_Pitch = lR[1]
+        L_Roll = lR[2]
+        
+        rR = R.from_matrix(r_foot_o).as_euler('zyx', degrees=False) 
+        R_Yaw = rR[0]
+        R_Pitch = rR[1]
+        R_Roll = rR[2]
+
+        self.PX = np.array([[pelvis_p[0,0]],[pelvis_p[1,0]],[pelvis_p[2,0]],[P_Roll],[P_Pitch],[P_Yaw]])
+        self.LX = np.array([[l_foot_p[0,0]],[l_foot_p[1,0]],[l_foot_p[2,0]],[L_Roll],[L_Pitch],[L_Yaw]])
+        self.RX = np.array([[r_foot_p[0,0]],[r_foot_p[1,0]],[r_foot_p[2,0]],[R_Roll],[R_Pitch],[R_Yaw]])
+
+        self.L_Body_transfer = np.array([[cos(L_Pitch)*cos(L_Yaw), -sin(L_Yaw),0],
+                                [cos(L_Pitch)*sin(L_Yaw), cos(L_Yaw), 0],
+                                [-sin(L_Pitch), 0, 1]])  
+        
+        self.R_Body_transfer = np.array([[cos(R_Pitch)*cos(R_Yaw), -sin(R_Yaw),0],
+                                [cos(R_Pitch)*sin(R_Yaw), cos(R_Yaw), 0],
+                                [-sin(R_Pitch), 0, 1]])  
+        
     def left_leg_jacobian(self):
         pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
         l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
@@ -262,7 +302,15 @@ class UpperLevelController(Node):
         l_ankle_pitch = np.reshape(copy.deepcopy(self.l_ankle_pitch.translation),(3,1))
         l_ankle_roll = np.reshape(copy.deepcopy(self.l_ankle_roll.translation),(3,1))
         l_foot = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
-        # print("1:",l_hip_roll,l_hip_yaw,l_hip_pitch)
+        # print("l_hip_roll:",l_hip_roll)
+        # print("l_hip_yaw:",l_hip_yaw)
+        # print("l_hip_pitch:",l_hip_pitch)
+        # print("l_knee_pitch:",l_knee_pitch)
+        # print("l_ankle_pitch:",l_ankle_pitch)
+        # print("l_ankle_roll:",l_ankle_roll)
+        # print("l_foot:",l_foot)
+
+
         # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
         # l_foot = copy.deepcopy(l_foot)
         JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
@@ -277,6 +325,115 @@ class UpperLevelController(Node):
         self.JLL = np.vstack((JLL_upper,JLL_lower))  
         print(self.JLL)
 
+        return self.JLL
+
+    def right_leg_jacobian(self):
+        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        r_hip_roll = np.reshape(copy.deepcopy(self.r_hip_roll.translation),(3,1))
+        r_hip_yaw = np.reshape(copy.deepcopy(self.r_hip_yaw.translation),(3,1))
+        r_hip_pitch = np.reshape(copy.deepcopy(self.r_hip_pitch.translation),(3,1))
+        r_knee_pitch = np.reshape(copy.deepcopy(self.r_knee_pitch.translation),(3,1))
+        r_ankle_pitch = np.reshape(copy.deepcopy(self.r_ankle_pitch.translation),(3,1))
+        r_ankle_roll = np.reshape(copy.deepcopy(self.r_ankle_roll.translation),(3,1))
+        r_foot = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
+        # print("1:",l_hip_roll,l_hip_yaw,l_hip_pitch)
+        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
+        # l_foot = copy.deepcopy(l_foot)
+        JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
+        JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
+        JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
+        JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
+        JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
+        JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
+
+        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
+        JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
+        self.JRR = np.vstack((JRR_upper,JRR_lower))  
+        # print(self.JRR)
+    
+        return self.JRR
+
+    def ref_cmd(self):
+        #pelvis
+        P_X_ref = 0.0
+        P_Y_ref = 0.0
+        P_Z_ref = 0.6
+        P_Roll_ref = 0.0
+        P_Pitch_ref = 0.0
+        P_Yaw_ref = 0.0
+
+        self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
+
+        #left_foot
+        L_X_ref = 0.0
+        L_Y_ref = 0.1
+        L_Z_ref = 0.03
+        L_Roll_ref = 0.0
+        L_Pitch_ref = 0.0
+        L_Yaw_ref = 0.0
+        
+        self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
+
+        #right_foot
+        R_X_ref = 0.0
+        R_Y_ref = -0.1
+        R_Z_ref = 0.03
+        R_Roll_ref = 0.0
+        R_Pitch_ref = 0.0
+        R_Yaw_ref = 0.0
+
+        self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
+
+    def calculate_err(self):
+        PX_ref = copy.deepcopy(self.PX_ref)
+        LX_ref = copy.deepcopy(self.LX_ref)
+        RX_ref = copy.deepcopy(self.RX_ref)
+        PX = copy.deepcopy(self.PX)
+        LX = copy.deepcopy(self.LX)
+        RX = copy.deepcopy(self.RX)
+
+        L_ref = LX_ref - PX_ref 
+        R_ref = RX_ref - PX_ref
+        L = LX - PX
+        R = RX - PX 
+
+        Le_dot = 10*(L_ref - L)
+        Re_dot = 10*(R_ref - R)
+
+        Lroll_error_dot = Le_dot[3,0]
+        Lpitch_error_dot = Le_dot[4,0]
+        Lyaw_error_dot = Le_dot[5,0]
+        WL_x = self.L_Body_transfer[0,0]*Lroll_error_dot + self.L_Body_transfer[0,1]*Lpitch_error_dot
+        WL_y = self.L_Body_transfer[1,0]*Lroll_error_dot + self.L_Body_transfer[1,1]*Lpitch_error_dot
+        WL_z = self.L_Body_transfer[2,0]*Lroll_error_dot + self.L_Body_transfer[2,2]*Lyaw_error_dot
+
+        Le_2 = np.array([[Le_dot[0,0]],[Le_dot[1,0]],[Le_dot[2,0]],[WL_x],[WL_y],[WL_z]])
+
+        Rroll_error_dot = Re_dot[3,0]
+        Rpitch_error_dot = Re_dot[4,0]
+        Ryaw_error_dot = Re_dot[5,0]
+        WR_x = self.R_Body_transfer[0,0]*Rroll_error_dot + self.R_Body_transfer[0,1]*Rpitch_error_dot
+        WR_y = self.R_Body_transfer[1,0]*Rroll_error_dot + self.R_Body_transfer[1,1]*Rpitch_error_dot
+        WR_z = self.R_Body_transfer[2,0]*Rroll_error_dot + self.R_Body_transfer[2,2]*Ryaw_error_dot
+
+        Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
+
+        return Le_2,Re_2
+    
+    def velocity_cmd(self,Le_2,Re_2):
+
+        L2 = copy.deepcopy(Le_2)
+        R2 = copy.deepcopy(Re_2)
+
+        # print(L2)
+
+        Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
+        Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
+
+        # print(Lw_d)
+
+        return Lw_d,Rw_d
+
     def main_controller_callback(self):
         joint_position,joint_velocity = self.collect_joint_data()
         self.rotation_matrix(joint_position)
@@ -284,49 +441,41 @@ class UpperLevelController(Node):
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.get_position(configuration)
+        self.get_posture()
         self.viz.display(configuration.q)
-        self.left_leg_jacobian()
+        JLL = self.left_leg_jacobian()
+        JRR = self.right_leg_jacobian()
+        self.ref_cmd()
+        Le_2,Re_2 = self.calculate_err()
+        VL,VR = self.velocity_cmd(Le_2,Re_2)
 
-        # JLL = self.left_leg_jacobian(pelvis,l_foot)
+        v = np.vstack((VL,VR))
 
-        # # Task target specifications
-       
-        # pelvis_pose.translation[0] -= 0.03
+        #position
+        p = joint_position + self.timer_period*v
 
-        # self.tasks['pelvis_task'].set_target(pelvis_pose)
-        # self.tasks['pelvis_task'].set_target(configuration.get_transform_frame_to_world("base_link"))
-        # self.tasks['posture_task'].set_target_from_configuration(configuration)
+        v = np.reshape(v,(12))
+        p = np.reshape(p,(12))
+        print(p)
+        # self.velocity_publisher.publish(Float64MultiArray(data=v))
 
-        # solver = qpsolvers.available_solvers[0]
-        # if "quadprog" in qpsolvers.available_solvers:
-        #     solver = "quadprog"
+        # print(v)
 
 
-        # velocity = solve_ik(configuration, self.tasks.values(), self.timer_period, solver=solver)
-
-
-        # trajectory_msg  = JointTrajectory()
+        trajectory_msg  = JointTrajectory()
         # trajectory_msg.header.stamp = self.get_clock().now().to_msg()
-        # trajectory_msg.header.frame_id= 'base_link'
-        # trajectory_msg.joint_names = [
-        #     'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
-        #     'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
-        #     'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
-        # ]
-        # point = JointTrajectoryPoint()
-        # print("VEL",list(velocity))
-        # print("POS",(pelvis_pose))
-
-        # point.velocities = list(velocity)
-        # point.time_from_start = rclpy.duration.Duration(seconds=0.01).to_msg()
-        # trajectory_msg.points.append(point)
-        # self.joint_trajectory_controller.publish(trajectory_msg)
-
-
-
-
-
-
+        trajectory_msg.header.frame_id= 'base_link'
+        trajectory_msg.joint_names = [
+            'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
+            'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
+            'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
+        ]
+        point = JointTrajectoryPoint()
+        point.positions = list(p)
+        point.velocities = list(v)
+        point.time_from_start = rclpy.duration.Duration(seconds=self.timer_period).to_msg()
+        trajectory_msg.points.append(point)
+        self.joint_trajectory_controller.publish(trajectory_msg)
 
 
 

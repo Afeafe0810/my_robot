@@ -12,8 +12,6 @@ controller_manager:
     joint_trajectory_controller:
       type: "joint_trajectory_controller/JointTrajectoryController"
 
-
-
 bip_effort_controller:
   ros__parameters:
     joints:
@@ -63,16 +61,16 @@ joint_trajectory_controller:
     gains:
       L_Hip_Roll:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 80.0
+        p: 15.0
 
       L_Hip_Yaw:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -81,7 +79,7 @@ joint_trajectory_controller:
 
       L_Hip_Pitch:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -90,7 +88,7 @@ joint_trajectory_controller:
 
       L_Knee_Pitch:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -99,7 +97,7 @@ joint_trajectory_controller:
 
       L_Ankle_Pitch:
         angle_wraparound: false
-        d: 3.0
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -108,7 +106,7 @@ joint_trajectory_controller:
 
       L_Ankle_Roll:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -118,17 +116,17 @@ joint_trajectory_controller:
 
       R_Hip_Roll:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 80.0
+        p: 15.0
 
 
       R_Hip_Yaw:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -137,7 +135,7 @@ joint_trajectory_controller:
 
       R_Hip_Pitch:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -147,7 +145,7 @@ joint_trajectory_controller:
 
       R_Knee_Pitch:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -157,7 +155,7 @@ joint_trajectory_controller:
 
       R_Ankle_Pitch:
         angle_wraparound: false
-        d: 3.0
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
@@ -166,7 +164,7 @@ joint_trajectory_controller:
 
       R_Ankle_Roll:
         angle_wraparound: false
-        d: 1.5
+        d: 0.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
