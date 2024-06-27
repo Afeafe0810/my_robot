@@ -5,6 +5,11 @@
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.trans" />
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.gazebo" />
 
+<link name="world"/>
+<joint name="fixed" type="fixed">
+  <parent link="world"/>
+  <child link="base_link"/>
+</joint>
 
 <link name="pelvis_link">
   <visual>

@@ -59,8 +59,8 @@
               <ode>
                 <min_depth>0.0005</min_depth>
                 <max_vel>0.00</max_vel>
-                <kp>4500000</kp>
-                <kd>36224.30124</kd>
+                <kp>450000</kp>
+                <kd>3622.430124</kd>
               </ode>
             </contact>
             <friction>

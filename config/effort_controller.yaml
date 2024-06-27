@@ -63,112 +63,112 @@ joint_trajectory_controller:
     gains:
       L_Hip_Roll:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 80.0
 
       L_Hip_Yaw:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       L_Hip_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       L_Knee_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       L_Ankle_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 3.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       L_Ankle_Roll:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
 
       R_Hip_Roll:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 80.0
 
 
       R_Hip_Yaw:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       R_Hip_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
 
       R_Knee_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
 
       R_Ankle_Pitch:
         angle_wraparound: false
-        d: 8.0
+        d: 3.0
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
 
       R_Ankle_Roll:
         angle_wraparound: false
-        d: 8.0
+        d: 1.5
         ff_velocity_scale: 0.0
         i: 0.0
         i_clamp: 0.0
         normalize_error: false
-        p: 90.0
+        p: 15.0
