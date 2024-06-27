@@ -233,29 +233,49 @@ class UpperLevelController(Node):
         # print("AR6: ",self.AR6) 
 
     def get_position(self,configuration):
-        pelvis = configuration.get_transform_frame_to_world("pelvis_link")
-        print("p",pelvis)
-        l_foot = configuration.get_transform_frame_to_world("l_foot_1")
-        # print("l",l_foot_pose)
-        r_foot = configuration.get_transform_frame_to_world("r_foot_1")
-        # print("r",r_foot_pose)
+        self.pelvis = configuration.get_transform_frame_to_world("pelvis_link")
+        # print("p",pelvis)
+        self.l_hip_roll = configuration.get_transform_frame_to_world("l_hip_yaw_1")
+        self.l_hip_yaw = configuration.get_transform_frame_to_world("l_hip_pitch_1")
+        self.l_hip_pitch = configuration.get_transform_frame_to_world("l_thigh_1")
+        self.l_knee_pitch = configuration.get_transform_frame_to_world("l_shank_1")
+        self.l_ankle_pitch = configuration.get_transform_frame_to_world("l_ankle_1")
+        self.l_ankle_roll = configuration.get_transform_frame_to_world("l_foot_1")
+        self.l_foot = configuration.get_transform_frame_to_world("l_foot")
+        # print("l_foot:",l_foot.translation)
+        self.r_hip_roll = configuration.get_transform_frame_to_world("r_hip_yaw_1")
+        self.r_hip_yaw = configuration.get_transform_frame_to_world("r_hip_pitch_1")
+        self.r_hip_pitch = configuration.get_transform_frame_to_world("r_thigh_1")
+        self.r_knee_pitch = configuration.get_transform_frame_to_world("r_shank_1")
+        self.r_ankle_pitch = configuration.get_transform_frame_to_world("r_ankle_1")
+        self.r_ankle_roll = configuration.get_transform_frame_to_world("r_foot_1")
+        self.r_foot = configuration.get_transform_frame_to_world("r_foot")
+        # print("r_foot:",r_foot.translation)
 
-
-        return pelvis,l_foot,r_foot
             
-    def left_leg_jacobian(self,pelvis,l_foot):
-        pelvis = copy.deepcopy(pelvis)
-        l_foot = copy.deepcopy(l_foot)
-        JL1 = np.cross(self.Wa1,(hip-self.L_Ankle_Roll),axis=0)
-        JL2 = np.cross(self.Wa2,(hip-self.L_Ankle_Pitch),axis=0)
-        JL3 = np.cross(self.Wa3,(hip-self.L_Knee_Pitch),axis=0)
-        JL4 = np.cross(self.Wa4,(hip-self.L_Hip_Pitch),axis=0)
-        JL5 = np.cross(self.Wa5,(hip-self.L_Hip_Yaw),axis=0)
-        JL6 = np.cross(self.Wa6,(hip-self.L_Hip_Roll),axis=0)
+    def left_leg_jacobian(self):
+        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
+        l_hip_yaw = np.reshape(copy.deepcopy(self.l_hip_yaw.translation),(3,1))
+        l_hip_pitch = np.reshape(copy.deepcopy(self.l_hip_pitch.translation),(3,1))
+        l_knee_pitch = np.reshape(copy.deepcopy(self.l_knee_pitch.translation),(3,1))
+        l_ankle_pitch = np.reshape(copy.deepcopy(self.l_ankle_pitch.translation),(3,1))
+        l_ankle_roll = np.reshape(copy.deepcopy(self.l_ankle_roll.translation),(3,1))
+        l_foot = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
+        # print("1:",l_hip_roll,l_hip_yaw,l_hip_pitch)
+        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
+        # l_foot = copy.deepcopy(l_foot)
+        JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
+        JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
+        JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
+        JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
+        JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
+        JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
 
         JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
-        JLL_lower = np.hstack((self.Wa1,self.Wa2,self.Wa3,self.Wa4,self.Wa5,self.Wa6))    
+        JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
         self.JLL = np.vstack((JLL_upper,JLL_lower))  
+        print(self.JLL)
 
     def main_controller_callback(self):
         joint_position,joint_velocity = self.collect_joint_data()
@@ -263,8 +283,9 @@ class UpperLevelController(Node):
         self.relative_axis()
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
-        pelvis,l_foot,r_foot = self.get_position(configuration)
+        self.get_position(configuration)
         self.viz.display(configuration.q)
+        self.left_leg_jacobian()
 
         # JLL = self.left_leg_jacobian(pelvis,l_foot)
 

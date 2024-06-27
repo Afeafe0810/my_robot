@@ -6,27 +6,25 @@
 <xacro:include filename="/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.gazebo" />
 
 
-<link name="pelvis_link">
-  <visual>
-    <geometry>
-      <box size="0 0 0"/>
-    </geometry>
-  </visual>
-  <collision>
-    <geometry>
-      <box size="0 0 0"/>
-    </geometry>
-  </collision>
-  <inertial>
-    <mass value="0"/>
-    <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
-  </inertial>
-</link>
-
-<joint name="dummy_joint" type="fixed">
+<link name="pelvis_link"/>
+<joint name="pelvis_joint" type="fixed">
   <parent link="base_link"/>
   <child link="pelvis_link"/>
   <origin xyz="0 0 0.598" rpy="0 0 0"/>
+</joint>
+
+<link name="l_foot"/>
+<joint name="l_foot_joint" type="fixed">
+  <parent link="l_foot_1"/>
+  <child link="l_foot"/>
+  <origin xyz="0 0 -0.026" rpy="0 0 0"/>
+</joint>
+
+<link name="r_foot"/>
+<joint name="r_foot_joint" type="fixed">
+  <parent link="r_foot_1"/>
+  <child link="r_foot"/>
+  <origin xyz="0 0 -0.026" rpy="0 0 0"/>
 </joint>
 
 
