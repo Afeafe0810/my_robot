@@ -5,11 +5,11 @@
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.trans" />
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.gazebo" />
 
-<link name="world"/>
+<!-- <link name="world"/>
 <joint name="fixed" type="fixed">
   <parent link="world"/>
   <child link="base_link"/>
-</joint>
+</joint> -->
 
 <link name="l_foot"/>
 <joint name="l_foot_joint" type="fixed">
@@ -413,7 +413,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -423,7 +423,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -433,7 +433,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -443,7 +443,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -453,7 +453,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -463,7 +463,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -474,7 +474,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -485,7 +485,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -496,7 +496,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -507,7 +507,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -519,7 +519,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -530,7 +530,7 @@
       <param name="initial_position">0.0</param>
     </command_interface>
     <command_interface name="effort"/>
-    <command_interface name="velocity"/>
+    <!-- <command_interface name="velocity"/> -->
     <state_interface name="position"/>
     <state_interface name="velocity"/>
     <state_interface name="effort"/>
@@ -540,7 +540,7 @@
 <gazebo>
   <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
     <robot_sim_type>gazebo_ros2_control/GazeboSystem</robot_sim_type>
-    <parameters>$(find bipedal_floating_description)/config/effort_controller.yaml</parameters>
+    <parameters>$(find bipedal_floating_description)/config/trajectory_controller.yaml</parameters>
     <!-- <parameters>$(find bipedal_floating_description)/config/velocity_controller.yaml</parameters> -->
   </plugin>
   <plugin name="gazebo_link_attacher" filename="libgazebo_link_attacher.so"/>

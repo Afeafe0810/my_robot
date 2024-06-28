@@ -323,7 +323,7 @@ class UpperLevelController(Node):
         JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
         JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
         self.JLL = np.vstack((JLL_upper,JLL_lower))  
-        print(self.JLL)
+        # print(self.JLL)
 
         return self.JLL
 
@@ -365,9 +365,9 @@ class UpperLevelController(Node):
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
-        L_X_ref = 0.0
+        L_X_ref = 0.1
         L_Y_ref = 0.1
-        L_Z_ref = 0.03
+        L_Z_ref = 0.05
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
         L_Yaw_ref = 0.0
@@ -375,9 +375,9 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        R_X_ref = 0.0
+        R_X_ref = 0.1
         R_Y_ref = -0.1
-        R_Z_ref = 0.03
+        R_Z_ref = 0.05
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
@@ -397,8 +397,8 @@ class UpperLevelController(Node):
         L = LX - PX
         R = RX - PX 
 
-        Le_dot = 10*(L_ref - L)
-        Re_dot = 10*(R_ref - R)
+        Le_dot = 100*(L_ref - L)
+        Re_dot = 100*(R_ref - R)
 
         Lroll_error_dot = Le_dot[3,0]
         Lpitch_error_dot = Le_dot[4,0]
@@ -449,17 +449,19 @@ class UpperLevelController(Node):
         Le_2,Re_2 = self.calculate_err()
         VL,VR = self.velocity_cmd(Le_2,Re_2)
 
-        v = np.vstack((VL,VR))
+        # v = np.vstack((VL,VR))
 
-        #position
-        p = joint_position + self.timer_period*v
+        # #position
+        # p = joint_position + self.timer_period*v
 
-        v = np.reshape(v,(12))
-        p = np.reshape(p,(12))
-        print(p)
+        # v = np.reshape(v,(12))
+        # p = np.reshape(p,(12))
+        # print(p)
         # self.velocity_publisher.publish(Float64MultiArray(data=v))
 
-        # print(v)
+        v = np.zeros(12)
+        p = np.array([0.0,0.0,-0.37,0.74,-0.36,0.0,0.0,0.0,-0.37,0.74,-0.36,0.0])
+
 
 
         trajectory_msg  = JointTrajectory()
