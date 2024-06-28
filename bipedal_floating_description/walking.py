@@ -435,6 +435,53 @@ class UpperLevelController(Node):
 
         return Lw_d,Rw_d
 
+    def balance(self,joint_position):
+        #balance the robot to initial state by p_control
+        jp = copy.deepcopy(joint_position)
+        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
+
+        torque = np.zeros((12,1))
+        torque[0,0] = 20*(p[0,0]-jp[0,0])
+        torque[1,0] = 20*(p[1,0]-jp[1,0])
+        torque[2,0] = 30*(p[2,0]-jp[2,0])
+        torque[3,0] = 60*(p[3,0]-jp[3,0])
+        torque[4,0] = 60*(p[4,0]-jp[4,0])
+        torque[5,0] = 40*(p[5,0]-jp[5,0])
+
+        torque[6,0] = 25*(p[6,0]-jp[6,0])
+        torque[7,0] = 20*(p[7,0]-jp[7,0])
+        torque[8,0] = 30*(p[8,0]-jp[8,0])
+        torque[9,0] = 80*(p[9,0]-jp[9,0])
+        torque[10,0] = 60*(p[10,0]-jp[10,0])
+        torque[11,0] = 40*(p[11,0]-jp[11,0])
+        self.effort_publisher.publish(Float64MultiArray(data=torque))
+
+    def swing_leg(self,joint_position,L_leg_velocity):
+        print("swing_mode")
+        vl = copy.deepcopy(L_leg_velocity)
+        jp = copy.deepcopy(joint_position)
+        pl = np.reshape(copy.deepcopy(joint_position[:6,0]),(6,1))
+
+        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
+        p_swing = pl + self.timer_period*vl
+
+        torque = np.zeros((12,1))
+
+        torque[0,0] = 20*(p_swing[0,0]-jp[0,0])
+        torque[1,0] = 20*(p_swing[1,0]-jp[1,0])
+        torque[2,0] = 20*(p_swing[2,0]-jp[2,0])
+        torque[3,0] = 70*(p_swing[3,0]-jp[3,0])
+        torque[4,0] = 60*(p_swing[4,0]-jp[4,0])
+        torque[5,0] = 40*(p_swing[5,0]-jp[5,0])
+
+        torque[6,0] = 25*(p[6,0]-jp[6,0])
+        torque[7,0] = 20*(p[7,0]-jp[7,0])
+        torque[8,0] = 20*(p[8,0]-jp[8,0])
+        torque[9,0] = 70*(p[9,0]-jp[9,0])
+        torque[10,0] = 60*(p[10,0]-jp[10,0])
+        torque[11,0] = 40*(p[11,0]-jp[11,0])
+        self.effort_publisher.publish(Float64MultiArray(data=torque))
+
     def main_controller_callback(self):
         joint_position,joint_velocity = self.collect_joint_data()
         self.rotation_matrix(joint_position)
@@ -449,26 +496,12 @@ class UpperLevelController(Node):
         self.ref_cmd()
         Le_2,Re_2 = self.calculate_err()
         VL,VR = self.velocity_cmd(Le_2,Re_2)
+        self.balance(joint_position)
+        # self.swing_leg(joint_position,VL)
 
         # v = np.vstack((VL,VR))
 
-        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
 
-        torque = np.zeros((12,1))
-        torque[0,0] = 20*(p[0,0]-joint_position[0,0])
-        torque[1,0] = 20*(p[1,0]-joint_position[1,0])
-        torque[2,0] = 30*(p[2,0]-joint_position[2,0])
-        torque[3,0] = 70*(p[3,0]-joint_position[3,0])
-        torque[4,0] = 60*(p[4,0]-joint_position[4,0])
-        torque[5,0] = 40*(p[5,0]-joint_position[5,0])
-
-        torque[6,0] = 20*(p[6,0]-joint_position[6,0])
-        torque[7,0] = 20*(p[7,0]-joint_position[7,0])
-        torque[8,0] = 30*(p[8,0]-joint_position[8,0])
-        torque[9,0] = 70*(p[9,0]-joint_position[9,0])
-        torque[10,0] = 60*(p[10,0]-joint_position[10,0])
-        torque[11,0] = 40*(p[11,0]-joint_position[11,0])
-        self.effort_publisher.publish(Float64MultiArray(data=torque))
 
 
 
