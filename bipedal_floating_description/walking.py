@@ -394,7 +394,7 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        R_X_ref = -0.03
+        R_X_ref = 0.05*math.cos(self.tt)
         R_Y_ref = -0.1
         R_Z_ref = 0.0
         R_Roll_ref = 0.0
@@ -497,19 +497,19 @@ class UpperLevelController(Node):
         torque[4,0] = (vl_cmd[4,0]-jv[4,0])
         torque[5,0] = (vl_cmd[5,0]-jv[5,0])
 
-        # torque[6,0] = (vr_cmd[0,0]-jv[6,0])
-        # torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        # torque[8,0] = (vr_cmd[2,0]-jv[8,0])
-        # torque[9,0] = (vr_cmd[3,0]-jv[9,0])
-        # torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        # torque[11,0] = (vr_cmd[5,0]-jv[11,0])
+        torque[6,0] = (vr_cmd[0,0]-jv[6,0])
+        torque[7,0] = (vr_cmd[1,0]-jv[7,0])
+        torque[8,0] = (vr_cmd[2,0]-jv[8,0])
+        torque[9,0] = (vr_cmd[3,0]-jv[9,0])
+        torque[10,0] = (vr_cmd[4,0]-jv[10,0])
+        torque[11,0] = (vr_cmd[5,0]-jv[11,0])
 
-        torque[6,0] = 25*(p[6,0]-jp[6,0])
-        torque[7,0] = 20*(p[7,0]-jp[7,0])
-        torque[8,0] = 20*(p[8,0]-jp[8,0])
-        torque[9,0] = 70*(p[9,0]-jp[9,0])
-        torque[10,0] = 60*(p[10,0]-jp[10,0])
-        torque[11,0] = 40*(p[11,0]-jp[11,0])
+        # torque[6,0] = 25*(p[6,0]-jp[6,0])
+        # torque[7,0] = 20*(p[7,0]-jp[7,0])
+        # torque[8,0] = 20*(p[8,0]-jp[8,0])
+        # torque[9,0] = 70*(p[9,0]-jp[9,0])
+        # torque[10,0] = 60*(p[10,0]-jp[10,0])
+        # torque[11,0] = 40*(p[11,0]-jp[11,0])
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
     def main_controller_callback(self):
