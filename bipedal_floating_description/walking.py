@@ -39,6 +39,7 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
 
         self.velocity_publisher = self.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
+        self.effort_publisher = self.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10)
         #init variables as self
         self.jp_sub = np.zeros(12)
         self.jv_sub = np.zeros(12)
@@ -451,33 +452,45 @@ class UpperLevelController(Node):
 
         # v = np.vstack((VL,VR))
 
-        # #position
-        # p = joint_position + self.timer_period*v
+        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
 
+        torque = np.zeros((12,1))
+        torque[0,0] = 20*(p[0,0]-joint_position[0,0])
+        torque[1,0] = 20*(p[1,0]-joint_position[1,0])
+        torque[2,0] = 30*(p[2,0]-joint_position[2,0])
+        torque[3,0] = 70*(p[3,0]-joint_position[3,0])
+        torque[4,0] = 60*(p[4,0]-joint_position[4,0])
+        torque[5,0] = 40*(p[5,0]-joint_position[5,0])
+
+        torque[6,0] = 20*(p[6,0]-joint_position[6,0])
+        torque[7,0] = 20*(p[7,0]-joint_position[7,0])
+        torque[8,0] = 30*(p[8,0]-joint_position[8,0])
+        torque[9,0] = 70*(p[9,0]-joint_position[9,0])
+        torque[10,0] = 60*(p[10,0]-joint_position[10,0])
+        torque[11,0] = 40*(p[11,0]-joint_position[11,0])
+        self.effort_publisher.publish(Float64MultiArray(data=torque))
+
+
+
+        # # for trajectory controller
+        # p = joint_position + self.timer_period*v
         # v = np.reshape(v,(12))
         # p = np.reshape(p,(12))
-        # print(p)
-        # self.velocity_publisher.publish(Float64MultiArray(data=v))
-
-        v = np.zeros(12)
-        p = np.array([0.0,0.0,-0.37,0.74,-0.36,0.0,0.0,0.0,-0.37,0.74,-0.36,0.0])
-
-
-
-        trajectory_msg  = JointTrajectory()
-        # trajectory_msg.header.stamp = self.get_clock().now().to_msg()
-        trajectory_msg.header.frame_id= 'base_link'
-        trajectory_msg.joint_names = [
-            'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
-            'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
-            'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
-        ]
-        point = JointTrajectoryPoint()
-        point.positions = list(p)
-        point.velocities = list(v)
-        point.time_from_start = rclpy.duration.Duration(seconds=self.timer_period).to_msg()
-        trajectory_msg.points.append(point)
-        self.joint_trajectory_controller.publish(trajectory_msg)
+        # p = np.array([0.0,0.0,-0.37,0.74,-0.36,0.0,0.0,0.0,-0.37,0.74,-0.36,0.0])
+        # trajectory_msg  = JointTrajectory()
+        # # trajectory_msg.header.stamp = self.get_clock().now().to_msg()
+        # trajectory_msg.header.frame_id= 'base_link'
+        # trajectory_msg.joint_names = [
+        #     'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
+        #     'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
+        #     'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
+        # ]
+        # point = JointTrajectoryPoint()
+        # point.positions = list(p)
+        # point.velocities = list(v)
+        # point.time_from_start = rclpy.duration.Duration(seconds=self.timer_period).to_msg()
+        # trajectory_msg.points.append(point)
+        # self.joint_trajectory_controller.publish(trajectory_msg)
 
 
 

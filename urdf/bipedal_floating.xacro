@@ -311,6 +311,7 @@
   <parent link="base_link"/>
   <child link="l_hip_yaw_1"/>
   <axis xyz="1.0 0.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.523599" lower="-0.523599" effort="100" velocity="100"/>
 </joint>
 
@@ -319,6 +320,7 @@
   <parent link="l_hip_yaw_1"/>
   <child link="l_hip_pitch_1"/>
   <axis xyz="0.0 0.0 1.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.523599" lower="-0.523599" effort="100" velocity="100"/>
 </joint>
 
@@ -327,6 +329,7 @@
   <parent link="l_hip_pitch_1"/>
   <child link="l_thigh_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
 </joint>
 
@@ -335,6 +338,7 @@
   <parent link="l_thigh_1"/>
   <child link="l_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="1.919862" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
@@ -343,6 +347,7 @@
   <parent link="l_shank_1"/>
   <child link="l_ankle_1"/>
   <axis xyz="0.0 1.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 
@@ -351,6 +356,7 @@
   <parent link="l_ankle_1"/>
   <child link="l_foot_1"/>
   <axis xyz="1.0 0.0 -0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 
@@ -359,6 +365,7 @@
   <parent link="base_link"/>
   <child link="r_hip_yaw_1"/>
   <axis xyz="1.0 0.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.523599" lower="-0.523599" effort="100" velocity="100"/>
 </joint>
 
@@ -367,6 +374,7 @@
   <parent link="r_hip_yaw_1"/>
   <child link="r_hip_pitch_1"/>
   <axis xyz="0.0 0.0 1.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.523599" lower="-0.523599" effort="100" velocity="100"/>
 </joint>
 
@@ -375,6 +383,7 @@
   <parent link="r_hip_pitch_1"/>
   <child link="r_thigh_1"/>
   <axis xyz="0.0 1.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
 </joint>
 
@@ -383,6 +392,7 @@
   <parent link="r_thigh_1"/>
   <child link="r_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="1.919862" lower="0.0" effort="100" velocity="100"/>
 </joint>
 
@@ -391,6 +401,7 @@
   <parent link="r_shank_1"/>
   <child link="r_ankle_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 
@@ -399,6 +410,7 @@
   <parent link="r_ankle_1"/>
   <child link="r_foot_1"/>
   <axis xyz="1.0 0.0 -0.0"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 
@@ -542,6 +554,7 @@
     <robot_sim_type>gazebo_ros2_control/GazeboSystem</robot_sim_type>
     <parameters>$(find bipedal_floating_description)/config/trajectory_controller.yaml</parameters>
     <!-- <parameters>$(find bipedal_floating_description)/config/velocity_controller.yaml</parameters> -->
+    <parameters>$(find bipedal_floating_description)/config/effort_controller.yaml</parameters>
   </plugin>
   <plugin name="gazebo_link_attacher" filename="libgazebo_link_attacher.so"/>
 </gazebo>

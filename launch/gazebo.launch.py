@@ -102,11 +102,6 @@ def generate_launch_description():
         output='screen'
     )
 
-    bip_effort_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','bip_effort_controller'],
-        output='screen'
-    )
-
     joint_trajectory_controller = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','joint_trajectory_controller'],
         output='screen'
@@ -120,6 +115,11 @@ def generate_launch_description():
         ],
         output='screen'
     )
+
+    effort_controllers = ExecuteProcess(
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','effort_controllers'],
+        output='screen'
+        )
 
 
 
@@ -139,24 +139,32 @@ def generate_launch_description():
                 on_exit=[joint_state_broadcaster]
             )
         ),
+
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=joint_state_broadcaster,
+                on_exit=[effort_controllers]
+            )
+        ),
+
         # RegisterEventHandler(
         #     OnProcessExit(
         #         target_action=joint_state_broadcaster,
         #         on_exit=[velocity_controller]
         #     )
         # ),
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=joint_state_broadcaster,
-                on_exit=[joint_trajectory_controller]
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=joint_state_broadcaster,
-                on_exit=[init_pose]
-            )
-        ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=joint_state_broadcaster,
+        #         on_exit=[joint_trajectory_controller]
+        #     )
+        # ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=joint_state_broadcaster,
+        #         on_exit=[init_pose]
+        #     )
+        # ),
 
 
     ])
