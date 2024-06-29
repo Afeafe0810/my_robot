@@ -177,10 +177,6 @@ class UpperLevelController(Node):
         self.jv_sub_pp = copy.deepcopy(self.jv_sub_p)
         self.jv_sub_p = copy.deepcopy(jv_sub)
 
-
-        jv_data = np.array([[joint_velocity[1,0]],[self.jv[1,0]]])
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_data))
-
         return self.jv
 
     def joint_states_callback(self, msg):
@@ -418,15 +414,15 @@ class UpperLevelController(Node):
         P_Y_ref = 0.0
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
-        P_Pitch_ref = 0.0
+        P_Pitch_ref = 0.3
         P_Yaw_ref = 0.0
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
-        L_X_ref = 0.02
+        L_X_ref = 0.05*math.sin(self.tt)
         L_Y_ref = 0.1
-        L_Z_ref = 0.01
+        L_Z_ref = 0.025
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
         L_Yaw_ref = 0.0
@@ -434,9 +430,9 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        R_X_ref = 0.02
+        R_X_ref = 0.05*math.cos(self.tt)
         R_Y_ref = -0.1
-        R_Z_ref = 0.01
+        R_Z_ref = 0.025
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
@@ -530,18 +526,18 @@ class UpperLevelController(Node):
 
         torque = np.zeros((12,1))
 
-        torque[0,0] = (vl_cmd[0,0]-jv[0,0])
+        torque[0,0] = 1.6*(vl_cmd[0,0]-jv[0,0])
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
         torque[2,0] = (vl_cmd[2,0]-jv[2,0])
         torque[3,0] = (vl_cmd[3,0]-jv[3,0])
-        torque[4,0] = 3.5*(vl_cmd[4,0]-jv[4,0])
+        torque[4,0] = (vl_cmd[4,0]-jv[4,0])
         torque[5,0] = (vl_cmd[5,0]-jv[5,0])
 
-        torque[6,0] = (vr_cmd[0,0]-jv[6,0])
+        torque[6,0] = 1.6*(vr_cmd[0,0]-jv[6,0])
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
         torque[8,0] = (vr_cmd[2,0]-jv[8,0])
         torque[9,0] = (vr_cmd[3,0]-jv[9,0])
-        torque[10,0] = 3.5*(vr_cmd[4,0]-jv[10,0])
+        torque[10,0] = (vr_cmd[4,0]-jv[10,0])
         torque[11,0] = (vr_cmd[5,0]-jv[11,0])
 
         # torque[6,0] = 25*(p[6,0]-jp[6,0])
@@ -553,13 +549,16 @@ class UpperLevelController(Node):
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
     def main_controller_callback(self):
+
         joint_position,joint_velocity = self.collect_joint_data()
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
+        jv_f = self.joint_velocity_filter(joint_velocity_cal)
+
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
-        self.velocity_publisher.publish(Float64MultiArray(data=joint_velocity_cal))#檢查收到的速度(超髒)
+
+        jv_collect = np.array([[joint_velocity[5,0]],[joint_velocity_cal[5,0]],[jv_f[5,0]]])
+        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
         
-        
-        # self.joint_velocity_filter(joint_velocity)
         self.rotation_matrix(joint_position)
         self.relative_axis()
 
@@ -575,7 +574,7 @@ class UpperLevelController(Node):
         if self.state == 0:   
             self.balance(joint_position)
         elif self.state == 1:
-            self.swing_leg(joint_position,joint_velocity,VL,VR)
+            self.swing_leg(joint_position,jv_f,VL,VR)
 
         # v = np.vstack((VL,VR))
 
