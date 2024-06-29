@@ -38,11 +38,9 @@ class UpperLevelController(Node):
     def __init__(self):
         super().__init__('upper_level_controllers')
 
+        self.position_publisher = self.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
         self.velocity_publisher = self.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
         self.effort_publisher = self.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10)
-        #init variables as self
-        self.jp_sub = np.zeros(12)
-        self.jv_sub = np.zeros(12)
 
         # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
         # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
@@ -55,6 +53,22 @@ class UpperLevelController(Node):
             self.joint_states_callback,
             10)
         self.joint_states_subscriber  # prevent unused variable warning
+
+        #joint_state(subscribe data)
+        self.jp_sub = np.zeros(12)
+        self.jv_sub = np.zeros(12)
+
+        #joint_velocity_cal
+        self.joint_position_past = np.zeros((12,1))
+
+        #joint_velocity_filter (jv = after filter)
+        self.jv = np.zeros((12,1))
+        self.jv_p = np.zeros((12,1))
+        self.jv_pp = np.zeros((12,1))
+        self.jv_sub_p = np.zeros((12,1))
+        self.jv_sub_pp = np.zeros((12,1))
+
+
 
         self.state_subscriber = self.create_subscription(
             Float64MultiArray,
@@ -141,7 +155,33 @@ class UpperLevelController(Node):
 
         joint_position = np.reshape(joint_position,(12,1))
         joint_velocity = np.reshape(joint_velocity,(12,1))
+
         return joint_position,joint_velocity
+
+    def joint_velocity_cal(self,joint_position):
+        joint_position_now = copy.deepcopy(joint_position)
+        joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
+        self.joint_position_past = joint_position_now
+
+        joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
+        return joint_velocity_cal
+
+    def joint_velocity_filter(self,joint_velocity):
+        
+        jv_sub = copy.deepcopy(joint_velocity)
+
+        self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp
+
+        self.jv_pp = copy.deepcopy(self.jv_p)
+        self.jv_p = copy.deepcopy(self.jv)
+        self.jv_sub_pp = copy.deepcopy(self.jv_sub_p)
+        self.jv_sub_p = copy.deepcopy(jv_sub)
+
+
+        jv_data = np.array([[joint_velocity[1,0]],[self.jv[1,0]]])
+        self.velocity_publisher.publish(Float64MultiArray(data=jv_data))
+
+        return self.jv
 
     def joint_states_callback(self, msg):
         
@@ -514,6 +554,12 @@ class UpperLevelController(Node):
 
     def main_controller_callback(self):
         joint_position,joint_velocity = self.collect_joint_data()
+        joint_velocity_cal = self.joint_velocity_cal(joint_position)
+        self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
+        self.velocity_publisher.publish(Float64MultiArray(data=joint_velocity_cal))#檢查收到的速度(超髒)
+        
+        
+        # self.joint_velocity_filter(joint_velocity)
         self.rotation_matrix(joint_position)
         self.relative_axis()
 
