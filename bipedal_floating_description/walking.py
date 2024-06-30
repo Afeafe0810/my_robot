@@ -465,8 +465,8 @@ class UpperLevelController(Node):
         L = LX - PX
         R = RX - PX 
 
-        Le_dot = 30*(L_ref - L)
-        Re_dot = 30*(R_ref - R)
+        Le_dot = 10*(L_ref - L)
+        Re_dot = 10*(R_ref - R)
 
         Lroll_error_dot = Le_dot[3,0]
         Lpitch_error_dot = Le_dot[4,0]
@@ -573,16 +573,16 @@ class UpperLevelController(Node):
         torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
         torque[2,0] = (vl_cmd[2,0]-jv[2,0])
-        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0])
-        torque[4,0] = 1.5*(vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0])
+        torque[3,0] = (vl_cmd[3,0]-jv[3,0])
+        torque[4,0] = (vl_cmd[4,0]-jv[4,0])
+        torque[5,0] = (vl_cmd[5,0]-jv[5,0])
 
         torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
         torque[8,0] = (vr_cmd[2,0]-jv[8,0])
-        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0])
-        torque[10,0] = 1.5*(vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0])
+        torque[9,0] = (vr_cmd[3,0]-jv[9,0])
+        torque[10,0] = (vr_cmd[4,0]-jv[10,0])
+        torque[11,0] = 0.5*(vr_cmd[5,0]-jv[11,0])
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
