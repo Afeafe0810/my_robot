@@ -314,6 +314,7 @@ class UpperLevelController(Node):
         sin = math.sin
 
         pelvis_p = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        pelvis_p[0,0] = pelvis_p[0,0] - 0.007
         l_foot_p = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
         r_foot_p = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
 
@@ -413,11 +414,11 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        P_X_ref = 0.02*math.cos(self.tt)
-        P_Y_ref = 0
+        P_X_ref = 0.005*math.cos(self.tt) 
+        P_Y_ref = 0.005*math.cos(self.tt) 
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
-        P_Pitch_ref = 0.5
+        P_Pitch_ref = 0.35
         P_Yaw_ref = 0.0
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
@@ -425,9 +426,9 @@ class UpperLevelController(Node):
         #left_foot
         L_X_ref = 0.05*math.sin(self.tt)
         L_Y_ref = 0.1
-        L_Z_ref = 0.025+0.005*math.sin(self.tt)
+        L_Z_ref = 0.02-0.003*math.sin(self.tt)
         L_Roll_ref = 0.0
-        L_Pitch_ref = 0.0
+        L_Pitch_ref = 0.15
         L_Yaw_ref = 0.0
         
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
@@ -435,9 +436,9 @@ class UpperLevelController(Node):
         #right_foot
         R_X_ref = 0.05*math.cos(self.tt)
         R_Y_ref = -0.1
-        R_Z_ref = 0.025+0.005*math.cos(self.tt)
+        R_Z_ref = 0.02-0.003*math.cos(self.tt)
         R_Roll_ref = 0.0
-        R_Pitch_ref = 0.0
+        R_Pitch_ref = 0.15
         R_Yaw_ref = 0.0
 
         self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
@@ -539,18 +540,18 @@ class UpperLevelController(Node):
         torque = np.zeros((12,1))
 
         torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
-        torque[1,0] = (vl_cmd[1,0]-jv[1,0])
-        torque[2,0] = 1.2*(vl_cmd[2,0]-jv[2,0])
+        torque[1,0] = 1.2*(vl_cmd[1,0]-jv[1,0])
+        torque[2,0] = 1.4*(vl_cmd[2,0]-jv[2,0])
         torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0])
-        torque[4,0] = (vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = 1.5*(vl_cmd[5,0]-jv[5,0])
+        torque[4,0] = 1.3*(vl_cmd[4,0]-jv[4,0])
+        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0])
 
         torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
-        torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = 1.2*(vr_cmd[2,0]-jv[8,0])
+        torque[7,0] = 1.2*(vr_cmd[1,0]-jv[7,0])
+        torque[8,0] = 1.4*(vr_cmd[2,0]-jv[8,0])
         torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0])
-        torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = 1.5*(vr_cmd[5,0]-jv[11,0])
+        torque[10,0] = 1.3*(vr_cmd[4,0]-jv[10,0])
+        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0])
 
         # torque[6,0] = 25*(p[6,0]-jp[6,0])
         # torque[7,0] = 20*(p[7,0]-jp[7,0])
