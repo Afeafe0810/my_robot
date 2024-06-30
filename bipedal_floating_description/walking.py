@@ -19,8 +19,6 @@ from pink.tasks import FrameTask, JointCouplingTask, PostureTask
 import meshcat_shapes
 import qpsolvers
 
-
-
 import numpy as np
 np.set_printoptions(precision=2)
 
@@ -31,7 +29,7 @@ import copy
 import math
 from scipy.spatial.transform import Rotation as R
 
-
+import pandas as pd
 
 class UpperLevelController(Node):
 
@@ -105,6 +103,11 @@ class UpperLevelController(Node):
         self.state = 0
         self.tt = 0
 
+        #path_data_norman(減過後的軌跡)
+
+        self.L_ref_data = pd.read_csv('/home/ldsc/Path_norman/LX.csv', header=None).values
+        self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
+        self.count = 0
         
     def load_URDF(self, urdf_path):
         robot = pin.RobotWrapper.BuildFromURDF(
@@ -410,11 +413,11 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        P_X_ref = 0.0
-        P_Y_ref = 0.0
+        P_X_ref = 0.02*math.cos(self.tt)
+        P_Y_ref = 0
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
-        P_Pitch_ref = 0.3
+        P_Pitch_ref = 0.5
         P_Yaw_ref = 0.0
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
@@ -422,7 +425,7 @@ class UpperLevelController(Node):
         #left_foot
         L_X_ref = 0.05*math.sin(self.tt)
         L_Y_ref = 0.1
-        L_Z_ref = 0.025
+        L_Z_ref = 0.025+0.005*math.sin(self.tt)
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
         L_Yaw_ref = 0.0
@@ -432,7 +435,7 @@ class UpperLevelController(Node):
         #right_foot
         R_X_ref = 0.05*math.cos(self.tt)
         R_Y_ref = -0.1
-        R_Z_ref = 0.025
+        R_Z_ref = 0.025+0.005*math.cos(self.tt)
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
@@ -447,8 +450,17 @@ class UpperLevelController(Node):
         LX = copy.deepcopy(self.LX)
         RX = copy.deepcopy(self.RX)
 
-        L_ref = LX_ref - PX_ref 
-        R_ref = RX_ref - PX_ref
+        # print(self.L_ref_data[:,0])
+        
+        if self.state==2 and self.count < 1800:
+            #foot_trajectory(by norman)
+            L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
+            R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
+        else:
+            #foot_trajectory(by myself)
+            L_ref = LX_ref - PX_ref 
+            R_ref = RX_ref - PX_ref
+
         L = LX - PX
         R = RX - PX 
 
@@ -513,6 +525,7 @@ class UpperLevelController(Node):
     def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd):
         print("swing_mode")
         self.tt += 0.0314
+        self.count += 1 
         jp = copy.deepcopy(joint_position)
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
@@ -523,22 +536,21 @@ class UpperLevelController(Node):
 
         p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
 
-
         torque = np.zeros((12,1))
 
-        torque[0,0] = 1.6*(vl_cmd[0,0]-jv[0,0])
+        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
-        torque[2,0] = (vl_cmd[2,0]-jv[2,0])
-        torque[3,0] = (vl_cmd[3,0]-jv[3,0])
+        torque[2,0] = 1.2*(vl_cmd[2,0]-jv[2,0])
+        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0])
         torque[4,0] = (vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = (vl_cmd[5,0]-jv[5,0])
+        torque[5,0] = 1.5*(vl_cmd[5,0]-jv[5,0])
 
-        torque[6,0] = 1.6*(vr_cmd[0,0]-jv[6,0])
+        torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = (vr_cmd[2,0]-jv[8,0])
-        torque[9,0] = (vr_cmd[3,0]-jv[9,0])
+        torque[8,0] = 1.2*(vr_cmd[2,0]-jv[8,0])
+        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0])
         torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = (vr_cmd[5,0]-jv[11,0])
+        torque[11,0] = 1.5*(vr_cmd[5,0]-jv[11,0])
 
         # torque[6,0] = 25*(p[6,0]-jp[6,0])
         # torque[7,0] = 20*(p[7,0]-jp[7,0])
@@ -546,6 +558,31 @@ class UpperLevelController(Node):
         # torque[9,0] = 70*(p[9,0]-jp[9,0])
         # torque[10,0] = 60*(p[10,0]-jp[10,0])
         # torque[11,0] = 40*(p[11,0]-jp[11,0])
+        self.effort_publisher.publish(Float64MultiArray(data=torque))
+
+    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd):
+        print("walking")
+        self.count += 1 
+        jv = copy.deepcopy(joint_velocity)
+        vl_cmd = copy.deepcopy(l_leg_vcmd)
+        vr_cmd = copy.deepcopy(r_leg_vcmd)
+        
+        torque = np.zeros((12,1))
+
+        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
+        torque[1,0] = (vl_cmd[1,0]-jv[1,0])
+        torque[2,0] = (vl_cmd[2,0]-jv[2,0])
+        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0])
+        torque[4,0] = 1.5*(vl_cmd[4,0]-jv[4,0])
+        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0])
+
+        torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
+        torque[7,0] = (vr_cmd[1,0]-jv[7,0])
+        torque[8,0] = (vr_cmd[2,0]-jv[8,0])
+        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0])
+        torque[10,0] = 1.5*(vr_cmd[4,0]-jv[10,0])
+        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0])
+
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
     def main_controller_callback(self):
@@ -571,10 +608,13 @@ class UpperLevelController(Node):
         self.ref_cmd()
         Le_2,Re_2 = self.calculate_err()
         VL,VR = self.velocity_cmd(Le_2,Re_2)
+
         if self.state == 0:   
             self.balance(joint_position)
         elif self.state == 1:
             self.swing_leg(joint_position,jv_f,VL,VR)
+        elif self.state == 2:
+            self.walking(joint_position,jv_f,VL,VR)
 
         # v = np.vstack((VL,VR))
 
