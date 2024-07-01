@@ -110,6 +110,7 @@ class UpperLevelController(Node):
         self.L_ref_data = pd.read_csv('/home/ldsc/Path_norman/LX.csv', header=None).values
         self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
         self.count = 0
+        self.stance = 2
         
     def load_URDF(self, urdf_path):
         robot = pin.RobotWrapper.BuildFromURDF(
@@ -138,6 +139,15 @@ class UpperLevelController(Node):
         print('model name: ' + self.stance_r_model.name)
         # Create data required by the algorithms
         self.stance_r_data = self.stance_r_model.createData()
+
+        #雙足模型_以右腳建起
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_r_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        self.bipedal_r_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + self.bipedal_r_model.name)
+        # Create data required by the algorithms
+        self.bipedal_r_data = self.bipedal_r_model.createData()
 
         return robot
         
@@ -451,7 +461,7 @@ class UpperLevelController(Node):
         # L_Y_ref = 0.1
         L_X_ref = 0.007
         L_Y_ref = 0.1
-        L_Z_ref = 0.02
+        L_Z_ref = 0.025
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.15
         L_Yaw_ref = 0.0
@@ -513,6 +523,14 @@ class UpperLevelController(Node):
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
+        #切換重力補償模型
+        if abs(L[1,0]) <0.05:
+            self.stance = 1
+        elif abs(R[1,0]) <0.05:
+            self.stance = 0
+        else:
+            self.stance = 2
+        print("stance:",self.stance)
         return Le_2,Re_2
     
     def velocity_cmd(self,Le_2,Re_2):
@@ -529,24 +547,42 @@ class UpperLevelController(Node):
         return Lw_d,Rw_d
     
     def gravity_compemsate(self,joint_position):
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1))
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))
+        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
+        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
 
-        jp_l = np.flip(-jp_l,axis=0)
-        jv_l = np.zeros((6,1))
-        c_l = np.zeros((6,1))
-        l_leg_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_l,jv_l,(c_l)),(6,1))  
-        l_leg_gravity = np.flip(l_leg_gravity,axis=0)
+        #雙支撐
+        if self.stance == 2:
+            jp_l = np.flip(-jp_l,axis=0)
+            jv_l = np.zeros((6,1))
+            c_l = np.zeros((6,1))
+            l_leg_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_l,jv_l,(c_l)),(6,1))  
+            l_leg_gravity = np.flip(l_leg_gravity,axis=0)
+
+            jp_r = np.flip(-jp_r,axis=0)
+            jv_r = np.zeros((6,1))
+            c_r = np.zeros((6,1))
+            r_leg_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_r,jv_r,(c_r)),(6,1))  
+            r_leg_gravity = np.flip(r_leg_gravity,axis=0)
+        
+        #右腳為支撐腳(右腳關節翻轉加負號)
+        elif self.stance == 0: 
+            jp_r = np.flip(-jp_r,axis=0)
+            jp = np.vstack((jp_r,jp_l))
+            jv = np.zeros((12,1))
+            cin = np.zeros((12,1))
+            leg_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp,jv,(cin)),(12,1))  
+    
+            l_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
+            r_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1))
+            r_leg_gravity = np.flip(r_leg_gravity,axis=0)
+
+        else:
+            l_leg_gravity = np.zeros((6,1))
+            r_leg_gravity = np.zeros((6,1))
+        
         self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
-
-        jp_r = np.flip(-jp_r,axis=0)
-        jv_r = np.zeros((6,1))
-        c_r = np.zeros((6,1))
-        r_leg_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_r,jv_r,(c_r)),(6,1))  
-        r_leg_gravity = np.flip(r_leg_gravity,axis=0)
         self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
-
-
+        
         return l_leg_gravity,r_leg_gravity
     
     def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
@@ -575,7 +611,6 @@ class UpperLevelController(Node):
     def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate):
         print("swing_mode")
         self.tt += 0.0314
-        self.count += 1 
         jp = copy.deepcopy(joint_position)
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
@@ -621,19 +656,19 @@ class UpperLevelController(Node):
 
         torque = np.zeros((12,1))
 
-        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
+        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
         torque[2,0] = (vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
         torque[4,0] = (vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[5,0] = (vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
         torque[8,0] = 1.2*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = (vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[11,0] = (vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
