@@ -140,6 +140,15 @@ class UpperLevelController(Node):
         # Create data required by the algorithms
         self.stance_r_data = self.stance_r_model.createData()
 
+        #雙足模型_以左腳建起
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_l_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        self.bipedal_l_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + self.bipedal_l_model.name)
+        # Create data required by the algorithms
+        self.bipedal_l_data = self.bipedal_l_model.createData()
+
         #雙足模型_以右腳建起
         pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
         urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_r_gravity.xacro' if len(argv)<2 else argv[1]
@@ -550,8 +559,13 @@ class UpperLevelController(Node):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
 
+        kl = 0.3
+        kr = 0.3
+
         #雙支撐
         if self.stance == 2:
+            kl = 1
+            kr = 1
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -566,6 +580,7 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif self.stance == 0: 
+            kr = 0.8
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -573,8 +588,21 @@ class UpperLevelController(Node):
             leg_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp,jv,(cin)),(12,1))  
     
             l_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
-            r_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1))
+            r_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1)) #加負號(相對關係)
             r_leg_gravity = np.flip(r_leg_gravity,axis=0)
+
+        #左腳為支撐腳(左腳關節翻轉加負號)
+        elif self.stance == 1:
+            kl = 0.8
+            jp_l = np.flip(-jp_l,axis=0)
+            jp = np.vstack((jp_l,jp_r))
+            jv = np.zeros((12,1))
+            cin = np.zeros((12,1))
+            leg_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp,jv,(cin)),(12,1))  
+    
+            l_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1)) #加負號(相對關係)
+            l_leg_gravity = np.flip(l_leg_gravity,axis=0)
+            r_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
 
         else:
             l_leg_gravity = np.zeros((6,1))
@@ -583,7 +611,7 @@ class UpperLevelController(Node):
         self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
         self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
         
-        return l_leg_gravity,r_leg_gravity
+        return l_leg_gravity,r_leg_gravity,kl,kr
     
     def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
         #balance the robot to initial state by p_control
@@ -645,7 +673,7 @@ class UpperLevelController(Node):
         jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
         self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
 
-    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate):
+    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
         print("walking")
         self.count += 1 
         jv = copy.deepcopy(joint_velocity)
@@ -656,19 +684,19 @@ class UpperLevelController(Node):
 
         torque = np.zeros((12,1))
 
-        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[0,0] = 1.1*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
         torque[2,0] = (vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = (vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = (vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
-        torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
+        torque[6,0] = 1.1*(vr_cmd[0,0]-jv[6,0])+ r_leg_gravity[0,0]
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = 1.2*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = (vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = (vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[8,0] = (vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0])
+        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
@@ -691,7 +719,7 @@ class UpperLevelController(Node):
         self.get_posture()
         self.viz.display(configuration.q)
 
-        l_leg_gravity,r_leg_gravity = self.gravity_compemsate(joint_position)
+        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
@@ -704,7 +732,7 @@ class UpperLevelController(Node):
         elif self.state == 1:
             self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity)
         elif self.state == 2:
-            self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity)
+            self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
         # v = np.vstack((VL,VR))
 
