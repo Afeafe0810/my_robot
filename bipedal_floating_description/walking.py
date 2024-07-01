@@ -39,7 +39,9 @@ class UpperLevelController(Node):
         self.position_publisher = self.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
         self.velocity_publisher = self.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
         self.effort_publisher = self.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10)
-
+        self.vcmd_publisher = self.create_publisher(Float64MultiArray , '/velocity_command/commands', 10)
+        self.l_gravity_publisher = self.create_publisher(Float64MultiArray , '/l_gravity', 10)
+        self.r_gravity_publisher = self.create_publisher(Float64MultiArray , '/r_gravity', 10)
         # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
         # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
 
@@ -118,8 +120,27 @@ class UpperLevelController(Node):
                         )
         
         print(f"URDF description successfully loaded in {robot}")
-        return robot
 
+        #左單支撐腳
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_l.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        self.stance_l_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + self.stance_l_model.name)
+        # Create data required by the algorithms
+        self.stance_l_data = self.stance_l_model.createData()
+
+        #右單支撐腳
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_r_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        self.stance_r_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + self.stance_r_model.name)
+        # Create data required by the algorithms
+        self.stance_r_data = self.stance_r_model.createData()
+
+        return robot
+        
     def tasks_init(self):
         # Tasks initialization for IK
         left_foot_task = FrameTask(
@@ -414,8 +435,10 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        P_X_ref = 0.005*math.cos(self.tt) 
-        P_Y_ref = 0.005*math.cos(self.tt) 
+        # P_X_ref = 0.005*math.cos(self.tt) 
+        # P_Y_ref = 0.005*math.cos(self.tt) 
+        P_X_ref = 0.0
+        P_Y_ref = -0.05
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.35
@@ -424,9 +447,11 @@ class UpperLevelController(Node):
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
-        L_X_ref = 0.05*math.sin(self.tt)
+        # L_X_ref = 0.05*math.sin(self.tt)
+        # L_Y_ref = 0.1
+        L_X_ref = 0.007
         L_Y_ref = 0.1
-        L_Z_ref = 0.02-0.003*math.sin(self.tt)
+        L_Z_ref = 0.02
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.15
         L_Yaw_ref = 0.0
@@ -434,9 +459,11 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        R_X_ref = 0.05*math.cos(self.tt)
+        # R_X_ref = 0.05*math.cos(self.tt)
+        # R_Y_ref = -0.1
+        R_X_ref = 0.007
         R_Y_ref = -0.1
-        R_Z_ref = 0.02-0.003*math.cos(self.tt)
+        R_Z_ref = 0.02
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.15
         R_Yaw_ref = 0.0
@@ -465,8 +492,8 @@ class UpperLevelController(Node):
         L = LX - PX
         R = RX - PX 
 
-        Le_dot = 10*(L_ref - L)
-        Re_dot = 10*(R_ref - R)
+        Le_dot = 20*(L_ref - L)
+        Re_dot = 20*(R_ref - R)
 
         Lroll_error_dot = Le_dot[3,0]
         Lpitch_error_dot = Le_dot[4,0]
@@ -497,33 +524,55 @@ class UpperLevelController(Node):
 
         Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
         Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
-
-        # print(Lw_d)
+        
 
         return Lw_d,Rw_d
+    
+    def gravity_compemsate(self,joint_position):
+        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1))
+        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))
 
-    def balance(self,joint_position):
+        jp_l = np.flip(-jp_l,axis=0)
+        jv_l = np.zeros((6,1))
+        c_l = np.zeros((6,1))
+        l_leg_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_l,jv_l,(c_l)),(6,1))  
+        l_leg_gravity = np.flip(l_leg_gravity,axis=0)
+        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
+
+        jp_r = np.flip(-jp_r,axis=0)
+        jv_r = np.zeros((6,1))
+        c_r = np.zeros((6,1))
+        r_leg_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_r,jv_r,(c_r)),(6,1))  
+        r_leg_gravity = np.flip(r_leg_gravity,axis=0)
+        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
+
+
+        return l_leg_gravity,r_leg_gravity
+    
+    def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
         #balance the robot to initial state by p_control
         jp = copy.deepcopy(joint_position)
         p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
         torque = np.zeros((12,1))
-        torque[0,0] = 20*(p[0,0]-jp[0,0])
-        torque[1,0] = 20*(p[1,0]-jp[1,0])
-        torque[2,0] = 30*(p[2,0]-jp[2,0])
-        torque[3,0] = 60*(p[3,0]-jp[3,0])
-        torque[4,0] = 60*(p[4,0]-jp[4,0])
-        torque[5,0] = 40*(p[5,0]-jp[5,0])
+        torque[0,0] = 20*(p[0,0]-jp[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = 20*(p[1,0]-jp[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = 40*(p[2,0]-jp[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = 60*(p[3,0]-jp[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = 60*(p[4,0]-jp[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = 40*(p[5,0]-jp[5,0]) 
 
-        torque[6,0] = 25*(p[6,0]-jp[6,0])
-        torque[7,0] = 20*(p[7,0]-jp[7,0])
-        torque[8,0] = 30*(p[8,0]-jp[8,0])
-        torque[9,0] = 80*(p[9,0]-jp[9,0])
-        torque[10,0] = 60*(p[10,0]-jp[10,0])
-        torque[11,0] = 50*(p[11,0]-jp[11,0])
+        torque[6,0] = 25*(p[6,0]-jp[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = 20*(p[7,0]-jp[7,0]) + r_leg_gravity[1,0]
+        torque[8,0] = 40*(p[8,0]-jp[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = 60*(p[9,0]-jp[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = 60*(p[10,0]-jp[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = 50*(p[11,0]-jp[11,0]) 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd):
+    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate):
         print("swing_mode")
         self.tt += 0.0314
         self.count += 1 
@@ -531,7 +580,9 @@ class UpperLevelController(Node):
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
         vr_cmd = copy.deepcopy(r_leg_vcmd)
-        
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+
         # #L_leg_velocity
         # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
 
@@ -540,49 +591,49 @@ class UpperLevelController(Node):
         torque = np.zeros((12,1))
 
         torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
-        torque[1,0] = 1.2*(vl_cmd[1,0]-jv[1,0])
-        torque[2,0] = 1.4*(vl_cmd[2,0]-jv[2,0])
-        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0])
-        torque[4,0] = 1.3*(vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0])
+        torque[1,0] = 1.2*(vl_cmd[1,0]-jv[1,0]) 
+        torque[2,0] = 1.4*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = 1.3*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
-        torque[7,0] = 1.2*(vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = 1.4*(vr_cmd[2,0]-jv[8,0])
-        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0])
-        torque[10,0] = 1.3*(vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0])
-
-        # torque[6,0] = 25*(p[6,0]-jp[6,0])
-        # torque[7,0] = 20*(p[7,0]-jp[7,0])
-        # torque[8,0] = 20*(p[8,0]-jp[8,0])
-        # torque[9,0] = 70*(p[9,0]-jp[9,0])
-        # torque[10,0] = 60*(p[10,0]-jp[10,0])
-        # torque[11,0] = 40*(p[11,0]-jp[11,0])
+        torque[7,0] = 1.2*(vr_cmd[1,0]-jv[7,0]) 
+        torque[8,0] = 1.4*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = 1.3*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd):
+        vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
+        self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
+        jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
+        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
+
+    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate):
         print("walking")
         self.count += 1 
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
         vr_cmd = copy.deepcopy(r_leg_vcmd)
-        
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+
         torque = np.zeros((12,1))
 
         torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
-        torque[2,0] = (vl_cmd[2,0]-jv[2,0])
-        torque[3,0] = (vl_cmd[3,0]-jv[3,0])
+        torque[2,0] = (vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
         torque[4,0] = (vl_cmd[4,0]-jv[4,0])
-        torque[5,0] = (vl_cmd[5,0]-jv[5,0])
+        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = (vr_cmd[2,0]-jv[8,0])
-        torque[9,0] = (vr_cmd[3,0]-jv[9,0])
+        torque[8,0] = 1.2*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = (vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = (vr_cmd[4,0]-jv[10,0])
-        torque[11,0] = 0.5*(vr_cmd[5,0]-jv[11,0])
+        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
@@ -594,8 +645,8 @@ class UpperLevelController(Node):
 
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
 
-        jv_collect = np.array([[joint_velocity[5,0]],[joint_velocity_cal[5,0]],[jv_f[5,0]]])
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
+        # jv_collect = np.array([[joint_velocity[5,0]],[joint_velocity_cal[5,0]],[jv_f[5,0]]])
+        # self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
         
         self.rotation_matrix(joint_position)
         self.relative_axis()
@@ -604,6 +655,9 @@ class UpperLevelController(Node):
         self.get_position(configuration)
         self.get_posture()
         self.viz.display(configuration.q)
+
+        l_leg_gravity,r_leg_gravity = self.gravity_compemsate(joint_position)
+
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
         self.ref_cmd()
@@ -611,11 +665,11 @@ class UpperLevelController(Node):
         VL,VR = self.velocity_cmd(Le_2,Re_2)
 
         if self.state == 0:   
-            self.balance(joint_position)
+            self.balance(joint_position,l_leg_gravity,r_leg_gravity)
         elif self.state == 1:
-            self.swing_leg(joint_position,jv_f,VL,VR)
+            self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity)
         elif self.state == 2:
-            self.walking(joint_position,jv_f,VL,VR)
+            self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity)
 
         # v = np.vstack((VL,VR))
 
