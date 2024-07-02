@@ -454,37 +454,33 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        # P_X_ref = 0.005*math.cos(self.tt) 
-        # P_Y_ref = 0.005*math.cos(self.tt) 
+        #放到右腳上
+        P_Y_ref = -0.1
+        
         P_X_ref = 0.0
-        P_Y_ref = -0.05
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
-        P_Pitch_ref = 0.35
+        P_Pitch_ref = 0.0
         P_Yaw_ref = 0.0
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
-        # L_X_ref = 0.05*math.sin(self.tt)
-        # L_Y_ref = 0.1
         L_X_ref = 0.007
-        L_Y_ref = 0.1
-        L_Z_ref = 0.025
+        L_Y_ref = 0.03
+        L_Z_ref = 0.05
         L_Roll_ref = 0.0
-        L_Pitch_ref = 0.15
+        L_Pitch_ref = 0.0
         L_Yaw_ref = 0.0
         
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        # R_X_ref = 0.05*math.cos(self.tt)
-        # R_Y_ref = -0.1
         R_X_ref = 0.007
         R_Y_ref = -0.1
         R_Z_ref = 0.02
         R_Roll_ref = 0.0
-        R_Pitch_ref = 0.15
+        R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
 
         self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
@@ -580,7 +576,7 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif self.stance == 0: 
-            kr = 0.8
+            kr = 1.5
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -593,7 +589,7 @@ class UpperLevelController(Node):
 
         #左腳為支撐腳(左腳關節翻轉加負號)
         elif self.stance == 1:
-            kl = 0.8
+            kl = 1.2
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
@@ -636,7 +632,7 @@ class UpperLevelController(Node):
         torque[11,0] = 50*(p[11,0]-jp[11,0]) 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate):
+    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
         print("swing_mode")
         self.tt += 0.0314
         jp = copy.deepcopy(joint_position)
@@ -653,19 +649,19 @@ class UpperLevelController(Node):
 
         torque = np.zeros((12,1))
 
-        torque[0,0] = 1.5*(vl_cmd[0,0]-jv[0,0])
-        torque[1,0] = 1.2*(vl_cmd[1,0]-jv[1,0]) 
-        torque[2,0] = 1.4*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = 1.2*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = 1.3*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = 1.2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[0,0] = kl*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
-        torque[6,0] = 1.5*(vr_cmd[0,0]-jv[6,0])
-        torque[7,0] = 1.2*(vr_cmd[1,0]-jv[7,0]) 
-        torque[8,0] = 1.4*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = 1.2*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = 1.3*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = 1.2*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0]) + r_leg_gravity[1,0]
+        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
         vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
@@ -707,7 +703,6 @@ class UpperLevelController(Node):
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
-
         # jv_collect = np.array([[joint_velocity[5,0]],[joint_velocity_cal[5,0]],[jv_f[5,0]]])
         # self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
         
@@ -730,7 +725,7 @@ class UpperLevelController(Node):
         if self.state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
         elif self.state == 1:
-            self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity)
+            self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
         elif self.state == 2:
             self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
