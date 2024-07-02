@@ -454,9 +454,11 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        #放到右腳上
-        P_Y_ref = -0.1
-        
+        # #放到右腳上
+        # P_Y_ref = -0.1
+        #放到左腳上
+        P_Y_ref = 0.1
+
         P_X_ref = 0.0
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
@@ -466,9 +468,15 @@ class UpperLevelController(Node):
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
+        # #右腳測試時
+        # L_X_ref = 0.007
+        # L_Y_ref = 0.03
+        # L_Z_ref = 0.05
+        #左腳測試時
         L_X_ref = 0.007
-        L_Y_ref = 0.03
-        L_Z_ref = 0.05
+        L_Y_ref = 0.1
+        L_Z_ref = 0.02
+
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
         L_Yaw_ref = 0.0
@@ -476,9 +484,15 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
+        # # 右腳測試時
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.1
+        # R_Z_ref = 0.02
+        #左腳測試時
         R_X_ref = 0.007
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02
+        R_Y_ref = -0.03
+        R_Z_ref = 0.05
+
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
@@ -589,7 +603,7 @@ class UpperLevelController(Node):
 
         #左腳為支撐腳(左腳關節翻轉加負號)
         elif self.stance == 1:
-            kl = 1.2
+            kl = 2
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
