@@ -31,6 +31,7 @@ setup(
             'controller = bipedal_floating_description.controller:main',
             'ref = bipedal_floating_description.ref:main',
             'walking = bipedal_floating_description.walking:main',
+            '2 = bipedal_floating_description.2:main',
         ],
     },
 )
