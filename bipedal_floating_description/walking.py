@@ -488,14 +488,20 @@ class UpperLevelController(Node):
         #pelvis
         # #放到右腳上
         # P_Y_ref = -0.1
-        #放到左腳上
-        if self.tt >= 5:
-            P_X_ref = 0.0
-            P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
-        else:  
-            P_X_ref = 0.0
-            P_Y_ref = 0.1
-        
+        # #放到左腳上
+        # if self.tt >= 5:
+        #     P_X_ref = 0.0
+        #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
+        # else:  
+        #     P_X_ref = 0.0
+        #     P_Y_ref = 0.1
+        #搖擺測試
+        if self.tt >=5:
+            P_Y_ref = 0.07*math.sin(self.tt)
+        else:
+            P_Y_ref = 0.0
+
+        P_X_ref = 0.0
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
@@ -508,7 +514,11 @@ class UpperLevelController(Node):
         # L_X_ref = 0.007
         # L_Y_ref = 0.03
         # L_Z_ref = 0.05
-        #左腳測試時
+        # #左腳測試時
+        # L_X_ref = 0.007
+        # L_Y_ref = 0.1
+        # L_Z_ref = 0.02
+        #搖擺測試
         L_X_ref = 0.007
         L_Y_ref = 0.1
         L_Z_ref = 0.02
@@ -524,11 +534,15 @@ class UpperLevelController(Node):
         # R_X_ref = 0.007
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
-        #左腳測試時
+        # #左腳測試時
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.03
+        # R_Z_ref = 0.05
+        #搖擺測試
         R_X_ref = 0.007
-        R_Y_ref = -0.03
-        R_Z_ref = 0.05
-
+        R_Y_ref = -0.1
+        R_Z_ref = 0.02
+        
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
         R_Yaw_ref = 0.0
@@ -579,9 +593,11 @@ class UpperLevelController(Node):
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
         #切換重力補償模型
-        if abs(L[1,0]) <0.05:
+        print("L:",abs(L[1,0]))
+        print("R:",abs(R[1,0]))
+        if abs(L[1,0]) <0.08:
             self.stance = 1
-        elif abs(R[1,0]) <0.05:
+        elif abs(R[1,0]) <0.08:
             self.stance = 0
         else:
             self.stance = 2
@@ -631,8 +647,8 @@ class UpperLevelController(Node):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
 
-        kl = 0.5
-        kr = 0.5
+        
+        
 
         #雙支撐
         if self.stance == 2:
@@ -652,7 +668,8 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif self.stance == 0: 
-            kr = 1.5
+            kl = 0.3
+            kr = 1
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -665,7 +682,8 @@ class UpperLevelController(Node):
 
         #左腳為支撐腳(左腳關節翻轉加負號)
         elif self.stance == 1:
-            kl = 2
+            kl = 1
+            kr = 0.3
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
@@ -677,6 +695,8 @@ class UpperLevelController(Node):
             r_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
 
         else:
+            kl = 1.5
+            kr = 1.5
             l_leg_gravity = np.zeros((6,1))
             r_leg_gravity = np.zeros((6,1))
         
@@ -732,10 +752,10 @@ class UpperLevelController(Node):
         torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
         torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
-        torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0]) + r_leg_gravity[1,0]
-        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[6,0] = kr*((vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0])
+        torque[7,0] = kr*((vr_cmd[1,0]-jv[7,0]) + r_leg_gravity[1,0])
+        torque[8,0] = kr*((vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0])
+        torque[9,0] = kr*((vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0])
         torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
         torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
