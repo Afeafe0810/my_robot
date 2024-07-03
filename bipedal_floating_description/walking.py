@@ -486,20 +486,21 @@ class UpperLevelController(Node):
 
     def ref_cmd(self):
         #pelvis
-        # #放到右腳上
-        # P_Y_ref = -0.1
+        #放到右腳上
+        P_Y_ref = -0.1
         # #放到左腳上
+        # P_Y_ref = 0.1
         # if self.tt >= 5:
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
         # else:  
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1
-        #搖擺測試
-        if self.tt >=5:
-            P_Y_ref = 0.07*math.sin(self.tt)
-        else:
-            P_Y_ref = 0.0
+        # #搖擺測試
+        # if self.tt >=5:
+        #     P_Y_ref = 0.07*math.sin(self.tt)
+        # else:
+        #     P_Y_ref = 0.0
 
         P_X_ref = 0.0
         P_Z_ref = 0.58
@@ -510,18 +511,18 @@ class UpperLevelController(Node):
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
         #left_foot
-        # #右腳測試時
-        # L_X_ref = 0.007
-        # L_Y_ref = 0.03
-        # L_Z_ref = 0.05
+        #右腳測試時
+        L_X_ref = 0.007
+        L_Y_ref = 0.03
+        L_Z_ref = 0.05
         # #左腳測試時
         # L_X_ref = 0.007
         # L_Y_ref = 0.1
         # L_Z_ref = 0.02
-        #搖擺測試
-        L_X_ref = 0.007
-        L_Y_ref = 0.1
-        L_Z_ref = 0.02
+        # #搖擺測試
+        # L_X_ref = 0.007
+        # L_Y_ref = 0.1
+        # L_Z_ref = 0.02
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -530,18 +531,18 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        # # 右腳測試時
-        # R_X_ref = 0.007
-        # R_Y_ref = -0.1
-        # R_Z_ref = 0.02
+        # 右腳測試時
+        R_X_ref = 0.007
+        R_Y_ref = -0.1
+        R_Z_ref = 0.02
         # #左腳測試時
         # R_X_ref = 0.007
         # R_Y_ref = -0.03
         # R_Z_ref = 0.05
-        #搖擺測試
-        R_X_ref = 0.007
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02
+        # #搖擺測試
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.1
+        # R_Z_ref = 0.02
         
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
@@ -822,11 +823,14 @@ class UpperLevelController(Node):
             l_foot_in_wf = np.array([[0.007],[0.1],[0]])
             com_in_lf = com_in_wf - l_foot_in_wf
             com_in_rf = np.zeros((3,1))
-        
+
+        # print("cl:",com_in_lf)
+        # print("cr:",com_in_rf)
+
         return com_in_lf,com_in_rf 
 
-    def alip_test(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,stance_type,com_in_lf,com_in_rf):
-        print("alip_mode")
+    def alip_L(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,stance_type,com_in_lf,com_in_rf):
+        print("ALIP_L")
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
         vr_cmd = copy.deepcopy(r_leg_vcmd)
@@ -944,6 +948,127 @@ class UpperLevelController(Node):
         print("mea_data:",self.model_state_y)
         print("obs_data:",self.ob_ylx)
 
+    def alip_R(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,stance_type,com_in_lf,com_in_rf):
+        print("ALIP_R")
+        jv = copy.deepcopy(joint_velocity)
+        vl_cmd = copy.deepcopy(l_leg_vcmd)
+        vr_cmd = copy.deepcopy(r_leg_vcmd)
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+
+        #支撐狀態
+        stance = copy.deepcopy(stance_type) 
+        #計算關節扭矩
+        torque = np.zeros((12,1))
+        torque[0,0] = kl*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+
+        torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0]) + r_leg_gravity[1,0]
+        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = 0
+        torque[11,0] = 0
+
+        #獲取量測值
+        CP_l = copy.deepcopy(com_in_lf)
+        CP_r = copy.deepcopy(com_in_rf)
+        # print("CP_l:",CP_l)
+        # print("CP_r:",CP_r)
+        
+        #右腳
+        #右腳ALIP模型測試
+        if self.stance == 0:
+            self.ALIP_time += 0.01
+            #計算質心速度
+            self.C_X_dot = (CP_r[0,0] - self.C_X_past)/0.01
+            self.C_X_past = CP_r[0,0]
+            self.C_Y_dot = (CP_r[1,0] - self.C_Y_past)/0.01
+            self.C_Y_past = CP_r[1,0]
+            #量測值
+            Xc_mea = CP_r[0,0]
+            Ly_mea = 9*self.C_X_dot*0.45
+            Yc_mea = CP_r[1,0]
+            Lx_mea = -9*self.C_Y_dot*0.45 #(記得加負號)
+            self.model_state_x = np.array([[Xc_mea],[Ly_mea]])
+            self.model_state_y = np.array([[Yc_mea],[Lx_mea]])
+            #參考值
+            if self.ALIP_time >= 5:
+                Xc_ref = 0.02*math.sin(self.ALIP_tt) 
+                Xc_ref_dot = 0.0314*math.cos(self.ALIP_tt)
+                Ly_ref = 9*Xc_ref_dot*0.45
+                Yc_ref = -0.02*math.sin(self.ALIP_tt)
+                Yc_ref_dot = -0.0314*math.cos(self.ALIP_tt)
+                Lx_ref = 9*-Yc_ref_dot*0.45
+                # Yc_ref = 0
+                # Lx_ref = 0
+                self.ALIP_tt += 0.0157 #2pi/(4/0.01)
+            else:
+                Xc_ref = 0
+                Ly_ref = 0
+                Yc_ref = 0
+                Lx_ref = 0
+            self.ref_x = np.array([[Xc_ref],[Ly_ref]])
+            self.ref_y = np.array([[Yc_ref],[Lx_ref]])
+
+            #xc & ly model(m=9 H=0.45 Ts=0.01)
+            Ax = np.array([[1,0.00247],[0.8832,1]])
+            Bx = np.array([[0],[0.01]])
+            Cx = np.array([[1,0],[0,1]])  
+            #--LQR
+            Kx = np.array([[290.3274,15.0198]])
+            Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
+            #--compensator
+            self.ob_xly = Ax@self.ob_xly_past + self.ap_past*Bx + Lx@(self.model_state_x_past - Cx@self.ob_xly_past)
+            #----calculate toruqe
+            self.ap = -Kx@(self.ob_xly)  #(地面給機器人 所以使用時要加負號)
+            # self.ap = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
+            # self.ap = -Kx@(self.ob_xly-self.ref_x)
+            #--torque assign
+            torque[10,0] = -self.ap
+            #----update
+            self.model_state_x_past = self.model_state_x
+            self.ob_xly_past = self.ob_xly
+            self.ap_past = self.ap
+
+            #yc & lx model
+            Ay = np.array([[1,-0.00247],[-0.8832,1]])
+            By = np.array([[0],[0.01]])
+            Cy = np.array([[1,0],[0,1]])  
+            #--LQR
+            Ky = np.array([[-290.3274,15.0198]])
+            Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
+            #--compensator
+            self.ob_ylx = Ay@self.ob_ylx_past + self.ar_past*By + Ly@(self.model_state_y_past - Cy@self.ob_ylx_past)
+            #----calculate toruqe
+            self.ar = -Ky@(self.ob_ylx)
+            # self.ar = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
+            # self.ar = -Ky@(self.ob_ylx-self.ref_y)
+            #--torque assign
+            torque[11,0] = -self.ar
+            #----update
+            self.model_state_y_past = self.model_state_y
+            self.ob_ylx_past = self.ob_ylx
+            self.ar_past = self.ar
+
+            self.effort_publisher.publish(Float64MultiArray(data=torque))
+            alip_data = np.array([[self.ref_x[0,0]],[self.ref_x[1,0]],[self.ob_xly[0,0]],[self.ob_xly[1,0]],[self.ref_y[0,0]],[self.ref_y[1,0]],[self.ob_ylx[0,0]],[self.ob_ylx[1,0]]])
+            self.alip_publisher.publish(Float64MultiArray(data=alip_data))
+      
+        print("ap_kin:",torque[10,0])
+        print("ap_ALIP:",self.ap)
+        print("mea_data:",self.model_state_x)
+        print("obs_data:",self.ob_xly)
+            
+        # print("ar_kin:",torque[11,0])
+        # print("ar_ALIP:",self.ar)
+        # print("mea_data:",self.model_state_y)
+        # print("obs_data:",self.ob_ylx)
+
     def main_controller_callback(self):
 
         joint_position,joint_velocity = self.collect_joint_data()
@@ -978,15 +1103,20 @@ class UpperLevelController(Node):
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
 
         elif self.state == 1:
-            self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
         elif self.state == 2:
             self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
+        elif self.state == 3:
+            if stance == 0 or stance == 1 :
+                com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+                self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
+
         elif self.state == 4:
             if stance == 0 or stance == 1 :
                 com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-                self.alip_test(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
+                self.alip_L(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
             
         # v = np.vstack((VL,VR))
 
