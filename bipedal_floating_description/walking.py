@@ -620,9 +620,9 @@ class UpperLevelController(Node):
 
             Lw_d = np.vstack((lw_41_d,lw_21_d))
             Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
-        
-        Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
-        Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
+        else:
+            Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
+            Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
         
 
         return Lw_d,Rw_d
