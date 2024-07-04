@@ -552,7 +552,7 @@
 <gazebo>
   <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
     <robot_sim_type>gazebo_ros2_control/GazeboSystem</robot_sim_type>
-    <parameters>$(find bipedal_floating_description)/config/trajectory_controller.yaml</parameters>
+    <!-- <parameters>$(find bipedal_floating_description)/config/trajectory_controller.yaml</parameters> -->
     <!-- <parameters>$(find bipedal_floating_description)/config/velocity_controller.yaml</parameters> -->
     <parameters>$(find bipedal_floating_description)/config/effort_controller.yaml</parameters>
   </plugin>
