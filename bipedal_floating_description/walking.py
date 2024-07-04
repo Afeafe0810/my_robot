@@ -42,7 +42,8 @@ class UpperLevelController(Node):
         self.vcmd_publisher = self.create_publisher(Float64MultiArray , '/velocity_command/commands', 10)
         self.l_gravity_publisher = self.create_publisher(Float64MultiArray , '/l_gravity', 10)
         self.r_gravity_publisher = self.create_publisher(Float64MultiArray , '/r_gravity', 10)
-        self.alip_publisher = self.create_publisher(Float64MultiArray , '/alip_data', 10)
+        self.alip_L_publisher = self.create_publisher(Float64MultiArray , '/alip_l_data', 10)
+        self.alip_R_publisher = self.create_publisher(Float64MultiArray , '/alip_r_data', 10)
         self.PXL_publisher = self.create_publisher(Float64MultiArray , '/pxl_data', 10)
         self.PXR_publisher = self.create_publisher(Float64MultiArray , '/pxr_data', 10)
         self.torque_L_publisher = self.create_publisher(Float64MultiArray , '/torqueL_data', 10)
@@ -119,27 +120,46 @@ class UpperLevelController(Node):
 
         #ALIP
         #--velocity
-        self.C_X_past = 0.0
-        self.C_X_dot = 0.0
-        self.C_Y_past = 0.0
-        self.C_Y_dot = 0.0
+        self.CX_past_L = 0.0
+        self.CX_dot_L = 0.0
+        self.CY_past_L = 0.0
+        self.CY_dot_L = 0.0
+        self.CX_past_R = 0.0
+        self.CX_dot_R = 0.0
+        self.CY_past_R = 0.0
+        self.CY_dot_R = 0.0
         #--measurement
-        self.model_state_x = np.zeros((2,1))
-        self.model_state_x_past = np.zeros((2,1))
-        self.model_state_y = np.zeros((2,1))
-        self.model_state_y_past = np.zeros((2,1))
+        self.mea_x_L = np.zeros((2,1))
+        self.mea_x_past_L = np.zeros((2,1))
+        self.mea_y_L = np.zeros((2,1))
+        self.mea_y_past_L = np.zeros((2,1))
+        self.mea_x_R = np.zeros((2,1))
+        self.mea_x_past_R = np.zeros((2,1))
+        self.mea_y_R = np.zeros((2,1))
+        self.mea_y_past_R = np.zeros((2,1))
         #--compensator
-        self.ob_xly = np.zeros((2,1))
-        self.ob_xly_past = np.zeros((2,1))
-        self.ob_ylx = np.zeros((2,1))
-        self.ob_ylx_past = np.zeros((2,1))
+        self.ob_x_L = np.zeros((2,1))
+        self.ob_x_past_L = np.zeros((2,1))
+        self.ob_y_L = np.zeros((2,1))
+        self.ob_y_past_L = np.zeros((2,1))
+        self.ob_x_R = np.zeros((2,1))
+        self.ob_x_past_R = np.zeros((2,1))
+        self.ob_y_R = np.zeros((2,1))
+        self.ob_y_past_R = np.zeros((2,1))
         #--torque
-        self.ap = 0.0
-        self.ap_past = 0.0
-        self.ar = 0.0
-        self.ar_past = 0.0
-        self.ALIP_time = 0.0
-        self.ALIP_tt = 0.0
+        self.ap_L = 0.0
+        self.ap_past_L = 0.0
+        self.ar_L = 0.0
+        self.ar_past_L = 0.0
+        self.ap_R = 0.0
+        self.ap_past_R = 0.0
+        self.ar_R = 0.0
+        self.ar_past_R = 0.0
+        #--ref        
+        self.ref_x_L = np.zeros((2,1))
+        self.ref_y_L = np.zeros((2,1))
+        self.ref_x_R = np.zeros((2,1))
+        self.ref_y_R = np.zeros((2,1))
         
     def load_URDF(self, urdf_path):
         robot = pin.RobotWrapper.BuildFromURDF(
@@ -853,63 +873,39 @@ class UpperLevelController(Node):
 
         #支撐狀態
         stance = copy.deepcopy(stance_type) 
-        #計算關節扭矩
+        #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
         torque = copy.deepcopy(torque_kine) 
 
-        #獲取量測值
+        #獲取量測值(相對於左腳腳底)
         PX_l = copy.deepcopy(px_in_lf) #pelvis position in left foot frame
+        #計算質心速度
+        self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/0.01
+        self.CX_past_L = PX_l[0,0]
+        self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/0.01
+        self.CY_past_L = PX_l[1,0]
+        #量測值
+        Xc_mea = PX_l[0,0]
+        Ly_mea = 9*self.CX_dot_L*0.45
+        Yc_mea = PX_l[1,0]
+        Lx_mea = -9*self.CY_dot_L*0.45 #(記得加負號)
+        self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
+        self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
 
         #骨盆在大地座標下的參考軌跡以左腳frame表示
         L_foot = np.array([[0.007],[0.1]])
         PX_ref_in_L  = PX_ref - L_foot
         # print("PX_L:",PX_ref_in_L)
-
         #比對
         px_data = np.array([[PX_ref_in_L[0,0]],[PX_ref_in_L[1,0]],[PX_l[0,0]],[PX_l[1,0]]])
         self.PXL_publisher.publish(Float64MultiArray(data=px_data))
-
-        #左腳px_in_l
-        #左腳ALIP模型測試
-        self.ALIP_time += 0.01
-        #計算質心速度
-        self.C_X_dot = (PX_l[0,0] - self.C_X_past)/0.01
-        self.C_X_past = PX_l[0,0]
-        self.C_Y_dot = (PX_l[1,0] - self.C_Y_past)/0.01
-        self.C_Y_past = PX_l[1,0]
-
-        #量測值
-        Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.C_X_dot*0.45
-        Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.C_Y_dot*0.45 #(記得加負號)
-        self.model_state_x = np.array([[Xc_mea],[Ly_mea]])
-        self.model_state_y = np.array([[Yc_mea],[Lx_mea]])
-
         #參考值
-        # if self.ALIP_time >= 5:
-        #     Xc_ref = 0.02*math.sin(self.ALIP_tt) 
-        #     Xc_ref_dot = 0.0314*math.cos(self.ALIP_tt)
-        #     Ly_ref = 9*Xc_ref_dot*0.45
-        #     Yc_ref = -0.02*math.sin(self.ALIP_tt)
-        #     Yc_ref_dot = -0.0314*math.cos(self.ALIP_tt)
-        #     Lx_ref = 9*-Yc_ref_dot*0.45
-        #     # Yc_ref = 0
-        #     # Lx_ref = 0
-        #     self.ALIP_tt += 0.0157 #2pi/(4/0.01)
-        # else:
-        #     Xc_ref = 0
-        #     Ly_ref = 0
-        #     Yc_ref = 0
-        #     Lx_ref = 0
-        
         Xc_ref = PX_ref_in_L[0,0]
         Ly_ref = 0
         Yc_ref = PX_ref_in_L[1,0]
         Yc_ref_dot = 0.2199*math.cos(self.tt)
         Lx_ref = 9*-Yc_ref_dot*0.45
-
-        self.ref_x = np.array([[Xc_ref],[Ly_ref]])
-        self.ref_y = np.array([[Yc_ref],[Lx_ref]])
+        self.ref_x_L = np.array([[Xc_ref],[Ly_ref]])
+        self.ref_y_L = np.array([[Yc_ref],[Lx_ref]])
 
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         Ax = np.array([[1,0.00247],[0.8832,1]])
@@ -919,17 +915,17 @@ class UpperLevelController(Node):
         Kx = np.array([[290.3274,15.0198]])
         Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
         #--compensator
-        self.ob_xly = Ax@self.ob_xly_past + self.ap_past*Bx + Lx@(self.model_state_x_past - Cx@self.ob_xly_past)
+        self.ob_x_L = Ax@self.ob_x_past_L + self.ap_past_L*Bx + Lx@(self.mea_x_past_L - Cx@self.ob_x_past_L)
         #----calculate toruqe
-        # self.ap = -Kx@(self.ob_xly)  #(地面給機器人 所以使用時要加負號)
-        # self.ap = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap = -Kx@(self.ob_xly-self.ref_x)
+        # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
+        # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
         #--torque assign
-        torque[4,0] = -self.ap
+        torque[4,0] = -self.ap_L
         #----update
-        self.model_state_x_past = self.model_state_x
-        self.ob_xly_past = self.ob_xly
-        self.ap_past = self.ap
+        self.mea_x_past_L = self.mea_x_L
+        self.ob_x_past_L = self.ob_x_L
+        self.ap_past_L = self.ap_L
 
         #yc & lx model
         Ay = np.array([[1,-0.00247],[-0.8832,1]])
@@ -939,33 +935,25 @@ class UpperLevelController(Node):
         Ky = np.array([[-290.3274,15.0198]])
         Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
         #--compensator
-        self.ob_ylx = Ay@self.ob_ylx_past + self.ar_past*By + Ly@(self.model_state_y_past - Cy@self.ob_ylx_past)
+        self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
         #----calculate toruqe
-        # self.ar = -Ky@(self.ob_ylx)
-        # self.ar = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar = -Ky@(self.ob_ylx-self.ref_y)
+        # self.ar_L = -Ky@(self.ob_y_L)
+        # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
+        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)
         #--torque assign
-        torque[5,0] = 0.1*(-self.ar+275)
+        torque[5,0] = -self.ar_L*0.5
         #----update
-        self.model_state_y_past = self.model_state_y
-        self.ob_ylx_past = self.ob_ylx
-        self.ar_past = self.ar
+        self.mea_y_past_L = self.mea_y_L
+        self.ob_y_past_L = self.ob_y_L
+        self.ar_past_L = self.ar_L
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         tl_data= np.array([[torque[4,0]],[torque[5,0]]])
         self.torque_L_publisher.publish(Float64MultiArray(data=tl_data))
-        # alip_data = np.array([[self.ref_x[0,0]],[self.ref_x[1,0]],[self.ob_xly[0,0]],[self.ob_xly[1,0]],[self.ref_y[0,0]],[self.ref_y[1,0]],[self.ob_ylx[0,0]],[self.ob_ylx[1,0]]])
-        # self.alip_publisher.publish(Float64MultiArray(data=alip_data))
-        # print("ap_kin:",torque[4,0])
-        # print("ap_ALIP:",self.ap)
-        # print("mea_data:",self.model_state_x)
-        # print("obs_data:",self.ob_xly)
 
-        # print("ar_kin:",torque[5,0])
-        # print("ar_ALIP:",self.ar)
-        # print("mea_data:",self.model_state_y)
-        # print("obs_data:",self.ob_ylx)
-        # fake_torque = np.zeros((12,1))
+        # alip_data = np.array([[self.ref_x[0,0]],[self.ref_x[1,0]],[self.ob_xly[0,0]],[self.ob_xly[1,0]],[self.ref_y[0,0]],[self.ref_y[1,0]],[self.ob_ylx[0,0]],[self.ob_ylx[1,0]]])
+        alip_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+        self.alip_L_publisher.publish(Float64MultiArray(data=alip_data))
         
         return torque
 
@@ -980,60 +968,37 @@ class UpperLevelController(Node):
 
         #支撐狀態
         stance = copy.deepcopy(stance_type) 
-        #計算關節扭矩
+        #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
         torque = copy.deepcopy(torque_kine) 
 
-        #獲取量測值
+        #獲取量測值(相對於右腳腳底)
         PX_r = copy.deepcopy(px_in_rf) #pelvis position in right foot frame
-
+        #計算質心速度
+        self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/0.01
+        self.CX_past_R = PX_r[0,0]
+        self.CY_dot_R = (PX_r[1,0] - self.CY_past_R)/0.01
+        self.CY_past_R = PX_r[1,0]
+        #量測值
+        Xc_mea = PX_r[0,0]
+        Ly_mea = 9*self.CX_dot_R*0.45
+        Yc_mea = PX_r[1,0]
+        Lx_mea = -9*self.CY_dot_R*0.45 #(記得加負號)
+        self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
+        self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
         #骨盆在大地座標下的軌跡以右腳frame表示
         R_foot = np.array([[0.007],[-0.1]])
         PX_ref_in_R  = PX_ref - R_foot
         print("PX_R:",PX_ref_in_R)
-        # self.PXR_publisher.publish(Float64MultiArray(data=PX_ref_in_R))
-        
-        #右腳
-        #右腳ALIP模型測試
+        #比對
         self.PXR_publisher.publish(Float64MultiArray(data=PX_ref_in_R))
-        self.ALIP_time += 0.01
-        
-        #計算質心速度
-        self.C_X_dot = (PX_r[0,0] - self.C_X_past)/0.01
-        self.C_X_past = PX_r[0,0]
-        self.C_Y_dot = (PX_r[1,0] - self.C_Y_past)/0.01
-        self.C_Y_past = PX_r[1,0]
-        
-        #量測值
-        Xc_mea = PX_r[0,0]
-        Ly_mea = 9*self.C_X_dot*0.45
-        Yc_mea = PX_r[1,0]
-        Lx_mea = -9*self.C_Y_dot*0.45 #(記得加負號)
-        self.model_state_x = np.array([[Xc_mea],[Ly_mea]])
-        self.model_state_y = np.array([[Yc_mea],[Lx_mea]])
-        
         #參考值
-        # if self.ALIP_time >= 5:
-        #     Xc_ref = 0.02*math.sin(self.ALIP_tt) 
-        #     Xc_ref_dot = 0.0314*math.cos(self.ALIP_tt)
-        #     Ly_ref = 9*Xc_ref_dot*0.45
-        #     Yc_ref = -0.02*math.sin(self.ALIP_tt)
-        #     Yc_ref_dot = -0.0314*math.cos(self.ALIP_tt)
-        #     Lx_ref = 9*-Yc_ref_dot*0.45
-        #     # Yc_ref = 0
-        #     # Lx_ref = 0
-        #     self.ALIP_tt += 0.0157 #2pi/(4/0.01)
-        # else:
-        #     Xc_ref = 0
-        #     Ly_ref = 0
-        #     Yc_ref = 0
-        #     Lx_ref = 0
         Xc_ref = PX_ref_in_R[0,0]
         Ly_ref = 0
         Yc_ref = PX_ref_in_R[1,0]
         Yc_ref_dot = 0.2199*math.cos(self.tt)
         Lx_ref = 9*-Yc_ref_dot*0.45
-        self.ref_x = np.array([[Xc_ref],[Ly_ref]])
-        self.ref_y = np.array([[Yc_ref],[Lx_ref]])
+        self.ref_x_R = np.array([[Xc_ref],[Ly_ref]])
+        self.ref_y_R = np.array([[Yc_ref],[Lx_ref]])
 
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         Ax = np.array([[1,0.00247],[0.8832,1]])
@@ -1043,17 +1008,17 @@ class UpperLevelController(Node):
         Kx = np.array([[290.3274,15.0198]])
         Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
         #--compensator
-        self.ob_xly = Ax@self.ob_xly_past + self.ap_past*Bx + Lx@(self.model_state_x_past - Cx@self.ob_xly_past)
+        self.ob_x_R = Ax@self.ob_x_past_R + self.ap_past_R*Bx + Lx@(self.mea_x_past_R - Cx@self.ob_x_past_R)
         #----calculate toruqe
-        # self.ap = -Kx@(self.ob_xly)  #(地面給機器人 所以使用時要加負號)
-        # self.ap = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap = -Kx@(self.ob_xly-self.ref_x)
+        # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
+        # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
         #--torque assign
-        torque[10,0] = -self.ap
+        torque[10,0] = -self.ap_R
         #----update
-        self.model_state_x_past = self.model_state_x
-        self.ob_xly_past = self.ob_xly
-        self.ap_past = self.ap
+        self.mea_x_past_R = self.mea_x_R
+        self.ob_x_past_R = self.ob_x_R
+        self.ap_past_R = self.ap_R
 
         #yc & lx model
         Ay = np.array([[1,-0.00247],[-0.8832,1]])
@@ -1063,35 +1028,24 @@ class UpperLevelController(Node):
         Ky = np.array([[-290.3274,15.0198]])
         Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
         #--compensator
-        self.ob_ylx = Ay@self.ob_ylx_past + self.ar_past*By + Ly@(self.model_state_y_past - Cy@self.ob_ylx_past)
+        self.ob_y_R = Ay@self.ob_y_past_R + self.ar_past_R*By + Ly@(self.mea_y_past_R - Cy@self.ob_y_past_R)
         #----calculate toruqe
-        # self.ar = -Ky@(self.ob_ylx)
-        # self.ar = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
-        self.ar = -Ky@(self.ob_ylx-self.ref_y)
+        # self.ar_R = -Ky@(self.ob_y_R)
+        # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
+        self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)
         #--torque assign
-        torque[11,0] = 0.1*(-self.ar-275)
+        torque[11,0] = -self.ar_R*0.5
         #----update
-        self.model_state_y_past = self.model_state_y
-        self.ob_ylx_past = self.ob_ylx
-        self.ar_past = self.ar
+        self.mea_y_past_R = self.mea_y_R
+        self.ob_y_past_R = self.ob_y_R
+        self.ar_past_R = self.ar_R
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         tr_data= np.array([[torque[10,0]],[torque[11,0]]])
         self.torque_R_publisher.publish(Float64MultiArray(data=tr_data))
-        alip_data = np.array([[self.ref_x[0,0]],[self.ref_x[1,0]],[self.ob_xly[0,0]],[self.ob_xly[1,0]],[self.ref_y[0,0]],[self.ref_y[1,0]],[self.ob_ylx[0,0]],[self.ob_ylx[1,0]]])
-        self.alip_publisher.publish(Float64MultiArray(data=alip_data))
-      
-        # print("ap_kin:",torque[10,0])
-        # print("ap_ALIP:",self.ap)
-        # print("mea_data:",self.model_state_x)
-        # print("obs_data:",self.ob_xly)
-            
-        # print("ar_kin:",torque[11,0])
-        # print("ar_ALIP:",self.ar)
-        # print("mea_data:",self.model_state_y)
-        # print("obs_data:",self.ob_ylx)
-        # fake_torque = np.zeros((12,1))
-
+        alip_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]],[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+        self.alip_R_publisher.publish(Float64MultiArray(data=alip_data))
+    
         return torque
     
     def main_controller_callback(self):
@@ -1130,8 +1084,9 @@ class UpperLevelController(Node):
         elif self.state == 1:
             torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-            torque_R = self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance,px_in_rf,torque_kine)
             torque_L = self.alip_L(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance,px_in_lf,torque_kine)
+            torque_R = self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance,px_in_rf,torque_kine)
+
 
 
             if stance == 0:
