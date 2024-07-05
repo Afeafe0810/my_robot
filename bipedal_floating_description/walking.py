@@ -625,9 +625,9 @@ class UpperLevelController(Node):
         #切換重力補償模型
         print("L:",abs(L[1,0]))
         print("R:",abs(R[1,0]))
-        if abs(L[1,0]) <0.088:
+        if abs(L[1,0]) <0.05:
             self.stance = 1
-        elif abs(R[1,0]) <0.088:
+        elif abs(R[1,0]) <0.05:
             self.stance = 0
         else:
             self.stance = 2
@@ -677,16 +677,18 @@ class UpperLevelController(Node):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
         
-        kl = 1.5
-        kr = 1.5
+        kl = 0.5
+        kr = 0.5
 
-        if self.LX[2,0] >= 0.04:
-            kl = 0.7
-        if self.RX[2,0] >= 0.04:
-            kr = 0.7
+        # if self.LX[2,0] >= 0.04:
+        #     kl = 1
+        # if self.RX[2,0] >= 0.04:
+        #     kr = 1
 
         #雙支撐
         if self.stance == 2:
+            kl = 0.8
+            kr = 0.8
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -701,6 +703,7 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif self.stance == 0: 
+            kr = 1
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -713,6 +716,7 @@ class UpperLevelController(Node):
 
         #左腳為支撐腳(左腳關節翻轉加負號)
         elif self.stance == 1:
+            kl = 1.5
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
@@ -808,16 +812,16 @@ class UpperLevelController(Node):
 
         torque[0,0] = 1.1*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
         torque[1,0] = (vl_cmd[1,0]-jv[1,0])
-        torque[2,0] = (vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
         torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
         torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = 1.1*(vr_cmd[0,0]-jv[6,0])+ r_leg_gravity[0,0]
         torque[7,0] = (vr_cmd[1,0]-jv[7,0])
-        torque[8,0] = (vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0])
+        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0])+ r_leg_gravity[5,0]
         torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
