@@ -546,8 +546,8 @@ class UpperLevelController(Node):
         # print(self.JLL)
 
         # #排除支撐腳腳踝對末端速度的影響
-        # self.JLL44 = np.reshape(self.JLL[2:,0:4],(4,4))  
-        # self.JLL42 = np.reshape(self.JLL[2:,4:],(4,2))
+        self.JLL44 = np.reshape(self.JLL_support[2:,0:4],(4,4))  
+        self.JLL42 = np.reshape(self.JLL_support[2:,4:],(4,2))
 
         return self.JLL_support
 
@@ -586,7 +586,7 @@ class UpperLevelController(Node):
         #放到右腳上
         # P_Y_ref = -0.1
         #放到左腳上
-        # P_Y_ref = 0.1
+        P_Y_ref = 0.08
         # if self.tt >= 5:
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
@@ -594,10 +594,10 @@ class UpperLevelController(Node):
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1
         #搖擺測試
-        if self.tt >=5:
-            P_Y_ref = 0.03*math.sin(self.tt)
-        else:
-            P_Y_ref = 0.0
+        # if self.tt >=5:
+        #     P_Y_ref = 0.03
+        # else:
+        #     P_Y_ref = 0.0
 
         P_X_ref = 0.0
         P_Z_ref = 0.58
@@ -632,14 +632,14 @@ class UpperLevelController(Node):
         # R_X_ref = 0.007
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
-        # #左腳測試時
-        # R_X_ref = 0.007
-        # R_Y_ref = -0.03
-        # R_Z_ref = 0.05
-        #搖擺測試
+        #左腳測試時
         R_X_ref = 0.007
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02
+        R_Y_ref = -0.03
+        R_Z_ref = 0.05
+        # #搖擺測試
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.1
+        # R_Z_ref = 0.02
         
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
@@ -699,9 +699,9 @@ class UpperLevelController(Node):
         #切換重力補償模型
         print("L:",abs(L[1,0]))
         print("R:",abs(R[1,0]))
-        if abs(L[1,0]) <0.03:
+        if abs(L[1,0]) <0.05:
             self.stance = 1
-        elif abs(R[1,0]) <0.03:
+        elif abs(R[1,0]) <0.05:
             self.stance = 0
         else:
             self.stance = 2
@@ -756,13 +756,13 @@ class UpperLevelController(Node):
         # if self.RX[2,0] >= 0.04:
         #     kr = 1
 
-        kr = 0.8
+        kr = 0.0
         kl = 0.8
 
         #雙支撐
         if self.stance == 2:
             kl = 1
-            kr = 1
+            kr = 0
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -871,6 +871,10 @@ class UpperLevelController(Node):
         self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
         jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
         self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
+
+        if self.state == 3:
+            torque[4,0] = 0
+            torque[5,0] = 0
 
         return torque
 
@@ -1161,7 +1165,7 @@ class UpperLevelController(Node):
         if self.state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
 
-        elif self.state == 1:
+        elif self.state == 1 or self.state == 3:
             torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
