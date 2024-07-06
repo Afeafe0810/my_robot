@@ -32,6 +32,7 @@ setup(
             'ref = bipedal_floating_description.ref:main',
             'walking = bipedal_floating_description.walking:main',
             '2 = bipedal_floating_description.2:main',
+            'walking_modify = bipedal_floating_description.walking_modify:main',
         ],
     },
 )

@@ -74,6 +74,10 @@ class UpperLevelController(Node):
         self.jv_sub_p = np.zeros((12,1))
         self.jv_sub_pp = np.zeros((12,1))
 
+        #jacobian
+        self.JLL_support = np.zeros((6,6))
+        self.JRR_support = np.zeros((6,6))
+
 
 
         self.state_subscriber = self.create_subscription(
@@ -430,6 +434,10 @@ class UpperLevelController(Node):
         self.LX = np.array([[l_foot_p[0,0]],[l_foot_p[1,0]],[l_foot_p[2,0]],[L_Roll],[L_Pitch],[L_Yaw]])
         self.RX = np.array([[r_foot_p[0,0]],[r_foot_p[1,0]],[r_foot_p[2,0]],[R_Roll],[R_Pitch],[R_Yaw]])
 
+        self.P_Body_transfer = np.array([[cos(P_Pitch)*cos(P_Yaw), -sin(P_Yaw),0],
+                                [cos(P_Pitch)*sin(P_Yaw), cos(P_Yaw), 0],
+                                [-sin(P_Pitch), 0, 1]]) 
+
         self.L_Body_transfer = np.array([[cos(L_Pitch)*cos(L_Yaw), -sin(L_Yaw),0],
                                 [cos(L_Pitch)*sin(L_Yaw), cos(L_Yaw), 0],
                                 [-sin(L_Pitch), 0, 1]])  
@@ -513,6 +521,66 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
+    def left_leg_support_jacobian(self):
+        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
+        l_hip_yaw = np.reshape(copy.deepcopy(self.l_hip_yaw.translation),(3,1))
+        l_hip_pitch = np.reshape(copy.deepcopy(self.l_hip_pitch.translation),(3,1))
+        l_knee_pitch = np.reshape(copy.deepcopy(self.l_knee_pitch.translation),(3,1))
+        l_ankle_pitch = np.reshape(copy.deepcopy(self.l_ankle_pitch.translation),(3,1))
+        l_ankle_roll = np.reshape(copy.deepcopy(self.l_ankle_roll.translation),(3,1))
+        l_foot = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
+
+        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
+        # l_foot = copy.deepcopy(l_foot)
+        JL1 = np.cross(-self.AL1,(pelvis-l_hip_roll),axis=0)
+        JL2 = np.cross(-self.AL2,(pelvis-l_hip_yaw),axis=0)
+        JL3 = np.cross(-self.AL3,(pelvis-l_hip_pitch),axis=0)
+        JL4 = np.cross(-self.AL4,(pelvis-l_knee_pitch),axis=0)
+        JL5 = np.cross(-self.AL5,(pelvis-l_ankle_pitch),axis=0)
+        JL6 = np.cross(-self.AL6,(pelvis-l_ankle_roll),axis=0)
+
+        JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
+        JLL_lower = np.hstack((-self.AL1,-self.AL2,-self.AL3,-self.AL4,-self.AL5,-self.AL6))    
+        self.JLL_support = np.vstack((JLL_upper,JLL_lower))  
+        # print(self.JLL)
+
+        # #排除支撐腳腳踝對末端速度的影響
+        # self.JLL44 = np.reshape(self.JLL[2:,0:4],(4,4))  
+        # self.JLL42 = np.reshape(self.JLL[2:,4:],(4,2))
+
+        return self.JLL_support
+
+    def right_leg_support_jacobian(self):
+        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
+        r_hip_roll = np.reshape(copy.deepcopy(self.r_hip_roll.translation),(3,1))
+        r_hip_yaw = np.reshape(copy.deepcopy(self.r_hip_yaw.translation),(3,1))
+        r_hip_pitch = np.reshape(copy.deepcopy(self.r_hip_pitch.translation),(3,1))
+        r_knee_pitch = np.reshape(copy.deepcopy(self.r_knee_pitch.translation),(3,1))
+        r_ankle_pitch = np.reshape(copy.deepcopy(self.r_ankle_pitch.translation),(3,1))
+        r_ankle_roll = np.reshape(copy.deepcopy(self.r_ankle_roll.translation),(3,1))
+        r_foot = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
+        # print("1:",l_hip_roll,l_hip_yaw,l_hip_pitch)
+        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
+        # l_foot = copy.deepcopy(l_foot)
+        JR1 = np.cross(-self.AR1,(pelvis-r_hip_roll),axis=0)
+        JR2 = np.cross(-self.AR2,(pelvis-r_hip_yaw),axis=0)
+        JR3 = np.cross(-self.AR3,(pelvis-r_hip_pitch),axis=0)
+        JR4 = np.cross(-self.AR4,(pelvis-r_knee_pitch),axis=0)
+        JR5 = np.cross(-self.AR5,(pelvis-r_ankle_pitch),axis=0)
+        JR6 = np.cross(-self.AR6,(pelvis-r_ankle_roll),axis=0)
+
+        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
+        JRR_lower = np.hstack((-self.AR1,-self.AR2,-self.AR3,-self.AR4,-self.AR5,-self.AR6))    
+        self.JRR_support = np.vstack((JRR_upper,JRR_lower))  
+        # print(self.JRR)
+
+        # #排除支撐腳腳踝對末端速度的影響
+        # self.JRR44 = np.reshape(self.JRR[2:,0:4],(4,4))  
+        # self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
+       
+        return self.JRR_support
+
     def ref_cmd(self):
         #pelvis
         #放到右腳上
@@ -527,7 +595,7 @@ class UpperLevelController(Node):
         #     P_Y_ref = 0.1
         #搖擺測試
         if self.tt >=5:
-            P_Y_ref = 0.05*math.sin(self.tt)
+            P_Y_ref = 0.03*math.sin(self.tt)
         else:
             P_Y_ref = 0.0
 
@@ -595,11 +663,11 @@ class UpperLevelController(Node):
             R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
         else:
             #foot_trajectory(by myself)
-            L_ref = LX_ref - PX_ref 
-            R_ref = RX_ref - PX_ref
+            L_ref = PX_ref - LX_ref
+            R_ref = PX_ref - RX_ref 
 
-        L = LX - PX
-        R = RX - PX 
+        L = PX - LX
+        R = PX - RX
 
         Le_dot = 20*(L_ref - L)
         Re_dot = 20*(R_ref - R)
@@ -607,9 +675,12 @@ class UpperLevelController(Node):
         Lroll_error_dot = Le_dot[3,0]
         Lpitch_error_dot = Le_dot[4,0]
         Lyaw_error_dot = Le_dot[5,0]
-        WL_x = self.L_Body_transfer[0,0]*Lroll_error_dot + self.L_Body_transfer[0,1]*Lpitch_error_dot
-        WL_y = self.L_Body_transfer[1,0]*Lroll_error_dot + self.L_Body_transfer[1,1]*Lpitch_error_dot
-        WL_z = self.L_Body_transfer[2,0]*Lroll_error_dot + self.L_Body_transfer[2,2]*Lyaw_error_dot
+        # WL_x = self.L_Body_transfer[0,0]*Lroll_error_dot + self.L_Body_transfer[0,1]*Lpitch_error_dot
+        # WL_y = self.L_Body_transfer[1,0]*Lroll_error_dot + self.L_Body_transfer[1,1]*Lpitch_error_dot
+        # WL_z = self.L_Body_transfer[2,0]*Lroll_error_dot + self.L_Body_transfer[2,2]*Lyaw_error_dot
+        WL_x = self.P_Body_transfer[0,0]*Lroll_error_dot + self.P_Body_transfer[0,1]*Lpitch_error_dot
+        WL_y = self.P_Body_transfer[1,0]*Lroll_error_dot + self.P_Body_transfer[1,1]*Lpitch_error_dot
+        WL_z = self.P_Body_transfer[2,0]*Lroll_error_dot + self.P_Body_transfer[2,2]*Lyaw_error_dot
 
         Le_2 = np.array([[Le_dot[0,0]],[Le_dot[1,0]],[Le_dot[2,0]],[WL_x],[WL_y],[WL_z]])
 
@@ -619,6 +690,9 @@ class UpperLevelController(Node):
         WR_x = self.R_Body_transfer[0,0]*Rroll_error_dot + self.R_Body_transfer[0,1]*Rpitch_error_dot
         WR_y = self.R_Body_transfer[1,0]*Rroll_error_dot + self.R_Body_transfer[1,1]*Rpitch_error_dot
         WR_z = self.R_Body_transfer[2,0]*Rroll_error_dot + self.R_Body_transfer[2,2]*Ryaw_error_dot
+        # WR_x = self.P_Body_transfer[0,0]*Rroll_error_dot + self.P_Body_transfer[0,1]*Rpitch_error_dot
+        # WR_y = self.P_Body_transfer[1,0]*Rroll_error_dot + self.P_Body_transfer[1,1]*Rpitch_error_dot
+        # WR_z = self.P_Body_transfer[2,0]*Rroll_error_dot + self.P_Body_transfer[2,2]*Ryaw_error_dot
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
@@ -667,8 +741,8 @@ class UpperLevelController(Node):
             Lw_d = np.vstack((lw_41_d,lw_21_d))
             Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
         else:
-            Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
-            Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
+            Lw_d = np.dot(np.linalg.pinv(self.JLL_support),L2) 
+            Rw_d = np.dot(np.linalg.pinv(self.JRR_support),R2) 
         
 
         return Lw_d,Rw_d
@@ -687,8 +761,8 @@ class UpperLevelController(Node):
 
         #雙支撐
         if self.stance == 2:
-            kl = 0.7
-            kr = 0.7
+            kl = 1
+            kr = 1
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -1075,6 +1149,8 @@ class UpperLevelController(Node):
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
+        JLL_support = self.left_leg_support_jacobian()
+        JRR_support = self.right_leg_support_jacobian()
 
         self.ref_cmd()
 
