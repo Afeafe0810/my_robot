@@ -48,6 +48,7 @@ class UpperLevelController(Node):
         self.PXR_publisher = self.create_publisher(Float64MultiArray , '/pxr_data', 10)
         self.torque_L_publisher = self.create_publisher(Float64MultiArray , '/torqueL_data', 10)
         self.torque_R_publisher = self.create_publisher(Float64MultiArray , '/torqueR_data', 10)
+        self.record_publisher = self.create_publisher(Float64MultiArray , '/record', 10)
         # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
         # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
 
@@ -517,20 +518,21 @@ class UpperLevelController(Node):
         #pelvis
         #放到右腳上
         # P_Y_ref = -0.1
-        #放到左腳上
-        # P_Y_ref = 0.1
+        # 放到左腳上
+        P_Y_ref = 0.1
         # if self.tt >= 5:
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
         # else:  
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1
-        #搖擺測試
-        if self.tt >=5:
-            P_Y_ref = 0.05*math.sin(self.tt)
-        else:
-            P_Y_ref = 0.0
-
+        # #搖擺測試
+        # if self.tt >=5:
+        #     P_Y_ref = 0.03*math.sin(self.tt)
+        #     P_X_ref = 0.03*math.cos(self.tt)
+        # else:
+        #     P_Y_ref = 0.0
+        #     P_X_ref = 0.0
         P_X_ref = 0.0
         P_Z_ref = 0.58
         P_Roll_ref = 0.0
@@ -544,14 +546,14 @@ class UpperLevelController(Node):
         # L_X_ref = 0.007
         # L_Y_ref = 0.03
         # L_Z_ref = 0.05
-        # #左腳測試時
-        # L_X_ref = 0.007
-        # L_Y_ref = 0.1
-        # L_Z_ref = 0.02
-        #搖擺測試
+        #左腳測試時
         L_X_ref = 0.007
         L_Y_ref = 0.1
         L_Z_ref = 0.02
+        # #搖擺測試
+        # L_X_ref = 0.007
+        # L_Y_ref = 0.1
+        # L_Z_ref = 0.02
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -564,14 +566,14 @@ class UpperLevelController(Node):
         # R_X_ref = 0.007
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
-        # #左腳測試時
-        # R_X_ref = 0.007
-        # R_Y_ref = -0.03
-        # R_Z_ref = 0.05
-        #搖擺測試
+        #左腳測試時
         R_X_ref = 0.007
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02
+        R_Y_ref = -0.03
+        R_Z_ref = 0.05
+        # #搖擺測試
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.1
+        # R_Z_ref = 0.02
         
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
@@ -625,9 +627,9 @@ class UpperLevelController(Node):
         #切換重力補償模型
         print("L:",abs(L[1,0]))
         print("R:",abs(R[1,0]))
-        if abs(L[1,0]) <0.03:
+        if abs(L[1,0]) <0.05:
             self.stance = 1
-        elif abs(R[1,0]) <0.03:
+        elif abs(R[1,0]) <0.05:
             self.stance = 0
         else:
             self.stance = 2
@@ -687,8 +689,8 @@ class UpperLevelController(Node):
 
         #雙支撐
         if self.stance == 2:
-            kl = 0.7
-            kr = 0.7
+            kl = 1.2
+            kr = 1.2
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -703,7 +705,7 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif self.stance == 0: 
-            kr = 1
+            kr = 1.2
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -716,7 +718,7 @@ class UpperLevelController(Node):
 
         #左腳為支撐腳(左腳關節翻轉加負號)
         elif self.stance == 1:
-            kl = 1
+            kl = 0.8
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
@@ -875,8 +877,8 @@ class UpperLevelController(Node):
 
         #獲取量測值(相對於左腳腳底)
         # print("骨盆位置：",px_in_lf[1,0])
-        PX_l = copy.deepcopy(px_in_lf)
-        # PX_l = copy.deepcopy(com_in_lf)
+        # PX_l = copy.deepcopy(px_in_lf)
+        PX_l = copy.deepcopy(com_in_lf)
         
         #計算質心速度
         self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/0.01
@@ -923,9 +925,9 @@ class UpperLevelController(Node):
         #--compensator
         self.ob_x_L = Ax@self.ob_x_past_L + self.ap_past_L*Bx + Lx@(self.mea_x_past_L - Cx@self.ob_x_past_L)
         #----calculate toruqe
-        # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
+        self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
+        # self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
         #--torque assign
         torque[4,0] = -self.ap_L
         # torque[4,0] = 0
@@ -944,11 +946,11 @@ class UpperLevelController(Node):
         #--compensator
         self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
         #----calculate toruqe
-        # self.ar_L = -Ky@(self.ob_y_L)
+        self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)
+        # self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)
         #--torque assign
-        torque[5,0] = -self.ar_L*0.2
+        torque[5,0] = -self.ar_L
         # torque[5,0] = 0
         #----update
         self.mea_y_past_L = self.mea_y_L
@@ -1109,13 +1111,12 @@ class UpperLevelController(Node):
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        # elif self.state == 4:
-        #     if stance == 0 or stance == 1 :
-        #         torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-        #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-        #         torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-        #         self.effort_publisher.publish(Float64MultiArray(data=torque_L))
-        # v = np.vstack((VL,VR))
+        elif self.state == 4:
+            if stance == 0 or stance == 1 :
+                torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+                com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+                torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
+                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
 
 
