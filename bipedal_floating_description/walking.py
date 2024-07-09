@@ -75,6 +75,11 @@ class UpperLevelController(Node):
         self.jv_sub_p = np.zeros((12,1))
         self.jv_sub_pp = np.zeros((12,1))
 
+        #position PI
+        self.Le_dot_past = 0.0
+        self.Le_past = 0.0
+        self.Re_dot_past = 0.0
+        self.Re_past = 0.0
 
 
         self.state_subscriber = self.create_subscription(
@@ -447,6 +452,18 @@ class UpperLevelController(Node):
 
         return px_in_lf,px_in_rf
 
+    def stance_mode(self,px_in_lf,px_in_rf):
+        # print(px_in_lf)
+        # print(px_in_rf)
+        if abs(px_in_lf[1,0])<=0.05:
+            stance = 1 #左單支撐
+        elif abs(px_in_rf[1,0])<=0.05:
+            stance = 0 #右單支撐
+        else:
+            stance = 2 #雙支撐
+        
+        return stance
+
     def left_leg_jacobian(self):
         pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
         l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
@@ -602,9 +619,21 @@ class UpperLevelController(Node):
 
         L = LX - PX
         R = RX - PX 
+        Le = L_ref - L
+        Re = R_ref - R
+        # #--P
+        # Le_dot = 20*Le
+        # Re_dot = 20*Re
 
-        Le_dot = 20*(L_ref - L)
-        Re_dot = 20*(R_ref - R)
+        #--PI
+        Le_dot = self.Le_dot_past + 20*Le - 19.99*self.Le_past 
+        self.Le_dot_past = Le_dot
+        self.Le_past = Le
+
+        Re_dot = self.Re_dot_past + 20*Re - 19.99*self.Re_past 
+        self.Re_dot_past = Re_dot
+        self.Re_past = Re
+
 
         Lroll_error_dot = Le_dot[3,0]
         Lpitch_error_dot = Le_dot[4,0]
@@ -624,17 +653,17 @@ class UpperLevelController(Node):
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
-        #切換重力補償模型
-        print("L:",abs(L[1,0]))
-        print("R:",abs(R[1,0]))
-        if abs(L[1,0]) <0.05:
-            self.stance = 1
-        elif abs(R[1,0]) <0.05:
-            self.stance = 0
-        else:
-            self.stance = 2
-        # print("stance:",self.stance)
-        return Le_2,Re_2,self.stance
+        # #切換重力補償模型
+        # print("L:",abs(L[1,0]))
+        # print("R:",abs(R[1,0]))
+        # if abs(L[1,0]) <0.05:
+        #     self.stance = 1
+        # elif abs(R[1,0]) <0.05:
+        #     self.stance = 0
+        # else:
+        #     self.stance = 2
+        # # print("stance:",self.stance)
+        return Le_2,Re_2
     
     def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type):
 
@@ -675,9 +704,10 @@ class UpperLevelController(Node):
 
         return Lw_d,Rw_d
     
-    def gravity_compemsate(self,joint_position):
+    def gravity_compemsate(self,joint_position,stance_type):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
+        stance = copy.deepcopy((stance_type))
         
         # if self.LX[2,0] >= 0.04:
         #     kl = 1
@@ -688,7 +718,7 @@ class UpperLevelController(Node):
         kl = 0.8
 
         #雙支撐
-        if self.stance == 2:
+        if stance == 2:
             kl = 1.2
             kr = 1.2
             jp_l = np.flip(-jp_l,axis=0)
@@ -704,7 +734,7 @@ class UpperLevelController(Node):
             r_leg_gravity = np.flip(r_leg_gravity,axis=0)
         
         #右腳為支撐腳(右腳關節翻轉加負號)
-        elif self.stance == 0: 
+        elif stance == 0: 
             kr = 1.2
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
@@ -717,8 +747,8 @@ class UpperLevelController(Node):
             r_leg_gravity = np.flip(r_leg_gravity,axis=0)
 
         #左腳為支撐腳(左腳關節翻轉加負號)
-        elif self.stance == 1:
-            kl = 0.8
+        elif stance == 1:
+            kl = 1.2
             jp_l = np.flip(-jp_l,axis=0)
             jp = np.vstack((jp_l,jp_r))
             jv = np.zeros((12,1))
@@ -774,8 +804,6 @@ class UpperLevelController(Node):
 
         # #L_leg_velocity
         # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
-
-        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
 
         torque = np.zeros((12,1))
 
@@ -1072,15 +1100,17 @@ class UpperLevelController(Node):
         self.get_position(configuration)
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
+    
+        stance = self.stance_mode(px_in_lf,px_in_rf)
 
-        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position)
+        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
 
         self.ref_cmd()
 
-        Le_2,Re_2,stance = self.calculate_err()
+        Le_2,Re_2 = self.calculate_err()
 
         VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance)
         
