@@ -30,6 +30,7 @@ import math
 from scipy.spatial.transform import Rotation as R
 
 import pandas as pd
+import csv
 
 class UpperLevelController(Node):
 
@@ -48,7 +49,11 @@ class UpperLevelController(Node):
         self.PXR_publisher = self.create_publisher(Float64MultiArray , '/pxr_data', 10)
         self.torque_L_publisher = self.create_publisher(Float64MultiArray , '/torqueL_data', 10)
         self.torque_R_publisher = self.create_publisher(Float64MultiArray , '/torqueR_data', 10)
-        self.record_publisher = self.create_publisher(Float64MultiArray , '/record', 10)
+
+        self.ref_publisher = self.create_publisher(Float64MultiArray , '/ref_data', 10)
+        self.pelvis_publisher = self.create_publisher(Float64MultiArray , '/pelvis_data', 10)
+        self.left_publisher = self.create_publisher(Float64MultiArray , '/left_data', 10)
+        self.right_publisher = self.create_publisher(Float64MultiArray , '/right_data', 10)
         # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
         # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
 
@@ -455,9 +460,9 @@ class UpperLevelController(Node):
     def stance_mode(self,px_in_lf,px_in_rf):
         # print(px_in_lf)
         # print(px_in_rf)
-        if abs(px_in_lf[1,0])<=0.05:
+        if abs(px_in_lf[1,0])<=0.08:
             stance = 1 #左單支撐
-        elif abs(px_in_rf[1,0])<=0.05:
+        elif abs(px_in_rf[1,0])<=0.06:
             stance = 0 #右單支撐
         else:
             stance = 2 #雙支撐
@@ -545,13 +550,13 @@ class UpperLevelController(Node):
         #     P_Y_ref = 0.1
         # #搖擺測試
         # if self.tt >=5:
-        #     P_Y_ref = 0.03*math.sin(self.tt)
-        #     P_X_ref = 0.03*math.cos(self.tt)
+        #     P_Y_ref = 0.015*math.sin(self.tt)
+        #     P_X_ref = 0.015*math.cos(self.tt)
         # else:
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
-        P_X_ref = 0.0
-        P_Z_ref = 0.58
+        P_X_ref = -0.05
+        P_Z_ref = 0.57
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
         P_Yaw_ref = 0.0
@@ -564,13 +569,13 @@ class UpperLevelController(Node):
         # L_Y_ref = 0.03
         # L_Z_ref = 0.05
         #左腳測試時
-        L_X_ref = 0.007
+        L_X_ref = 0.0
         L_Y_ref = 0.1
         L_Z_ref = 0.02
         # #搖擺測試
-        # L_X_ref = 0.007
+        # L_X_ref = 0.0
         # L_Y_ref = 0.1
-        # L_Z_ref = 0.02
+        # L_Z_ref = 0.0
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -584,13 +589,13 @@ class UpperLevelController(Node):
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
         #左腳測試時
-        R_X_ref = 0.007
+        R_X_ref = 0.0
         R_Y_ref = -0.03
         R_Z_ref = 0.05
-        # #搖擺測試
-        # R_X_ref = 0.007
+        #搖擺測試
+        # R_X_ref = 0.0
         # R_Y_ref = -0.1
-        # R_Z_ref = 0.02
+        # R_Z_ref = 0.0
         
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
@@ -663,7 +668,7 @@ class UpperLevelController(Node):
         # else:
         #     self.stance = 2
         # # print("stance:",self.stance)
-        return Le_2,Re_2
+        return Le_2,Re_2,L
     
     def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type):
 
@@ -686,7 +691,7 @@ class UpperLevelController(Node):
 
             Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
             Rw_d = np.vstack((rw_41_d,rw_21_d))
-        elif self.state == 4 :   #(左支撐腳腳踝動態排除測試)
+        elif self.state == 5 :   #(左支撐腳腳踝動態排除測試)
             L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
             VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
             
@@ -719,8 +724,8 @@ class UpperLevelController(Node):
 
         #雙支撐
         if stance == 2:
-            kl = 1.2
-            kr = 1.2
+            kl = 1
+            kr = 1
             jp_l = np.flip(-jp_l,axis=0)
             jv_l = np.zeros((6,1))
             c_l = np.zeros((6,1))
@@ -792,15 +797,18 @@ class UpperLevelController(Node):
         torque[11,0] = 50*(p[11,0]-jp[11,0]) 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
+    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf):
         print("swing_mode")
         self.tt += 0.0157
         jp = copy.deepcopy(joint_position)
+        print("ankle_roll_angle:",jp[5,0])
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
         vr_cmd = copy.deepcopy(r_leg_vcmd)
         l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
         r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+
+        print("com:",com_in_lf)
 
         # #L_leg_velocity
         # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
@@ -893,6 +901,44 @@ class UpperLevelController(Node):
         # print("cr:",com_in_rf)
 
         return com_in_lf,com_in_rf 
+
+    def alip_test(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,px_in_lf):
+        print("alip_test")
+        jp = copy.deepcopy(joint_position)
+        jv = copy.deepcopy(joint_velocity)
+        vl_cmd = copy.deepcopy(l_leg_vcmd)
+        vr_cmd = copy.deepcopy(r_leg_vcmd)
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+        l_foot_in_wf = np.array([[0.0],[0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
+        px_in_wf = px_in_lf + l_foot_in_wf
+
+        torque = np.zeros((12,1))
+
+        torque[0,0] = kl*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = 0
+        torque[5,0] = 20*(0.2-jp[5,0]) + l_leg_gravity[5,0]
+
+        torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
+        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+
+        collect_data = [str(px_in_wf[0,0])]
+        csv_file_name = '/home/ldsc/com_x.csv'
+        with open(csv_file_name, 'a', newline='') as csvfile:
+            # Create a CSV writer object
+            csv_writer = csv.writer(csvfile)
+            # Write the data
+            csv_writer.writerow(collect_data)
+        print(f'Data has been written to {csv_file_name}.')
+
+        return torque
 
     def alip_L(self,stance_type,px_in_lf,torque_kine,com_in_lf):
         print("ALIP_L")
@@ -1083,6 +1129,29 @@ class UpperLevelController(Node):
     
         return torque
     
+    def foot_data(self,px_in_lf,px_in_rf,L):
+        l_foot_in_wf = np.array([[0.0],[0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
+        r_foot_in_wf = np.array([[0.007],[-0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
+        px_in_wf = px_in_lf + l_foot_in_wf
+        # px_in_wf = px_in_lf + r_foot_in_wf
+        ref_data = np.array([[self.PX_ref[0,0]],[self.PX_ref[1,0]],[self.PX_ref[2,0]],[self.PX_ref[3,0]],[self.PX_ref[4,0]],[self.PX_ref[5,0]]])
+        self.ref_publisher.publish(Float64MultiArray(data=ref_data))
+        
+        pelvis_data = np.array([[px_in_wf[0,0]],[px_in_wf[1,0]],[px_in_wf[2,0]],[px_in_wf[3,0]],[px_in_wf[4,0]],[px_in_wf[5,0]]])
+        self.pelvis_publisher.publish(Float64MultiArray(data=pelvis_data))
+
+        if self.state == 9:
+            collect_data = [str(self.PX_ref[0,0]),str(self.PX_ref[1,0]),str(self.PX_ref[2,0]),str(self.PX_ref[3,0]),str(self.PX_ref[4,0]),str(self.PX_ref[5,0]),
+            str(px_in_wf[0,0]),str(px_in_wf[1,0]),str(px_in_wf[2,0]),str(px_in_wf[3,0]),str(px_in_wf[4,0]),str(px_in_wf[5,0])]
+            csv_file_name = '/home/ldsc/pelvis.csv'
+            with open(csv_file_name, 'a', newline='') as csvfile:
+                # Create a CSV writer object
+                csv_writer = csv.writer(csvfile)
+                # Write the data
+                csv_writer.writerow(collect_data)
+            print(f'Data has been written to {csv_file_name}.')
+        
+
     def main_controller_callback(self):
 
         joint_position,joint_velocity = self.collect_joint_data()
@@ -1110,16 +1179,17 @@ class UpperLevelController(Node):
 
         self.ref_cmd()
 
-        Le_2,Re_2 = self.calculate_err()
+        Le_2,Re_2,L = self.calculate_err()
 
         VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance)
         
         if self.state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
 
-        elif self.state == 1:
-            torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+        elif self.state == 1 or self.state == 9 :
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+            torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
+            self.foot_data(px_in_lf,px_in_rf,L)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
             # torque_R = self.alip_R(stance,px_in_rf,torque_kine,com_in_rf)
 
@@ -1132,21 +1202,23 @@ class UpperLevelController(Node):
             elif stance == 2:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
                 
-            
         elif self.state == 2:
             self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
+        elif self.state == 5:
+            torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_test))
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        elif self.state == 4:
-            if stance == 0 or stance == 1 :
-                torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-                com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-                torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+        # elif self.state == 4:
+        #     if stance == 0 or stance == 1 :
+        #         torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+        #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+        #         torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
+        #         self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
 
 

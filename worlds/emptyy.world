@@ -57,16 +57,16 @@
                 <kd>8388608</kd>
               </ode> -->
               <ode>
-                <min_depth>0.0005</min_depth>
+                <min_depth>0.0001</min_depth>
                 <max_vel>0.00</max_vel>
-                <kp>450000</kp>
-                <kd>3622.430124</kd>
+                <kp>45000000</kp>
+                <kd>3622430.124</kd>
               </ode>
             </contact>
             <friction>
               <ode>
-                <mu>5</mu>
-                <mu2>5</mu2>
+                <mu>10</mu>
+                <mu2>10</mu2>
               </ode>
               <torsional>
                 <ode/>
