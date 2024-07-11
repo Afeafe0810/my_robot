@@ -329,7 +329,7 @@
   <parent link="l_hip_pitch_1"/>
   <child link="l_thigh_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
-  <dynamics damping="0.25" friction="0.5"/>
+  <dynamics damping="0.25" friction="0.3"/>
   <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
 </joint>
 

@@ -555,7 +555,8 @@ class UpperLevelController(Node):
         # else:
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
-        P_X_ref = -0.05
+
+        P_X_ref = 0.0
         P_Z_ref = 0.57
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
@@ -592,7 +593,7 @@ class UpperLevelController(Node):
         R_X_ref = 0.0
         R_Y_ref = -0.03
         R_Z_ref = 0.05
-        #搖擺測試
+        # # 搖擺測試
         # R_X_ref = 0.0
         # R_Y_ref = -0.1
         # R_Z_ref = 0.0
@@ -626,18 +627,18 @@ class UpperLevelController(Node):
         R = RX - PX 
         Le = L_ref - L
         Re = R_ref - R
-        # #--P
-        # Le_dot = 20*Le
-        # Re_dot = 20*Re
+        #--P
+        Le_dot = 30*Le
+        Re_dot = 20*Re
 
-        #--PI
-        Le_dot = self.Le_dot_past + 20*Le - 19.99*self.Le_past 
-        self.Le_dot_past = Le_dot
-        self.Le_past = Le
+        # #--PI
+        # Le_dot = self.Le_dot_past + 20*Le - 19.99*self.Le_past 
+        # self.Le_dot_past = Le_dot
+        # self.Le_past = Le
 
-        Re_dot = self.Re_dot_past + 20*Re - 19.99*self.Re_past 
-        self.Re_dot_past = Re_dot
-        self.Re_past = Re
+        # Re_dot = self.Re_dot_past + 20*Re - 19.99*self.Re_past 
+        # self.Re_dot_past = Re_dot
+        # self.Re_past = Re
 
 
         Lroll_error_dot = Le_dot[3,0]
@@ -819,8 +820,8 @@ class UpperLevelController(Node):
         torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[4,0] = 3*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = 3*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
@@ -953,6 +954,7 @@ class UpperLevelController(Node):
         # print("骨盆位置：",px_in_lf[1,0])
         # PX_l = copy.deepcopy(px_in_lf)
         PX_l = copy.deepcopy(com_in_lf)
+        PX_l[0,0] = PX_l[0,0] -0.015
         
         #計算質心速度
         self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/0.01
@@ -1159,7 +1161,7 @@ class UpperLevelController(Node):
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度(超髒)
+        self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
         
         self.rotation_matrix(joint_position)
 
@@ -1205,20 +1207,22 @@ class UpperLevelController(Node):
         elif self.state == 2:
             self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
-        elif self.state == 5:
-            torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_test))
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        # elif self.state == 4:
-        #     if stance == 0 or stance == 1 :
-        #         torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-        #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-        #         torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-        #         self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+        elif self.state == 4:
+            if stance == 0 or stance == 1 :
+                com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+                torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
+                torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
+                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+
+        elif self.state == 5:
+            torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_test))
+
 
 
 
