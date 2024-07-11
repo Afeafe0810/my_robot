@@ -139,6 +139,13 @@ class UpperLevelController(Node):
         self.CX_dot_R = 0.0
         self.CY_past_R = 0.0
         self.CY_dot_R = 0.0
+        #--velocity filter
+        self.Vx_L = 0.0
+        self.Vx_past_L = 0.0
+        self.CX_dot_past_L = 0.0
+        self.Vy_L = 0.0
+        self.Vy_past_L = 0.0
+        self.CY_dot_past_L = 0.0
         #--measurement
         self.mea_x_L = np.zeros((2,1))
         self.mea_x_past_L = np.zeros((2,1))
@@ -961,11 +968,22 @@ class UpperLevelController(Node):
         self.CX_past_L = PX_l[0,0]
         self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/0.01
         self.CY_past_L = PX_l[1,0]
+
+        #velocity filter
+        self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
+        self.Vx_past_L = self.Vx_L
+        self.CX_dot_past_L =  self.CX_dot_L
+
+        self.Vy_L = 0.7408*self.Vy_past_L + 0.2592*self.CY_dot_past_L  #濾過後的速度(5Hz)
+        self.Vy_past_L = self.Vy_L
+        self.CY_dot_past_L =  self.CY_dot_L
+
+
         #量測值
         Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.CX_dot_L*0.45
+        Ly_mea = 9*self.Vx_L*0.45
         Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.CY_dot_L*0.45 #(記得加負號)
+        Lx_mea = -9*self.Vy_L*0.45 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
 
@@ -1131,7 +1149,7 @@ class UpperLevelController(Node):
     
         return torque
     
-    def foot_data(self,px_in_lf,px_in_rf,L):
+    def foot_data(self,px_in_lf,px_in_rf,L,torque_L):
         l_foot_in_wf = np.array([[0.0],[0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
         r_foot_in_wf = np.array([[0.007],[-0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
         px_in_wf = px_in_lf + l_foot_in_wf
@@ -1139,13 +1157,25 @@ class UpperLevelController(Node):
         ref_data = np.array([[self.PX_ref[0,0]],[self.PX_ref[1,0]],[self.PX_ref[2,0]],[self.PX_ref[3,0]],[self.PX_ref[4,0]],[self.PX_ref[5,0]]])
         self.ref_publisher.publish(Float64MultiArray(data=ref_data))
         
-        pelvis_data = np.array([[px_in_wf[0,0]],[px_in_wf[1,0]],[px_in_wf[2,0]],[px_in_wf[3,0]],[px_in_wf[4,0]],[px_in_wf[5,0]]])
+        # pelvis_data = np.array([[px_in_wf[0,0]],[px_in_wf[1,0]],[px_in_wf[2,0]],[px_in_wf[3,0]],[px_in_wf[4,0]],[px_in_wf[5,0]]])
+        pelvis_data = np.array([[px_in_lf[0,0]],[px_in_lf[1,0]],[px_in_lf[2,0]],[px_in_lf[3,0]],[px_in_lf[4,0]],[px_in_lf[5,0]]])
         self.pelvis_publisher.publish(Float64MultiArray(data=pelvis_data))
 
-        if self.state == 9:
+        if self.state == 9: #ALIP_X實驗
             collect_data = [str(self.PX_ref[0,0]),str(self.PX_ref[1,0]),str(self.PX_ref[2,0]),str(self.PX_ref[3,0]),str(self.PX_ref[4,0]),str(self.PX_ref[5,0]),
             str(px_in_wf[0,0]),str(px_in_wf[1,0]),str(px_in_wf[2,0]),str(px_in_wf[3,0]),str(px_in_wf[4,0]),str(px_in_wf[5,0])]
             csv_file_name = '/home/ldsc/pelvis.csv'
+            with open(csv_file_name, 'a', newline='') as csvfile:
+                # Create a CSV writer object
+                csv_writer = csv.writer(csvfile)
+                # Write the data
+                csv_writer.writerow(collect_data)
+            print(f'Data has been written to {csv_file_name}.')
+
+        if self.state == 7: #ALIP_L平衡實驗
+            collect_data = [str(px_in_lf[0,0]),str(px_in_lf[1,0]),str(px_in_lf[2,0]),str(px_in_lf[3,0]),str(px_in_lf[4,0]),str(px_in_lf[5,0])
+                            ,str(torque_L[4,0]),str(torque_L[5,0])]
+            csv_file_name = '/home/ldsc/impulse_test.csv'
             with open(csv_file_name, 'a', newline='') as csvfile:
                 # Create a CSV writer object
                 csv_writer = csv.writer(csvfile)
@@ -1191,7 +1221,7 @@ class UpperLevelController(Node):
         elif self.state == 1 or self.state == 9 :
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
             torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
-            self.foot_data(px_in_lf,px_in_rf,L)
+            self.foot_data(px_in_lf,px_in_rf,L,torque_kine)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
             # torque_R = self.alip_R(stance,px_in_rf,torque_kine,com_in_rf)
 
@@ -1212,12 +1242,13 @@ class UpperLevelController(Node):
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        elif self.state == 4:
+        elif self.state == 4 or self.state == 7:
             if stance == 0 or stance == 1 :
                 com_in_lf,com_in_rf = self.com_position(joint_position,stance)
                 torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
                 torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+                self.foot_data(px_in_lf,px_in_rf,L,torque_L)
 
         elif self.state == 5:
             torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
