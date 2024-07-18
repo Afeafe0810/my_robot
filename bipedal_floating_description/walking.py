@@ -121,6 +121,7 @@ class UpperLevelController(Node):
 
         self.state = 0
         self.tt = 0
+        self.P_Y_ref = 0.0
 
         #path_data_norman(減過後的軌跡)
 
@@ -546,10 +547,20 @@ class UpperLevelController(Node):
         return self.JRR
 
     def ref_cmd(self):
+        
         #pelvis
         #放到右腳上
         # P_Y_ref = -0.1
-        # 放到左腳上
+        #放到左腳上
+        # if self.state ==1:
+        #     if self.P_Y_ref< 0.1:
+        #         self.P_Y_ref +=0.001
+        #     else:
+        #         self.P_Y_ref = 0.1
+        # elif self.state ==4:
+        #     self.P_Y_ref = 0.1
+        # else:
+        #     self.P_Y_ref= 0.0
         P_Y_ref = 0.1
         # if self.tt >= 5:
         #     P_X_ref = 0.0
@@ -564,7 +575,6 @@ class UpperLevelController(Node):
         # else:
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
-
         P_X_ref = 0.0
         P_Z_ref = 0.57
         P_Roll_ref = 0.0
@@ -572,6 +582,7 @@ class UpperLevelController(Node):
         P_Yaw_ref = 0.0
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
+
 
         #left_foot
         # #右腳測試時
@@ -599,7 +610,7 @@ class UpperLevelController(Node):
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
         #左腳測試時
-        R_X_ref = 0.0
+        R_X_ref = 0.02
         R_Y_ref = -0.03
         R_Z_ref = 0.05
         # # 搖擺測試
@@ -637,7 +648,7 @@ class UpperLevelController(Node):
         Le = L_ref - L
         Re = R_ref - R
         #--P
-        Le_dot = 30*Le
+        Le_dot = 20*Le
         Re_dot = 20*Re
 
         # #--PI
@@ -716,7 +727,6 @@ class UpperLevelController(Node):
             Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
             Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
         
-
         return Lw_d,Rw_d
     
     def gravity_compemsate(self,joint_position,stance_type):
@@ -829,8 +839,8 @@ class UpperLevelController(Node):
         torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = 3*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = 3*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
@@ -987,7 +997,7 @@ class UpperLevelController(Node):
 
         #量測值
         Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.4
+        Ly_mea = 9*self.Vx_L*0.43
         Yc_mea = PX_l[1,0]
         Lx_mea = -9*self.Vy_L*0.43 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
@@ -1063,13 +1073,13 @@ class UpperLevelController(Node):
 
         collect_data = [str(self.ref_x_L[0,0]),str(self.ref_x_L[1,0]),str(self.ob_x_L[0,0]),str(self.ob_x_L[1,0])
                         ,str(self.ref_y_L[0,0]),str(self.ref_y_L[1,0]),str(self.ob_y_L[0,0]),str(self.ob_y_L[1,0])]
-        csv_file_name = '/home/ldsc/alip_tracking_xy.csv'
-        with open(csv_file_name, 'a', newline='') as csvfile:
-            # Create a CSV writer object
-            csv_writer = csv.writer(csvfile)
-            # Write the data
-            csv_writer.writerow(collect_data)
-        print(f'Data has been written to {csv_file_name}.')
+        # csv_file_name = '/home/ldsc/alip_tracking_xy.csv'
+        # with open(csv_file_name, 'a', newline='') as csvfile:
+        #     # Create a CSV writer object
+        #     csv_writer = csv.writer(csvfile)
+        #     # Write the data
+        #     csv_writer.writerow(collect_data)
+        # print(f'Data has been written to {csv_file_name}.')
         return torque
 
     def alip_R(self,stance_type,px_in_rf,torque_kine,com_in_rf):
@@ -1196,13 +1206,13 @@ class UpperLevelController(Node):
 
         if self.state == 4: #ALIP_L質心軌跡追蹤實驗
             collect_data = [str(px_in_lf[2,0]),str(px_in_lf[3,0]),str(px_in_lf[4,0]),str(px_in_lf[5,0]),str(torque_L[4,0]),str(torque_L[5,0])]
-            csv_file_name = '/home/ldsc/alip_tracking_attitude.csv'
-            with open(csv_file_name, 'a', newline='') as csvfile:
-                # Create a CSV writer object
-                csv_writer = csv.writer(csvfile)
-                # Write the data
-                csv_writer.writerow(collect_data)
-            print(f'Data has been written to {csv_file_name}.')
+            # csv_file_name = '/home/ldsc/alip_tracking_attitude.csv'
+            # with open(csv_file_name, 'a', newline='') as csvfile:
+            #     # Create a CSV writer object
+            #     csv_writer = csv.writer(csvfile)
+            #     # Write the data
+            #     csv_writer.writerow(collect_data)
+            # print(f'Data has been written to {csv_file_name}.')
         
     def main_controller_callback(self):
 
