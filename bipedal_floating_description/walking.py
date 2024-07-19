@@ -6,6 +6,7 @@ from std_msgs.msg import String
 from std_msgs.msg import Float64MultiArray 
 
 from sensor_msgs.msg import JointState
+from gazebo_msgs.msg import ContactsState
 
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -59,6 +60,27 @@ class UpperLevelController(Node):
 
         self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
 
+        #l_foot_contact_state_subscribe
+        self.l_foot_contact_subscriber = self.create_subscription(
+            ContactsState,
+            '/l_foot/bumper_demo',
+            self.contact_callback,
+            10)
+        self.l_foot_contact_subscriber  # prevent unused variable warning
+       
+        #r_foot_contact_state_subscribe
+        self.r_foot_contact_subscriber = self.create_subscription(
+            ContactsState,
+            '/r_foot/bumper_demo',
+            self.contact_callback,
+            10)
+        self.r_foot_contact_subscriber  # prevent unused variable warning
+
+        #contact data
+        self.l_contact = 0
+        self.r_contact = 0
+         
+        #joint_state_subscribe
         self.joint_states_subscriber = self.create_subscription(
             JointState,
             '/joint_states',
@@ -257,6 +279,19 @@ class UpperLevelController(Node):
             'posture_task': posture_task,
         }
         return tasks
+
+    def contact_callback(self,msg):
+        if msg.header.frame_id == 'l_foot_1':
+            if len(msg.states)>=1:
+                self.l_contact = 1
+            else:
+                self.l_contact = 0
+        elif msg.header.frame_id == 'r_foot_1':
+            if len(msg.states)>=1:
+                self.r_contact = 1
+            else:
+                self.r_contact = 0
+        print("L:",self.l_contact,"R:",self.r_contact)
 
     def state_callback(self,msg):
         
@@ -469,7 +504,7 @@ class UpperLevelController(Node):
 
     def stance_mode(self,px_in_lf,px_in_rf):
         # print(px_in_lf)
-        # print(px_in_rf)
+        # print(px_in_rf)       
         if abs(px_in_lf[1,0])<=0.08:
             stance = 1 #左單支撐
         elif abs(px_in_rf[1,0])<=0.06:
@@ -1247,6 +1282,7 @@ class UpperLevelController(Node):
         
         if self.state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
+            # print(0)
 
         elif self.state == 1 or self.state == 9 :
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
@@ -1283,11 +1319,6 @@ class UpperLevelController(Node):
         elif self.state == 5:
             torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
             self.effort_publisher.publish(Float64MultiArray(data=torque_test))
-
-
-
-
-
 
         # # for trajectory controller
         # p = joint_position + self.timer_period*v
