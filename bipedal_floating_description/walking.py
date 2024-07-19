@@ -502,13 +502,17 @@ class UpperLevelController(Node):
 
         return px_in_lf,px_in_rf
 
-    def stance_mode(self,px_in_lf,px_in_rf):
+    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact):
         # print(px_in_lf)
         # print(px_in_rf)       
-        if abs(px_in_lf[1,0])<=0.08:
+        # if abs(px_in_lf[1,0])<=0.08:
+        #     stance = 1 #左單支撐
+        # elif abs(px_in_rf[1,0])<=0.06:
+        #     stance = 0 #右單支撐
+        # else:
+        #     stance = 2 #雙支撐
+        if r_contact == 0:
             stance = 1 #左單支撐
-        elif abs(px_in_rf[1,0])<=0.06:
-            stance = 0 #右單支撐
         else:
             stance = 2 #雙支撐
         
@@ -596,7 +600,7 @@ class UpperLevelController(Node):
         #     self.P_Y_ref = 0.1
         # else:
         #     self.P_Y_ref= 0.0
-        P_Y_ref = 0.1
+        # P_Y_ref = 0.1
         # if self.tt >= 5:
         #     P_X_ref = 0.0
         #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
@@ -611,6 +615,7 @@ class UpperLevelController(Node):
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
         P_X_ref = 0.0
+        P_Y_ref = 0.0
         P_Z_ref = 0.57
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
@@ -624,14 +629,14 @@ class UpperLevelController(Node):
         # L_X_ref = 0.007
         # L_Y_ref = 0.03
         # L_Z_ref = 0.05
-        #左腳測試時
-        L_X_ref = 0.0
-        L_Y_ref = 0.1
-        L_Z_ref = 0.02
-        # #搖擺測試
+        # #左腳測試時
         # L_X_ref = 0.0
         # L_Y_ref = 0.1
-        # L_Z_ref = 0.0
+        # L_Z_ref = 0.02
+        #搖擺測試
+        L_X_ref = 0.0
+        L_Y_ref = 0.1
+        L_Z_ref = 0.0
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -644,13 +649,14 @@ class UpperLevelController(Node):
         # R_X_ref = 0.007
         # R_Y_ref = -0.1
         # R_Z_ref = 0.02
-        #左腳測試時
-        R_X_ref = 0.02
-        R_Y_ref = -0.03
-        R_Z_ref = 0.05
-        # # 搖擺測試
-        # R_X_ref = 0.0
-        # R_Y_ref = -0.1
+        # #左腳測試時
+        # R_X_ref = 0.02
+        # R_Y_ref = -0.03
+        # R_Z_ref = 0.05
+        # 搖擺測試
+        R_X_ref = 0.0
+        R_Y_ref = -0.1
+        R_Z_ref = 0.02*math.sin(self.tt)+0.02
         # R_Z_ref = 0.0
         
         R_Roll_ref = 0.0
@@ -1267,7 +1273,7 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
     
-        stance = self.stance_mode(px_in_lf,px_in_rf)
+        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact)
 
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
