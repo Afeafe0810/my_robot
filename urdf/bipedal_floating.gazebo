@@ -98,39 +98,39 @@
   <self_collide>true</self_collide>
 </gazebo>
 
+<gazebo reference="r_foot_1">
+    <sensor name="bumper" type="contact">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <contact>
+            <collision>r_foot_1_collision</collision>
+        </contact>
+        <plugin name="bumper" filename="libgazebo_ros_bumper.so">
+            <ros>
+                <namespace>r_foot</namespace>
+                <remapping>bumper_states:=bumper_demo</remapping>
+            </ros>
+            <frame_name>r_foot_1</frame_name>
+        </plugin>
+    </sensor>
+</gazebo>
 
-<!-- <gazebo reference="r_foot_1">
-  <sensor name='r_foot_contact_sensor' type='contact'>
-    <always_on>true</always_on>
-    <update_rate>100.0</update_rate>
-    <contact>
-      <collision>r_foot_1_collision</collision>
-    </contact>
-    <plugin name="r_foot_gazebo_ros_bumper_controller" filename="libgazebo_ros_bumper.so">
-      <always_on>true</always_on>
-      <updateRate>100.0</updateRate>
-      <bumperTopicName>r_foot_bumper</bumperTopicName>
-      <frameName>r_foot_1</frameName>
-    </plugin>
-  </sensor>
-</gazebo> -->
-
-<!-- <gazebo reference="l_foot_1">
-  <sensor name='l_foot_contact_sensor' type='contact'>
-    <always_on>true</always_on>
-    <update_rate>100.0</update_rate>
-    <contact>
-      <collision>l_foot_1_collision</collision>
-    </contact>
-    <plugin name="l_foot_gazebo_ros_bumper_controller" filename="libgazebo_ros_bumper.so">
-      <always_on>true</always_on>
-      <updateRate>100.0</updateRate>
-      <bumperTopicName>l_foot_bumper</bumperTopicName>
-      <frameName>l_foot_1</frameName>
-    </plugin>
-  </sensor>
-</gazebo> -->
-
+<gazebo reference="l_foot_1">
+    <sensor name="bumper" type="contact">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <contact>
+            <collision>r_foot_1_collision</collision>
+        </contact>
+        <plugin name="bumper" filename="libgazebo_ros_bumper.so">
+            <ros>
+                <namespace>l_foot</namespace>
+                <remapping>bumper_states:=bumper_demo</remapping>
+            </ros>
+            <frame_name>l_foot_1</frame_name>
+        </plugin>
+    </sensor>
+</gazebo>
 
 
 </robot>
