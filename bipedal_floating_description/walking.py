@@ -318,7 +318,9 @@ class UpperLevelController(Node):
         
         jv_sub = copy.deepcopy(joint_velocity)
 
-        self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp
+        self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
+        # self.jv = 0.5186*self.jv_p - 0.1691*self.jv_pp + 0.4215*self.jv_sub_p + 0.229*self.jv_sub_pp #20Hz
+        # self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
 
         self.jv_pp = copy.deepcopy(self.jv_p)
         self.jv_p = copy.deepcopy(self.jv)
@@ -502,20 +504,28 @@ class UpperLevelController(Node):
 
         return px_in_lf,px_in_rf
 
-    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact):
-        # print(px_in_lf)
-        # print(px_in_rf)       
-        # if abs(px_in_lf[1,0])<=0.08:
-        #     stance = 1 #左單支撐
-        # elif abs(px_in_rf[1,0])<=0.06:
-        #     stance = 0 #右單支撐
-        # else:
-        #     stance = 2 #雙支撐
-        if r_contact == 0:
-            stance = 1 #左單支撐
-        else:
-            stance = 2 #雙支撐
-        
+    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact,Lz,Rz):
+        if self.state ==0:
+            #用骨盆相對左右腳掌位置來切換   
+            if abs(px_in_lf[1,0])<=0.06:
+                stance = 1 #左單支撐
+            elif abs(px_in_rf[1,0])<=0.06:
+                stance = 0 #右單支撐
+            else:
+                stance = 2 #雙支撐
+            #用contact sensor來切換
+            # if r_contact == 0:
+            #     stance = 1 #左單支撐
+            # else:
+            #     stance = 2 #雙支撐
+        if self.state == 1:
+            #用命令來切換
+            if Lz > Rz:
+                stance = 0
+            elif Lz < Rz:
+                stance = 1
+            else:
+                stance = 2
         return stance
 
     def left_leg_jacobian(self):
@@ -588,8 +598,8 @@ class UpperLevelController(Node):
     def ref_cmd(self):
         
         #pelvis
-        #放到右腳上
-        # P_Y_ref = -0.1
+        # 放到右腳上
+        P_Y_ref = -0.1
         #放到左腳上
         # if self.state ==1:
         #     if self.P_Y_ref< 0.1:
@@ -615,7 +625,7 @@ class UpperLevelController(Node):
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
         P_X_ref = 0.0
-        P_Y_ref = 0.0
+        # P_Y_ref = 0.0
         P_Z_ref = 0.57
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
@@ -625,18 +635,18 @@ class UpperLevelController(Node):
 
 
         #left_foot
-        # #右腳測試時
-        # L_X_ref = 0.007
-        # L_Y_ref = 0.03
-        # L_Z_ref = 0.05
+        #右腳測試時
+        L_X_ref = 0.007
+        L_Y_ref = 0.03
+        L_Z_ref = 0.05
         # #左腳測試時
         # L_X_ref = 0.0
         # L_Y_ref = 0.1
         # L_Z_ref = 0.02
-        #搖擺測試
-        L_X_ref = 0.0
-        L_Y_ref = 0.1
-        L_Z_ref = 0.0
+        # #搖擺測試
+        # L_X_ref = 0.0
+        # L_Y_ref = 0.1
+        # L_Z_ref = 0.0
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -645,18 +655,18 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        # # 右腳測試時
-        # R_X_ref = 0.007
-        # R_Y_ref = -0.1
-        # R_Z_ref = 0.02
+        # 右腳測試時
+        R_X_ref = 0.007
+        R_Y_ref = -0.1
+        R_Z_ref = 0.02
         # #左腳測試時
-        # R_X_ref = 0.02
+        # R_X_ref = 0.0
         # R_Y_ref = -0.03
         # R_Z_ref = 0.05
-        # 搖擺測試
-        R_X_ref = 0.0
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02*math.sin(self.tt)+0.02
+        # # 搖擺測試
+        # R_X_ref = 0.0
+        # R_Y_ref = -0.1
+        # # R_Z_ref = 0.02*math.sin(self.tt)+0.02
         # R_Z_ref = 0.0
         
         R_Roll_ref = 0.0
@@ -664,7 +674,9 @@ class UpperLevelController(Node):
         R_Yaw_ref = 0.0
 
         self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
-
+    
+        return  L_Z_ref,R_Z_ref
+    
     def calculate_err(self):
         PX_ref = copy.deepcopy(self.PX_ref)
         LX_ref = copy.deepcopy(self.LX_ref)
@@ -720,16 +732,6 @@ class UpperLevelController(Node):
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
-        # #切換重力補償模型
-        # print("L:",abs(L[1,0]))
-        # print("R:",abs(R[1,0]))
-        # if abs(L[1,0]) <0.05:
-        #     self.stance = 1
-        # elif abs(R[1,0]) <0.05:
-        #     self.stance = 0
-        # else:
-        #     self.stance = 2
-        # # print("stance:",self.stance)
         return Le_2,Re_2,L
     
     def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type):
@@ -753,7 +755,7 @@ class UpperLevelController(Node):
 
             Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
             Rw_d = np.vstack((rw_41_d,rw_21_d))
-        elif self.state == 4 :   #(左支撐腳腳踝動態排除測試)
+        elif self.state == 5 :   #(左支撐腳腳踝動態排除測試)
             L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
             VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
             
@@ -780,8 +782,8 @@ class UpperLevelController(Node):
         # if self.RX[2,0] >= 0.04:
         #     kr = 1
 
-        kr = 0.8
-        kl = 0.8
+        kr = 0.5
+        kl = 0.5
 
         #雙支撐
         if stance == 2:
@@ -856,6 +858,20 @@ class UpperLevelController(Node):
         torque[9,0] = 60*(p[9,0]-jp[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = 60*(p[10,0]-jp[10,0]) + r_leg_gravity[4,0]
         torque[11,0] = 50*(p[11,0]-jp[11,0]) 
+
+        # torque[0,0] = 20*(p[0,0]-jp[0,0])
+        # torque[1,0] = 20*(p[1,0]-jp[1,0])
+        # torque[2,0] = 40*(p[2,0]-jp[2,0])
+        # torque[3,0] = 60*(p[3,0]-jp[3,0])
+        # torque[4,0] = 60*(p[4,0]-jp[4,0])
+        # torque[5,0] = 40*(p[5,0]-jp[5,0]) 
+
+        # torque[6,0] = 25*(p[6,0]-jp[6,0])
+        # torque[7,0] = 20*(p[7,0]-jp[7,0])
+        # torque[8,0] = 40*(p[8,0]-jp[8,0])
+        # torque[9,0] = 60*(p[9,0]-jp[9,0])
+        # torque[10,0] = 60*(p[10,0]-jp[10,0])
+        # torque[11,0] = 50*(p[11,0]-jp[11,0]) 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
     def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf):
@@ -881,14 +897,14 @@ class UpperLevelController(Node):
         torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
         torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = 20*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[11,0] = 5*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
@@ -1273,14 +1289,15 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
     
-        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact)
+        Lz,Rz = self.ref_cmd()
+        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,Lz,Rz)
 
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
 
-        self.ref_cmd()
+        # self.ref_cmd()
 
         Le_2,Re_2,L = self.calculate_err()
 
@@ -1345,7 +1362,6 @@ class UpperLevelController(Node):
         # point.time_from_start = rclpy.duration.Duration(seconds=self.timer_period).to_msg()
         # trajectory_msg.points.append(point)
         # self.joint_trajectory_controller.publish(trajectory_msg)
-
 
 
 def main(args=None):

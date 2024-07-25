@@ -7,9 +7,6 @@
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>500</real_time_update_rate>
-      <!--<ode>
-        <type>world</type> 
-      </ode>-->
     </physics>
 
     <!-- Specify the scene parameters -->
@@ -50,17 +47,11 @@
           </geometry>
           <surface>
             <contact>
-              <!-- <ode>
-                <min_depth>0.01</min_depth>
-                <max_vel>0.00</max_vel>
-                <kp>1e8</kp>
-                <kd>8388608</kd>
-              </ode> -->
               <ode>
-                <min_depth>0.0001</min_depth>
                 <max_vel>0.00</max_vel>
-                <kp>45000000</kp>
-                <kd>3622430.124</kd>
+                <min_depth>0.0001</min_depth>
+                <kp>180000</kp>
+                <kd>1620</kd>
               </ode>
             </contact>
             <friction>
@@ -73,9 +64,8 @@
               </torsional>
             </friction>
             <bounce/>
-            
           </surface>
-          <max_contacts>100</max_contacts>
+          <max_contacts>10</max_contacts>
         </collision>
         <visual name='visual'>
           <cast_shadows>0</cast_shadows>
@@ -98,50 +88,6 @@
       </link>
     </model>
 
-
-
-
-      <!--<link name="link">
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>1000 1000</size>
-            </plane>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>100.0</mu>
-                <mu2>50.0</mu2>
-              </ode>
-            </friction>
-            <contact>
-              <ode>
-                <min_depth>0.001</min_depth>
-                <max_vel>0.00</max_vel>
-                <kp>1e10</kp>
-                <kd>62609</kd>
-              </ode>
-            </contact>
-          </surface>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>1000 1000</size>
-            </plane>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Gray</name>
-            </script>
-          </material>
-        </visual>
-      </link>-->
-   
     <plugin name="gazebo_link_attacher" filename="libgazebo_link_attacher.so"/>
   </world>
 </sdf>

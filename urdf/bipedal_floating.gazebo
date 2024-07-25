@@ -51,8 +51,13 @@
 
 <gazebo reference="l_foot_1">
   <material>${body_color}</material>
-  <mu1>5</mu1>
-  <mu2>5</mu2>
+  <mu1>10</mu1>
+  <mu2>10</mu2>
+  <minDepth>0.0001</minDepth>
+  <max_vel>0.00</max_vel>
+  <kp>270000</kp>
+  <kd>1620</kd>
+  <maxContacts>10</maxContacts>
   <self_collide>true</self_collide>
 </gazebo>
 
@@ -95,6 +100,11 @@
   <material>${body_color}</material>
   <mu1>10</mu1>
   <mu2>10</mu2>
+  <minDepth>0.0001</minDepth>
+  <max_vel>0.00</max_vel>
+  <kp>180000</kp>
+  <kd>1620</kd>
+  <maxContacts>10</maxContacts>
   <self_collide>true</self_collide>
 </gazebo>
 
