@@ -504,7 +504,10 @@ class UpperLevelController(Node):
 
         return px_in_lf,px_in_rf
 
-    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact,Lz,Rz):
+    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact,L_ref,R_ref):
+        Lz = L_ref[2,0]
+        Rz = R_ref[2,0]
+
         if self.state ==0:
             #用骨盆相對左右腳掌位置來切換   
             if abs(px_in_lf[1,0])<=0.06:
@@ -518,7 +521,7 @@ class UpperLevelController(Node):
             #     stance = 1 #左單支撐
             # else:
             #     stance = 2 #雙支撐
-        if self.state == 1:
+        if self.state == 1 or self.state ==2:
             #用命令來切換
             if Lz > Rz:
                 stance = 0
@@ -598,8 +601,8 @@ class UpperLevelController(Node):
     def ref_cmd(self):
         
         #pelvis
-        # 放到右腳上
-        P_Y_ref = -0.1
+        # # 放到右腳上
+        # P_Y_ref = -0.1
         #放到左腳上
         # if self.state ==1:
         #     if self.P_Y_ref< 0.1:
@@ -625,7 +628,7 @@ class UpperLevelController(Node):
         #     P_Y_ref = 0.0
         #     P_X_ref = 0.0
         P_X_ref = 0.0
-        # P_Y_ref = 0.0
+        P_Y_ref = 0.0
         P_Z_ref = 0.57
         P_Roll_ref = 0.0
         P_Pitch_ref = 0.0
@@ -635,18 +638,20 @@ class UpperLevelController(Node):
 
 
         #left_foot
-        #右腳測試時
-        L_X_ref = 0.007
-        L_Y_ref = 0.03
-        L_Z_ref = 0.05
+        # #右腳測試時
+        # L_X_ref = 0.007
+        # L_Y_ref = 0.03
+        # L_Z_ref = 0.05
         # #左腳測試時
         # L_X_ref = 0.0
         # L_Y_ref = 0.1
         # L_Z_ref = 0.02
-        # #搖擺測試
-        # L_X_ref = 0.0
-        # L_Y_ref = 0.1
+        #搖擺測試
+        L_X_ref = 0.0
+        L_Y_ref = 0.1
+        L_Z_ref = 0.02*math.sin(self.tt)+0.02
         # L_Z_ref = 0.0
+        
 
         L_Roll_ref = 0.0
         L_Pitch_ref = 0.0
@@ -655,19 +660,18 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
         #right_foot
-        # 右腳測試時
-        R_X_ref = 0.007
-        R_Y_ref = -0.1
-        R_Z_ref = 0.02
+        # # 右腳測試時
+        # R_X_ref = 0.007
+        # R_Y_ref = -0.1
+        # R_Z_ref = 0.02
         # #左腳測試時
         # R_X_ref = 0.0
         # R_Y_ref = -0.03
         # R_Z_ref = 0.05
-        # # 搖擺測試
-        # R_X_ref = 0.0
-        # R_Y_ref = -0.1
-        # # R_Z_ref = 0.02*math.sin(self.tt)+0.02
-        # R_Z_ref = 0.0
+        # 搖擺測試
+        R_X_ref = 0.0
+        R_Y_ref = -0.1
+        R_Z_ref = 0.0
         
         R_Roll_ref = 0.0
         R_Pitch_ref = 0.0
@@ -732,7 +736,7 @@ class UpperLevelController(Node):
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
-        return Le_2,Re_2,L
+        return Le_2,Re_2,L_ref,R_ref,L
     
     def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type):
 
@@ -782,8 +786,8 @@ class UpperLevelController(Node):
         # if self.RX[2,0] >= 0.04:
         #     kr = 1
 
-        kr = 0.5
-        kl = 0.5
+        kr = 0.8
+        kl = 0.8
 
         #雙支撐
         if stance == 2:
@@ -803,7 +807,7 @@ class UpperLevelController(Node):
         
         #右腳為支撐腳(右腳關節翻轉加負號)
         elif stance == 0: 
-            kr = 1.2
+            kr = 1.5
             jp_r = np.flip(-jp_r,axis=0)
             jp = np.vstack((jp_r,jp_l))
             jv = np.zeros((12,1))
@@ -902,8 +906,8 @@ class UpperLevelController(Node):
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[9,0] = 2.5*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = 5*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
         torque[11,0] = 5*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
@@ -938,7 +942,7 @@ class UpperLevelController(Node):
         torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0])+ r_leg_gravity[5,0]
-        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[11,0] = 5*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
@@ -1289,17 +1293,23 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
     
-        Lz,Rz = self.ref_cmd()
-        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,Lz,Rz)
+        # Lz,Rz = self.ref_cmd()
+        # stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,Lz,Rz)
+
+        # l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
+
+        # JLL = self.left_leg_jacobian()
+        # JRR = self.right_leg_jacobian()
+
+        self.ref_cmd()
+        Le_2,Re_2,L_ref,R_ref,L = self.calculate_err()
+        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,L_ref,R_ref)
 
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
 
-        # self.ref_cmd()
-
-        Le_2,Re_2,L = self.calculate_err()
 
         VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance)
         

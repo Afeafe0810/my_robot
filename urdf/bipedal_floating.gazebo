@@ -53,10 +53,10 @@
   <material>${body_color}</material>
   <mu1>10</mu1>
   <mu2>10</mu2>
-  <minDepth>0.0001</minDepth>
-  <max_vel>0.00</max_vel>
-  <kp>270000</kp>
-  <kd>1620</kd>
+  <!-- <minDepth>0.0001</minDepth> -->
+  <!-- <max_vel>0.00</max_vel> -->
+  <!-- <kp>270000</kp> -->
+  <!-- <kd>1620</kd> -->
   <maxContacts>10</maxContacts>
   <self_collide>true</self_collide>
 </gazebo>
@@ -65,7 +65,7 @@
   <material>${body_color}</material>
   <mu1>0.2</mu1>
   <mu2>0.2</mu2>
-  <self_collide>true</self_collide>
+  <selfCollide>true</selfCollide>
 </gazebo>
 
 <gazebo reference="r_hip_pitch_1">
@@ -101,11 +101,11 @@
   <mu1>10</mu1>
   <mu2>10</mu2>
   <minDepth>0.0001</minDepth>
-  <max_vel>0.00</max_vel>
-  <kp>180000</kp>
-  <kd>1620</kd>
+  <!-- <max_vel>0.00</max_vel> -->
+  <!-- <kp>270000</kp> -->
+  <!-- <kd>1620</kd> -->
   <maxContacts>10</maxContacts>
-  <self_collide>true</self_collide>
+  <selfCollide>true</selfCollide>
 </gazebo>
 
 <gazebo reference="r_foot_1">

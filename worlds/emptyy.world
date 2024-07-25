@@ -50,8 +50,8 @@
               <ode>
                 <max_vel>0.00</max_vel>
                 <min_depth>0.0001</min_depth>
-                <kp>180000</kp>
-                <kd>1620</kd>
+                <kp>45000000</kp>
+                <kd>3622430.124</kd>
               </ode>
             </contact>
             <friction>
@@ -65,7 +65,7 @@
             </friction>
             <bounce/>
           </surface>
-          <max_contacts>10</max_contacts>
+          <max_contacts>100</max_contacts>
         </collision>
         <visual name='visual'>
           <cast_shadows>0</cast_shadows>
