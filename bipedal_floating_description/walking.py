@@ -75,11 +75,7 @@ class UpperLevelController(Node):
             self.contact_callback,
             10)
         self.r_foot_contact_subscriber  # prevent unused variable warning
-
-        #contact data
-        self.l_contact = 0
-        self.r_contact = 0
-         
+        
         #joint_state_subscribe
         self.joint_states_subscriber = self.create_subscription(
             JointState,
@@ -107,7 +103,12 @@ class UpperLevelController(Node):
         self.Le_past = 0.0
         self.Re_dot_past = 0.0
         self.Re_past = 0.0
-
+        
+        #state by user
+        self.pub_state = 0
+        #contact by bumper
+        self.l_contact = 1
+        self.r_contact = 1
 
         self.state_subscriber = self.create_subscription(
             Float64MultiArray,
@@ -141,7 +142,6 @@ class UpperLevelController(Node):
         self.timer_period = 0.01 # seconds
         self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
 
-        self.state = 0
         self.tt = 0
         self.P_Y_ref = 0.0
 
@@ -151,6 +151,9 @@ class UpperLevelController(Node):
         self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
         self.count = 0
         self.stance = 2
+        self.DS_time = 0.0
+        self.RSS_time = 0.0
+        self.LSS_time = 0.0
 
         #ALIP
         #time
@@ -280,6 +283,13 @@ class UpperLevelController(Node):
         }
         return tasks
 
+    def contact_collect(self):
+        l_contact = copy.deepcopy(self.l_contact)
+        r_contact = copy.deepcopy(self.r_contact)
+        print("L:",l_contact,"R:",r_contact)
+
+        return l_contact,r_contact
+
     def contact_callback(self,msg):
         if msg.header.frame_id == 'l_foot_1':
             if len(msg.states)>=1:
@@ -291,12 +301,18 @@ class UpperLevelController(Node):
                 self.r_contact = 1
             else:
                 self.r_contact = 0
-        print("L:",self.l_contact,"R:",self.r_contact)
+        self.contact_collect()
 
+    def state_collect(self):
+        state = self.pub_state
+
+        return state
+    
     def state_callback(self,msg):
         
-        self.state = msg.data[0]
-
+        self.pub_state = msg.data[0]
+        self.state_collect()
+        
     def collect_joint_data(self):
         joint_position = copy.deepcopy(self.jp_sub)
         joint_velocity = copy.deepcopy(self.jv_sub)
@@ -516,18 +532,16 @@ class UpperLevelController(Node):
                 stance = 0 #右單支撐
             else:
                 stance = 2 #雙支撐
-            #用contact sensor來切換
-            # if r_contact == 0:
-            #     stance = 1 #左單支撐
-            # else:
-            #     stance = 2 #雙支撐
         if self.state == 1 or self.state ==2:
+            # 用contact sensor來切換
+            # if l_contact == 1:
+            #     stance = 2 #雙支撐
+            # else:
+            #     stance = 0 #雙支撐
             #用命令來切換
             if Lz > Rz:
                 stance = 0
             elif Lz < Rz:
-                stance = 1
-            else:
                 stance = 2
         return stance
 
@@ -598,100 +612,108 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def ref_cmd(self):
-        
-        #pelvis
-        # # 放到右腳上
-        # P_Y_ref = -0.1
-        #放到左腳上
-        # if self.state ==1:
-        #     if self.P_Y_ref< 0.1:
-        #         self.P_Y_ref +=0.001
-        #     else:
-        #         self.P_Y_ref = 0.1
-        # elif self.state ==4:
-        #     self.P_Y_ref = 0.1
-        # else:
-        #     self.P_Y_ref= 0.0
-        # P_Y_ref = 0.1
-        # if self.tt >= 5:
-        #     P_X_ref = 0.0
-        #     P_Y_ref = 0.1 + 0.03*math.sin(self.tt)
-        # else:  
-        #     P_X_ref = 0.0
-        #     P_Y_ref = 0.1
-        # #搖擺測試
-        # if self.tt >=5:
-        #     P_Y_ref = 0.015*math.sin(self.tt)
-        #     P_X_ref = 0.015*math.cos(self.tt)
-        # else:
-        #     P_Y_ref = 0.0
-        #     P_X_ref = 0.0
-        P_X_ref = 0.0
-        P_Y_ref = 0.0
-        P_Z_ref = 0.57
-        P_Roll_ref = 0.0
-        P_Pitch_ref = 0.0
-        P_Yaw_ref = 0.0
+    def ref_cmd(self,state):
+    
+        if state == 0:
+            self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
+            self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
+            self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
+            P_Z_ref = 0.57
+            L_Z_ref = 0.0
+            R_Z_ref = 0.0
+        else:
+            #pelvis
+            P_X_ref = 0.0
+            P_Y_ref = 0.0
+            P_Z_ref = 0.57
+            P_Roll_ref = 0.0
+            P_Pitch_ref = 0.0
+            P_Yaw_ref = 0.0
 
-        self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
+            self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
+            #left_foot
+            if self.DS_time > 0:
+                L_Z_ref = 0.0 
+            elif self.RSS_time > 1:
+                L_Z_ref = 0.02*math.sin(self.tt)+0.015
+            else:
+                L_Z_ref = 0.0 
 
-        #left_foot
-        # #右腳測試時
-        # L_X_ref = 0.007
-        # L_Y_ref = 0.03
-        # L_Z_ref = 0.05
-        # #左腳測試時
-        # L_X_ref = 0.0
-        # L_Y_ref = 0.1
-        # L_Z_ref = 0.02
-        #搖擺測試
-        L_X_ref = 0.0
-        L_Y_ref = 0.1
-        L_Z_ref = 0.02*math.sin(self.tt)+0.02
-        # L_Z_ref = 0.0
-        
+            L_X_ref = 0.0
+            L_Y_ref = 0.1
+            L_Roll_ref = 0.0
+            L_Pitch_ref = 0.0
+            L_Yaw_ref = 0.0
+            
+            self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
-        L_Roll_ref = 0.0
-        L_Pitch_ref = 0.0
-        L_Yaw_ref = 0.0
-        
-        self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
+            #right_foot
+            R_Z_ref = 0.0
+            R_X_ref = 0.0
+            R_Y_ref = -0.1           
+            R_Roll_ref = 0.0
+            R_Pitch_ref = 0.0
+            R_Yaw_ref = 0.0
 
-        #right_foot
-        # # 右腳測試時
-        # R_X_ref = 0.007
-        # R_Y_ref = -0.1
-        # R_Z_ref = 0.02
-        # #左腳測試時
-        # R_X_ref = 0.0
-        # R_Y_ref = -0.03
-        # R_Z_ref = 0.05
-        # 搖擺測試
-        R_X_ref = 0.0
-        R_Y_ref = -0.1
-        R_Z_ref = 0.0
-        
-        R_Roll_ref = 0.0
-        R_Pitch_ref = 0.0
-        R_Yaw_ref = 0.0
-
-        self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
+            self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
     
         return  L_Z_ref,R_Z_ref
     
-    def calculate_err(self):
+    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,Lz,Rz,stance):
+        if state == 0:
+            #用骨盆相對左右腳掌位置來切換   
+            if abs(px_in_lf[1,0])<=0.06:
+                stance = 1 #左單支撐
+            elif abs(px_in_rf[1,0])<=0.06:
+                stance = 0 #右單支撐
+            else:
+                stance = 2 #雙支撐
+        else:
+            if stance == 2:
+                if self.DS_time <= 1:
+                    stance = 2
+                    self.DS_time += self.timer_period
+                else:
+                    self.DS_time = 0
+                    if Lz > Rz:
+                        stance = 0
+                    else:
+                        stance = 1
+            if stance == 0:
+                if self.RSS_time <= 1:
+                    stance = 0
+                    self.RSS_time += self.timer_period
+                else:
+                    if l_contact == 1:
+                        stance = 2
+                        self.RSS_time = 0
+                    else:
+                        stance = 0
+            if stance == 1:
+                if self.LSS_time <= 1:
+                    stance = 0
+                    self.LSS_time += self.timer_period
+                else:
+                    if r_contact == 1:
+                        stance = 2
+                        self.LSS_time = 0
+                    else:
+                        stance = 1
+            self.stance = stance
+        return stance
+
+    def calculate_err(self,state):
         PX_ref = copy.deepcopy(self.PX_ref)
         LX_ref = copy.deepcopy(self.LX_ref)
         RX_ref = copy.deepcopy(self.RX_ref)
         PX = copy.deepcopy(self.PX)
         LX = copy.deepcopy(self.LX)
         RX = copy.deepcopy(self.RX)
-
+        state - copy.deepcopy(state)
         # print(self.L_ref_data[:,0])
         
-        if self.state==2 and self.count < 1800:
+        if state==2 and self.count < 1800:
             #foot_trajectory(by norman)
             L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
             R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
@@ -736,19 +758,20 @@ class UpperLevelController(Node):
 
         Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
 
-        return Le_2,Re_2,L_ref,R_ref,L
+        return Le_2,Re_2,L
     
-    def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type):
+    def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type,state):
 
         L2 = copy.deepcopy(Le_2)
         R2 = copy.deepcopy(Re_2)
         v =  copy.deepcopy(jv_f) #joint_velocity
+        state = copy.deepcopy(state)
        
         #獲取支撐狀態(有問題)
         stance = copy.deepcopy(stance_type)
         print(stance)
         
-        if self.state == 3:   #(右支撐腳腳踝動態排除測試)
+        if state == 3:   #(右支撐腳腳踝動態排除測試)
             R2_41 = np.reshape(R2[2:,0],(4,1)) #R2 z to wz
             VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
             
@@ -759,7 +782,7 @@ class UpperLevelController(Node):
 
             Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
             Rw_d = np.vstack((rw_41_d,rw_21_d))
-        elif self.state == 5 :   #(左支撐腳腳踝動態排除測試)
+        elif state == 5 :   #(左支撐腳腳踝動態排除測試)
             L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
             VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
             
@@ -1280,47 +1303,40 @@ class UpperLevelController(Node):
         joint_position,joint_velocity = self.collect_joint_data()
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
-
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
         self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
         
         self.rotation_matrix(joint_position)
-
         self.relative_axis()
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.get_position(configuration)
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
-    
-        # Lz,Rz = self.ref_cmd()
-        # stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,Lz,Rz)
 
-        # l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
-        # JLL = self.left_leg_jacobian()
-        # JRR = self.right_leg_jacobian()
+        state = self.state_collect()
+        Lz_ref,Rz_ref = self.ref_cmd(state)
+        l_contact,r_contact = self.contact_collect()
+        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,Lz_ref,Rz_ref,self.stance)
 
-        self.ref_cmd()
-        Le_2,Re_2,L_ref,R_ref,L = self.calculate_err()
-        stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,L_ref,R_ref)
+        # stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,L_ref,R_ref)
 
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
-
-
-        VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance)
+        Le_2,Re_2,L = self.calculate_err(state)
+        VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance,state)
         
-        if self.state == 0:   
+        if state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
             # print(0)
 
-        elif self.state == 1 or self.state == 9 :
+        elif state == 1 or state == 9 :
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
             torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
-            self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
+            # self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
             # torque_R = self.alip_R(stance,px_in_rf,torque_kine,com_in_rf)
 
@@ -1341,7 +1357,7 @@ class UpperLevelController(Node):
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        elif self.state == 4 or self.state == 7:
+        elif state == 4 or state == 7:
             if stance == 0 or stance == 1 :
                 com_in_lf,com_in_rf = self.com_position(joint_position,stance)
                 torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
@@ -1349,7 +1365,7 @@ class UpperLevelController(Node):
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
                 self.foot_data(px_in_lf,px_in_rf,L,torque_L,com_in_lf)
 
-        elif self.state == 5:
+        elif state == 5:
             torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
             self.effort_publisher.publish(Float64MultiArray(data=torque_test))
 
