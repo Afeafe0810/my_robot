@@ -635,8 +635,8 @@ class UpperLevelController(Node):
             #left_foot
             if self.DS_time > 0:
                 L_Z_ref = 0.0 
-            elif self.RSS_time > 1:
-                L_Z_ref = 0.02*math.sin(self.tt)+0.015
+            elif self.RSS_time > 0:
+                L_Z_ref = 0.02*math.sin(6.28*self.RSS_time)+0.015
             else:
                 L_Z_ref = 0.0 
 
@@ -671,7 +671,7 @@ class UpperLevelController(Node):
                 stance = 2 #雙支撐
         else:
             if stance == 2:
-                if self.DS_time <= 1:
+                if self.DS_time <= 10:
                     stance = 2
                     self.DS_time += self.timer_period
                 else:
@@ -689,6 +689,7 @@ class UpperLevelController(Node):
                         stance = 2
                         self.RSS_time = 0
                     else:
+                        self.RSS_time += self.timer_period
                         stance = 0
             if stance == 1:
                 if self.LSS_time <= 1:
@@ -929,9 +930,9 @@ class UpperLevelController(Node):
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = 2.5*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = 5*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = 5*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
