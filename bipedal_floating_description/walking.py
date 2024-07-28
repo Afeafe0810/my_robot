@@ -623,8 +623,11 @@ class UpperLevelController(Node):
             R_Z_ref = 0.0
         else:
             #pelvis
+            if self.DS_time > 0:
+                P_Y_ref = -0.1*(self.DS_time/10.0)
+            else:
+                P_Y_ref = -0.1
             P_X_ref = 0.0
-            P_Y_ref = 0.0
             P_Z_ref = 0.57
             P_Roll_ref = 0.0
             P_Pitch_ref = 0.0
@@ -635,10 +638,14 @@ class UpperLevelController(Node):
             #left_foot
             if self.DS_time > 0:
                 L_Z_ref = 0.0 
-            elif self.RSS_time > 0:
-                L_Z_ref = 0.02*math.sin(6.28*self.RSS_time)+0.015
+            elif self.RSS_time > 0 and self.RSS_time<=10 :
+                if self.RSS_time >= 5:
+                    L_Z_ref = 0.03*((self.RSS_time-5.0)/5.0)
+                    # L_Z_ref = -0.02*math.cos(6.28*self.RSS_time)+0.015
+                else:
+                    L_Z_ref = 0.0
             else:
-                L_Z_ref = 0.0 
+                L_Z_ref = 0.03
 
             L_X_ref = 0.0
             L_Y_ref = 0.1
@@ -676,12 +683,13 @@ class UpperLevelController(Node):
                     self.DS_time += self.timer_period
                 else:
                     self.DS_time = 0
-                    if Lz > Rz:
-                        stance = 0
-                    else:
-                        stance = 1
+                    stance = 0
+                    # if Lz > Rz:
+                    #     stance = 0
+                    # else:
+                    #     stance = 1
             if stance == 0:
-                if self.RSS_time <= 1:
+                if self.RSS_time <= 10:
                     stance = 0
                     self.RSS_time += self.timer_period
                 else:
