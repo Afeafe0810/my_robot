@@ -347,7 +347,7 @@
   <parent link="l_shank_1"/>
   <child link="l_ankle_1"/>
   <axis xyz="0.0 1.0 0.0"/>
-  <dynamics damping="0.0" friction="0.2"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 
@@ -356,7 +356,7 @@
   <parent link="l_ankle_1"/>
   <child link="l_foot_1"/>
   <axis xyz="1.0 0.0 -0.0"/>
-  <dynamics damping="0.2" friction="0.2"/>
+  <dynamics damping="0.2" friction="0.5"/>
   <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
 </joint>
 

@@ -612,7 +612,7 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def ref_cmd(self,state):
+    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,l_contact):
     
         if state == 0:
             self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
@@ -622,11 +622,45 @@ class UpperLevelController(Node):
             L_Z_ref = 0.0
             R_Z_ref = 0.0
         else:
-            #pelvis
-            if self.DS_time > 0:
-                P_Y_ref = -0.1*(self.DS_time/10.0)
+            if stance == 2:
+                if self.DS_time > 0.0 and self.DS_time <= 10.0:
+                    P_Y_ref = -0.1*(self.DS_time/10.0)
+                else:
+                    if abs(px_in_rf[1,0])<=0.08:
+                        P_Y_ref = -0.1
+                    else:
+                        P_Y_ref = -0.1*(self.DS_time/10.0)
+                L_Z_ref = 0.0
+
+            elif stance == 0:
+                if self.RSS_time > 0.0 and self.RSS_time<=10.0:
+                    if self.RSS_time > 2.5 and self.RSS_time <= 5.0:
+                        L_Z_ref = 0.03*((self.RSS_time-2.5)/2.5) #lift l leg
+                        P_Y_ref = -0.1
+                    elif self.RSS_time > 5.0 and self.RSS_time <= 7.5:
+                        L_Z_ref = 0.03-0.03*((self.RSS_time-5.0)/2.5) #lay down l leg
+                        P_Y_ref = -0.1
+                    elif self.RSS_time > 7.5:
+                        P_Y_ref = -0.1+0.1*((self.RSS_time-7.5)/2.5)#move pelvis to center
+                        L_Z_ref = -0.005
+                        # if l_contact == 0:
+                        #     L_Z_ref = 0.0
+                        #     P_Y_ref = -0.1
+                        # else:
+                        #     L_Z_ref = 0.0
+                        #     # P_Y_ref = -0.1
+                        #     P_Y_ref = -0.1+0.1*((self.RSS_time-7.5)/2.5)#move pelvis to center
+                    else:
+                        L_Z_ref = 0.0
+                        P_Y_ref = -0.1
+                else:
+                    P_Y_ref = 0.0
+                    L_Z_ref = -0.005
             else:
-                P_Y_ref = -0.1
+                L_Z_ref = -0.005
+                P_Y_ref = 0.0
+                
+            #pelvis
             P_X_ref = 0.0
             P_Z_ref = 0.57
             P_Roll_ref = 0.0
@@ -636,17 +670,6 @@ class UpperLevelController(Node):
             self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
 
             #left_foot
-            if self.DS_time > 0:
-                L_Z_ref = 0.0 
-            elif self.RSS_time > 0 and self.RSS_time<=10 :
-                if self.RSS_time >= 5:
-                    L_Z_ref = 0.03*((self.RSS_time-5.0)/5.0)
-                    # L_Z_ref = -0.02*math.cos(6.28*self.RSS_time)+0.015
-                else:
-                    L_Z_ref = 0.0
-            else:
-                L_Z_ref = 0.03
-
             L_X_ref = 0.0
             L_Y_ref = 0.1
             L_Roll_ref = 0.0
@@ -667,7 +690,7 @@ class UpperLevelController(Node):
     
         return  L_Z_ref,R_Z_ref
     
-    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,Lz,Rz,stance):
+    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance):
         if state == 0:
             #用骨盆相對左右腳掌位置來切換   
             if abs(px_in_lf[1,0])<=0.06:
@@ -678,27 +701,29 @@ class UpperLevelController(Node):
                 stance = 2 #雙支撐
         else:
             if stance == 2:
-                if self.DS_time <= 10:
+                if self.DS_time <= 10.0:
                     stance = 2
                     self.DS_time += self.timer_period
                 else:
-                    self.DS_time = 0
-                    stance = 0
-                    # if Lz > Rz:
-                    #     stance = 0
-                    # else:
-                    #     stance = 1
+                    if abs(px_in_lf[1,0])<=0.08:
+                        stance = 1 #左單支撐
+                    elif abs(px_in_rf[1,0])<=0.08:
+                        stance = 0 #右單支撐
+                        self.RSS_time = 0.01
+                    self.DS_time = 0.0
+
             if stance == 0:
                 if self.RSS_time <= 10:
                     stance = 0
                     self.RSS_time += self.timer_period
                 else:
-                    if l_contact == 1:
-                        stance = 2
-                        self.RSS_time = 0
+                    stance = 0
+                    if abs(px_in_rf[1,0])>=0.05:
+                        stance = 2 #雙支撐
+                        self.DS_time = 0.01
+                        self.RSS_time = 0.0
                     else:
-                        self.RSS_time += self.timer_period
-                        stance = 0
+                        stance = 0 #右單支撐
             if stance == 1:
                 if self.LSS_time <= 1:
                     stance = 0
@@ -1325,10 +1350,9 @@ class UpperLevelController(Node):
 
 
         state = self.state_collect()
-        Lz_ref,Rz_ref = self.ref_cmd(state)
         l_contact,r_contact = self.contact_collect()
-        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,Lz_ref,Rz_ref,self.stance)
-
+        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance)
+        self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact)
         # stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,L_ref,R_ref)
 
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance)
