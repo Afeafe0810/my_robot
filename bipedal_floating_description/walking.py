@@ -835,62 +835,10 @@ class UpperLevelController(Node):
         
         return Lw_d,Rw_d
     
-    def gravity_compemsate(self,joint_position,stance_type,px_in_rf):
+    def gravity_compemsate(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
         stance = copy.deepcopy((stance_type))
-        
-        # kr = 0.8
-        # kl = 0.8
-
-        # #雙支撐
-        # if stance == 2:
-        #     kl = 1
-        #     kr = 1
-        #     jp_l = np.flip(-jp_l,axis=0)
-        #     jv_l = np.zeros((6,1))
-        #     c_l = np.zeros((6,1))
-        #     l_leg_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_l,jv_l,(c_l)),(6,1))  
-        #     l_leg_gravity = np.flip(l_leg_gravity,axis=0)
-        #     l_leg_gravity = np.array([[0],[0],[l_leg_gravity[2,0]],[l_leg_gravity[3,0]],[l_leg_gravity[4,0]],[0]])
-
-        #     jp_r = np.flip(-jp_r,axis=0)
-        #     jv_r = np.zeros((6,1))
-        #     c_r = np.zeros((6,1))
-        #     r_leg_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_r,jv_r,(c_r)),(6,1))  
-        #     r_leg_gravity = np.flip(r_leg_gravity,axis=0)
-        #     r_leg_gravity = np.array([[0],[0],[r_leg_gravity[2,0]],[r_leg_gravity[3,0]],[r_leg_gravity[4,0]],[0]])
-        
-        # #右腳為支撐腳(右腳關節翻轉加負號)
-        # elif stance == 0: 
-        #     kr = 1.5
-        #     jp_r = np.flip(-jp_r,axis=0)
-        #     jp = np.vstack((jp_r,jp_l))
-        #     jv = np.zeros((12,1))
-        #     cin = np.zeros((12,1))
-        #     leg_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp,jv,(cin)),(12,1))  
-    
-        #     l_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
-        #     r_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        #     r_leg_gravity = np.flip(r_leg_gravity,axis=0)
-
-        # #左腳為支撐腳(左腳關節翻轉加負號)
-        # elif stance == 1:
-        #     kl = 1.2
-        #     jp_l = np.flip(-jp_l,axis=0)
-        #     jp = np.vstack((jp_l,jp_r))
-        #     jv = np.zeros((12,1))
-        #     cin = np.zeros((12,1))
-        #     leg_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp,jv,(cin)),(12,1))  
-    
-        #     l_leg_gravity = np.reshape(-leg_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        #     l_leg_gravity = np.flip(l_leg_gravity,axis=0)
-        #     r_leg_gravity = np.reshape(leg_gravity[6:,0],(6,1))
-
-        # else:
-        #     l_leg_gravity = np.zeros((6,1))
-        #     r_leg_gravity = np.zeros((6,1))
-
         
         #DS_gravity
         jp_L_DS = np.flip(-jp_l,axis=0)
@@ -935,15 +883,22 @@ class UpperLevelController(Node):
         if stance == 2:
             kl = 1
             kr = 1
-            if abs(px_in_rf[1,0])<=0.05:
+            if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
                 Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
+            
+            elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
+                Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
+            
             else:
                 Leg_gravity = DS_gravity
         
         elif stance == 0:
-            kr = 1.5
+            kr = 1.2
             kl = 0.8
-            Leg_gravity = RSS_gravity
+            if l_contact ==1:
+                Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            else:
+                Leg_gravity = RSS_gravity
         
         elif stance == 1:
             kr = 0.8
@@ -1420,7 +1375,7 @@ class UpperLevelController(Node):
         self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact)
         # stance = self.stance_mode(px_in_lf,px_in_rf,self.l_contact,self.r_contact,L_ref,R_ref)
 
-        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_rf)
+        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
