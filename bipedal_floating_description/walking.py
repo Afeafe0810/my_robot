@@ -154,6 +154,7 @@ class UpperLevelController(Node):
         self.DS_time = 0.0
         self.RSS_time = 0.0
         self.LSS_time = 0.0
+        self.RSS_count = 0
 
         #ALIP
         #time
@@ -618,47 +619,66 @@ class UpperLevelController(Node):
             self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
-            P_Z_ref = 0.57
+            P_Z_ref = 0.55
             L_Z_ref = 0.0
             R_Z_ref = 0.0
         else:
             if stance == 2:
+                L_Z_ref = 0.0
+                R_Z_ref = 0.0
                 if self.DS_time > 0.0 and self.DS_time <= 10.0:
-                    P_Y_ref = -0.1*(self.DS_time/10.0)
+                    if self.RSS_count == 0:
+                        P_Y_ref = -0.1*(self.DS_time/10.0)
+                    else:
+                        P_Y_ref = 0.1*(self.DS_time/10.0)
                 else:
                     if abs(px_in_rf[1,0])<=0.08:
                         P_Y_ref = -0.1
+                    elif abs(px_in_lf[1,0])<=0.08:
+                        P_Y_ref = 0.1
                     else:
-                        P_Y_ref = -0.1*(self.DS_time/10.0)
-                L_Z_ref = 0.0
+                        P_Y_ref = 0.0
 
             elif stance == 0:
                 if self.RSS_time > 0.0 and self.RSS_time<=10.0:
+                    P_Y_ref = -0.1
+                    R_Z_ref = 0.0
                     if self.RSS_time > 2.5 and self.RSS_time <= 5.0:
                         L_Z_ref = 0.03*((self.RSS_time-2.5)/2.5) #lift l leg
-                        P_Y_ref = -0.1
                     elif self.RSS_time > 5.0 and self.RSS_time <= 7.5:
                         L_Z_ref = 0.03-0.03*((self.RSS_time-5.0)/2.5) #lay down l leg
-                        P_Y_ref = -0.1
                     elif self.RSS_time > 7.5:
                         P_Y_ref = -0.1+0.1*((self.RSS_time-7.5)/2.5)#move pelvis to center
                         L_Z_ref = -0.005
-                        # if l_contact == 0:
-                        #     L_Z_ref = 0.0
-                        #     P_Y_ref = -0.1
-                        # else:
-                        #     L_Z_ref = 0.0
-                        #     # P_Y_ref = -0.1
-                        #     P_Y_ref = -0.1+0.1*((self.RSS_time-7.5)/2.5)#move pelvis to center
                     else:
-                        L_Z_ref = 0.0
-                        P_Y_ref = -0.1
+                        L_Z_ref = -0.005
                 else:
                     P_Y_ref = 0.0
                     L_Z_ref = -0.005
+                    R_Z_ref = 0.0
+            
+            elif stance == 1:
+                if self.LSS_time > 0.0 and self.LSS_time<=10.0:
+                    P_Y_ref = 0.1
+                    L_Z_ref = 0.0
+                    if self.LSS_time > 2.5 and self.LSS_time <= 5.0:
+                        R_Z_ref = 0.03*((self.LSS_time-2.5)/2.5) #lift r leg
+                    elif self.LSS_time > 5.0 and self.LSS_time <= 7.5:
+                        R_Z_ref = 0.03-0.03*((self.LSS_time-5.0)/2.5) #lay down r leg
+                    elif self.LSS_time > 7.5:
+                        P_Y_ref = 0.1-0.1*((self.LSS_time-7.5)/2.5)#move pelvis to center
+                        R_Z_ref = -0.005
+                    else:
+                        R_Z_ref = -0.005
+                else:
+                    P_Y_ref = 0.0
+                    L_Z_ref = 0.0
+                    R_Z_ref = -0.005
+
             else:
-                L_Z_ref = -0.005
                 P_Y_ref = 0.0
+                L_Z_ref = 0.0
+                R_Z_ref = 0.0
                 
             #pelvis
             P_X_ref = 0.0
@@ -679,7 +699,6 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
 
             #right_foot
-            R_Z_ref = 0.0
             R_X_ref = 0.0
             R_Y_ref = -0.1           
             R_Roll_ref = 0.0
@@ -705,13 +724,13 @@ class UpperLevelController(Node):
                     stance = 2
                     self.DS_time += self.timer_period
                 else:
+                    self.DS_time = 0.0
                     if abs(px_in_lf[1,0])<=0.08:
                         stance = 1 #左單支撐
+                        self.LSS_time = 0.01
                     elif abs(px_in_rf[1,0])<=0.08:
                         stance = 0 #右單支撐
                         self.RSS_time = 0.01
-                    self.DS_time = 0.0
-
             if stance == 0:
                 if self.RSS_time <= 10:
                     stance = 0
@@ -720,23 +739,19 @@ class UpperLevelController(Node):
                     stance = 2 #雙支撐
                     self.DS_time = 0.01
                     self.RSS_time = 0.0
-                    # if abs(px_in_rf[1,0])>=0.05:
-                    #     stance = 2 #雙支撐
-                    #     self.DS_time = 0.01
-                    #     self.RSS_time = 0.0
-                    # else:
-                    #     stance = 0 #右單支撐
+                    self.RSS_count = 1
             if stance == 1:
-                if self.LSS_time <= 1:
-                    stance = 0
+                if self.LSS_time <= 10:
+                    stance = 1
                     self.LSS_time += self.timer_period
                 else:
-                    if r_contact == 1:
-                        stance = 2
-                        self.LSS_time = 0
-                    else:
-                        stance = 1
-            self.stance = stance
+                    stance = 2 #雙支撐
+                    self.DS_time = 0.01
+                    self.RSS_time = 0.0
+                    self.RSS_count = 0
+
+        self.stance = stance
+
         return stance
 
     def calculate_err(self,state):
@@ -895,15 +910,20 @@ class UpperLevelController(Node):
         elif stance == 0:
             kr = 1.2
             kl = 0.8
-            if l_contact ==1:
-                Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            else:
-                Leg_gravity = RSS_gravity
+            Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            # if l_contact ==1:
+            #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            # else:
+            #     Leg_gravity = RSS_gravity
         
         elif stance == 1:
             kr = 0.8
             kl = 1.2
-            Leg_gravity = LSS_gravity
+            Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # if r_contact ==1:
+            #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # else:
+            #     Leg_gravity = LSS_gravity
 
         else:
             kr = 0.8
