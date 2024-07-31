@@ -155,9 +155,6 @@ class UpperLevelController(Node):
         self.RSS_time = 0.0
         self.LSS_time = 0.0
         self.RSS_count = 0
-        self.DDT = 10.0
-        self.RDT = 10.0
-        self.LDT = 10.0
 
         #ALIP
         #time
@@ -622,13 +619,18 @@ class UpperLevelController(Node):
             self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
+            P_Z_ref = 0.55
+            L_Z_ref = 0.0
+            R_Z_ref = 0.0
         else:
-
-            if state == 1:
+            if stance == 2:
                 L_Z_ref = 0.0
                 R_Z_ref = 0.0
                 if self.DS_time > 0.0 and self.DS_time <= 10.0:
-                    P_Y_ref = -0.1*(self.DS_time/10.0)
+                    if self.RSS_count == 0:
+                        P_Y_ref = -0.1*(self.DS_time/10.0)
+                    else:
+                        P_Y_ref = 0.1*(self.DS_time/10.0)
                 else:
                     if abs(px_in_rf[1,0])<=0.08:
                         P_Y_ref = -0.1
@@ -637,71 +639,50 @@ class UpperLevelController(Node):
                     else:
                         P_Y_ref = 0.0
 
-            if state == 2:
-                if stance == 2:
-                    L_Z_ref = 0.0
+            elif stance == 0:
+                if self.RSS_time > 0.0 and self.RSS_time<=10.0:
+                    P_Y_ref = -0.1
                     R_Z_ref = 0.0
-                    if self.DS_time > 0.0 and self.DS_time <= self.DDT:
-                        if self.RSS_count == 0:
-                            P_Y_ref = -0.1*(self.DS_time/self.DDT)
-                        else:
-                            P_Y_ref = 0.1*(self.DS_time/self.DDT)
-                    else:
-                        if abs(px_in_rf[1,0])<=0.08:
-                            P_Y_ref = -0.1
-                        elif abs(px_in_lf[1,0])<=0.08:
-                            P_Y_ref = 0.1
-                        else:
-                            P_Y_ref = 0.0
-
-                elif stance == 0:
-                    fq_RDT = 0.25*self.RDT
-                    h_RDT = 0.5*self.RDT
-                    rq_RDT = 0.75*self.RDT
-
-                    if self.RSS_time > 0.0 and self.RSS_time<=self.RDT:
-                        P_Y_ref = -0.1
-                        R_Z_ref = 0.0
-                        if self.RSS_time > fq_RDT and self.RSS_time <= h_RDT:
-                            L_Z_ref = 0.03*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
-                        elif self.RSS_time > h_RDT and self.RSS_time <= rq_RDT:
-                            L_Z_ref = 0.03-0.03*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                        elif self.RSS_time > rq_RDT:
-                            P_Y_ref = -0.1+0.1*((self.RSS_time-rq_RDT)/(self.RDT-rq_RDT))#move pelvis to center
-                            L_Z_ref = -0.005
-                        else:
-                            L_Z_ref = -0.005
-                    else:
-                        P_Y_ref = 0.0
+                    if self.RSS_time > 2.5 and self.RSS_time <= 5.0:
+                        L_Z_ref = 0.03*((self.RSS_time-2.5)/2.5) #lift l leg
+                    elif self.RSS_time > 5.0 and self.RSS_time <= 7.5:
+                        L_Z_ref = 0.03-0.03*((self.RSS_time-5.0)/2.5) #lay down l leg
+                    elif self.RSS_time > 7.5:
+                        P_Y_ref = -0.1+0.1*((self.RSS_time-7.5)/2.5)#move pelvis to center
                         L_Z_ref = -0.005
-                        R_Z_ref = 0.0
-                
-                else: #stance = 1
-                    fq_LDT = 0.25*self.LDT
-                    h_LDT = 0.5*self.LDT
-                    rq_LDT = 0.75*self.LDT
-                    if self.LSS_time > 0.0 and self.LSS_time <= self.LDT:
-                        P_Y_ref = 0.1
-                        L_Z_ref = 0.0
-                        if self.LSS_time > fq_LDT and self.LSS_time <= h_LDT:
-                            R_Z_ref = 0.03*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
-                        elif self.LSS_time > h_LDT and self.LSS_time <= rq_LDT:
-                            R_Z_ref = 0.03-0.03*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                        elif self.LSS_time > rq_LDT:
-                            P_Y_ref = 0.1-0.1*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT))#move pelvis to center
-                            R_Z_ref = -0.005
-                        else:
-                            R_Z_ref = -0.005
                     else:
-                        P_Y_ref = 0.0
-                        L_Z_ref = 0.0
+                        L_Z_ref = -0.005
+                else:
+                    P_Y_ref = 0.0
+                    L_Z_ref = -0.005
+                    R_Z_ref = 0.0
+            
+            elif stance == 1:
+                if self.LSS_time > 0.0 and self.LSS_time<=10.0:
+                    P_Y_ref = 0.1
+                    L_Z_ref = 0.0
+                    if self.LSS_time > 2.5 and self.LSS_time <= 5.0:
+                        R_Z_ref = 0.03*((self.LSS_time-2.5)/2.5) #lift r leg
+                    elif self.LSS_time > 5.0 and self.LSS_time <= 7.5:
+                        R_Z_ref = 0.03-0.03*((self.LSS_time-5.0)/2.5) #lay down r leg
+                    elif self.LSS_time > 7.5:
+                        P_Y_ref = 0.1-0.1*((self.LSS_time-7.5)/2.5)#move pelvis to center
                         R_Z_ref = -0.005
+                    else:
+                        R_Z_ref = -0.005
+                else:
+                    P_Y_ref = 0.0
+                    L_Z_ref = 0.0
+                    R_Z_ref = -0.005
 
-
+            else:
+                P_Y_ref = 0.0
+                L_Z_ref = 0.0
+                R_Z_ref = 0.0
                 
             #pelvis
             P_X_ref = 0.0
-            P_Z_ref = 0.55
+            P_Z_ref = 0.57
             P_Roll_ref = 0.0
             P_Pitch_ref = 0.0
             P_Yaw_ref = 0.0
@@ -726,7 +707,7 @@ class UpperLevelController(Node):
 
             self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
     
-        return 
+        return  L_Z_ref,R_Z_ref
     
     def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance):
         if state == 0:
@@ -737,20 +718,9 @@ class UpperLevelController(Node):
                 stance = 0 #右單支撐
             else:
                 stance = 2 #雙支撐
-
-        if state == 1:
-            if self.DS_time <= self.DDT:
-                self.DS_time += self.timer_period
-                stance = 2
-                print("DS",self.DS_time)
-            else:
-                self.DS_time = 10.1
-                stance = 0
-                self.RSS_time = 0.01
-
-        if state == 2:
+        else:
             if stance == 2:
-                if self.DS_time <= self.DDT:
+                if self.DS_time <= 10.0:
                     stance = 2
                     self.DS_time += self.timer_period
                 else:
@@ -762,7 +732,7 @@ class UpperLevelController(Node):
                         stance = 0 #右單支撐
                         self.RSS_time = 0.01
             if stance == 0:
-                if self.RSS_time <= self.RDT:
+                if self.RSS_time <= 10:
                     stance = 0
                     self.RSS_time += self.timer_period
                 else:
@@ -771,7 +741,7 @@ class UpperLevelController(Node):
                     self.RSS_time = 0.0
                     self.RSS_count = 1
             if stance == 1:
-                if self.LSS_time <= self.LDT:
+                if self.LSS_time <= 10:
                     stance = 1
                     self.LSS_time += self.timer_period
                 else:
@@ -794,7 +764,7 @@ class UpperLevelController(Node):
         state - copy.deepcopy(state)
         # print(self.L_ref_data[:,0])
         
-        if state==20 and self.count < 1800:
+        if state==2 and self.count < 1800:
             #foot_trajectory(by norman)
             L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
             R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
@@ -1436,7 +1406,7 @@ class UpperLevelController(Node):
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
             # print(0)
 
-        elif state == 1 or state == 2 :
+        elif state == 1 or state == 9 :
             com_in_lf,com_in_rf = self.com_position(joint_position,stance)
             torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
             # self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
@@ -1452,8 +1422,8 @@ class UpperLevelController(Node):
             elif stance == 2:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
                 
-        # elif self.state == 2:
-        #     self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+        elif self.state == 2:
+            self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
