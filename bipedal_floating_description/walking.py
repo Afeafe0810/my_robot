@@ -625,20 +625,28 @@ class UpperLevelController(Node):
         else:
 
             if state == 1:
-                P_X_ref = 0.0
-                L_X_ref = 0.0
-                L_Z_ref = 0.0
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
                 if self.DS_time > 0.0 and self.DS_time <= 10.0:
-                    P_Y_ref = -0.1*(self.DS_time/10.0)
-                else:
-                    if abs(px_in_rf[1,0])<=0.08:
+                    if self.DS_time > 5.0 and self.DS_time <= 10.0:
+                        P_X_ref = 0.0
                         P_Y_ref = -0.1
-                    elif abs(px_in_lf[1,0])<=0.08:
-                        P_Y_ref = 0.1
+                        if self.DS_time <= 7.5:
+                            L_X_ref = -0.05*((self.DS_time-5.0)/2.5)
+                            L_Z_ref = 0.03*((self.DS_time-5.0)/2.5)
+                        else:
+                            L_X_ref = -0.05*((self.DS_time-7.5)/2.5)
+                            L_Z_ref = 0.03-0.03*((self.DS_time-7.5)/2.5)                            
                     else:
-                        P_Y_ref = 0.0
+                        P_X_ref = 0.0
+                        P_Y_ref = -0.1*(self.DS_time/5.0)
+                        L_X_ref = 0.0
+                        L_Z_ref = 0.0
+                else:
+                    P_X_ref = 0.0
+                    P_Y_ref = -0.1
+                    L_X_ref = -0.1
+                    L_Z_ref = 0.0
 
             if state == 2:
                 if stance == 2:
