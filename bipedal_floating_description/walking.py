@@ -155,9 +155,9 @@ class UpperLevelController(Node):
         self.RSS_time = 0.0
         self.LSS_time = 0.0
         self.RSS_count = 0
-        self.DDT = 3
-        self.RDT = 2.5
-        self.LDT = 2.5
+        self.DDT = 2
+        self.RDT = 1
+        self.LDT = 1
 
         #ALIP
         #time
@@ -624,9 +624,9 @@ class UpperLevelController(Node):
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
             Lth = 0.16
-            hLth = 0.08
-            hhLth = 0.04
-            pyLth = 0.08
+            hLth = 0.05
+            hhLth = 0.025
+            pyLth = 0.05
             hight  = 0.05
             if state == 1:
                 R_X_ref = 0.0
