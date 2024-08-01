@@ -665,7 +665,7 @@ class UpperLevelController(Node):
                             P_Y_ref = -0.1
                         elif abs(px_in_lf[1,0])<=0.08:
                             P_X_ref = 0.1
-                            P_Y_ref = 0.1
+                            P_Y_ref = 0.08
                             L_X_ref = 0.1
                             R_X_ref = 0.0
                         else:
@@ -679,14 +679,14 @@ class UpperLevelController(Node):
                     rq_RDT = 0.75*self.RDT
                     if self.RSS_time > 0.0 and self.RSS_time<=self.RDT:
                         if self.RSS_time > fq_RDT and self.RSS_time <= h_RDT:
-                            P_X_ref = 0.025*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
+                            P_X_ref = 0.0
                             P_Y_ref = -0.1
-                            L_X_ref = 0.05*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
+                            L_X_ref = -0.1+0.1*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                             L_Z_ref = 0.03*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                         elif self.RSS_time > h_RDT and self.RSS_time <= rq_RDT:
-                            P_X_ref = 0.025+0.025*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            P_X_ref = 0.05*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             P_Y_ref = -0.1+0.1*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            L_X_ref = 0.05+0.05*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            L_X_ref = 0.1*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             L_Z_ref = 0.03-0.03*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                         elif self.RSS_time > rq_RDT:
                             P_X_ref = 0.05
@@ -696,7 +696,7 @@ class UpperLevelController(Node):
                         else:
                             P_X_ref = 0.0
                             P_Y_ref = -0.1
-                            L_X_ref = 0.0
+                            L_X_ref = -0.1
                             L_Z_ref = 0.0
                     else:
                         P_X_ref = 0.05
@@ -705,25 +705,37 @@ class UpperLevelController(Node):
                         L_Z_ref = 0.0
                 
                 else: #stance = 1
+                    L_X_ref = 0.0
+                    L_Z_ref = 0.0
                     fq_LDT = 0.25*self.LDT
                     h_LDT = 0.5*self.LDT
                     rq_LDT = 0.75*self.LDT
                     if self.LSS_time > 0.0 and self.LSS_time <= self.LDT:
-                        P_Y_ref = 0.1
-                        L_Z_ref = 0.0
                         if self.LSS_time > fq_LDT and self.LSS_time <= h_LDT:
+                            P_X_ref = 0.0
+                            P_Y_ref = 0.1 #
+                            R_X_ref = -0.1+0.1*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                             R_Z_ref = 0.03*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                         elif self.LSS_time > h_LDT and self.LSS_time <= rq_LDT:
+                            P_X_ref = 0.05*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            P_Y_ref = 0.1-0.1*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            R_X_ref = 0.1*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                             R_Z_ref = 0.03-0.03*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                         elif self.LSS_time > rq_LDT:
-                            P_Y_ref = 0.1-0.1*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT))#move pelvis to center
-                            R_Z_ref = -0.005
+                            P_X_ref = 0.05
+                            P_Y_ref = 0.0
+                            R_X_ref = 0.1
+                            R_Z_ref = 0.0
                         else:
-                            R_Z_ref = -0.005
+                            P_X_ref = 0.0
+                            P_Y_ref = 0.1 #
+                            R_X_ref = -0.1
+                            R_Z_ref = 0.0
                     else:
+                        P_X_ref = 0.05
                         P_Y_ref = 0.0
-                        L_Z_ref = 0.0
-                        R_Z_ref = -0.005
+                        R_X_ref = 0.1
+                        R_Z_ref = 0.0
 
 
                 
@@ -779,10 +791,10 @@ class UpperLevelController(Node):
                     stance = 2
                     self.DS_time += self.timer_period
                 else:
-                    self.DS_time = 10.1
+                    self.DS_time = 0.0
                     if abs(px_in_lf[1,0])<=0.08:
-                        stance = 2 #左單支撐
-                        self.LSS_time = 0
+                        stance = 1 #左單支撐
+                        self.LSS_time = 0.01
                     elif abs(px_in_rf[1,0])<=0.08:
                         stance = 0 #右單支撐
                         self.RSS_time = 0.01
@@ -800,9 +812,9 @@ class UpperLevelController(Node):
                     stance = 1
                     self.LSS_time += self.timer_period
                 else:
-                    stance = 2 #雙支撐
+                    stance = 1 #雙支撐
                     self.DS_time = 0.01
-                    self.RSS_time = 0.0
+                    self.LSS_time = 10.1
                     self.RSS_count = 0
 
         self.stance = stance
@@ -974,6 +986,7 @@ class UpperLevelController(Node):
         elif stance == 1:
             kr = 0.8
             kl = 1.2
+            # Leg_gravity = LSS_gravity
             Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
             # if r_contact ==1:
             #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
@@ -1052,8 +1065,8 @@ class UpperLevelController(Node):
         torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[4,0] = 2*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = 2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
         torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
