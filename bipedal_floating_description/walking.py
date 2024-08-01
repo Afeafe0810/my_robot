@@ -155,7 +155,7 @@ class UpperLevelController(Node):
         self.RSS_time = 0.0
         self.LSS_time = 0.0
         self.RSS_count = 0
-        self.DDT = 2.5
+        self.DDT = 3
         self.RDT = 2.5
         self.LDT = 2.5
 
@@ -623,9 +623,9 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-            Lth = 0.12
-            hLth = 0.06
-            hhLth = 0.03
+            Lth = 0.16
+            hLth = 0.08
+            hhLth = 0.04
             pyLth = 0.08
             hight  = 0.05
             if state == 1:
@@ -694,13 +694,17 @@ class UpperLevelController(Node):
                             L_X_ref = -hLth+hLth*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                             L_Z_ref = hight*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                         elif self.RSS_time > h_RDT and self.RSS_time <= rq_RDT:
-                            P_X_ref = hhLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            P_Y_ref = -pyLth+pyLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            P_X_ref = 0.0
+                            P_Y_ref = -pyLth
+                            # P_X_ref = hhLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            # P_Y_ref = -pyLth+pyLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             L_X_ref = hLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             L_Z_ref = hight-hight*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                         elif self.RSS_time > rq_RDT:
-                            P_X_ref = hhLth
-                            P_Y_ref = 0.0
+                            P_X_ref = hhLth*((self.RSS_time-rq_RDT)/(self.RDT-rq_RDT)) #lay down l leg
+                            P_Y_ref = -pyLth+pyLth*((self.RSS_time-rq_RDT)/(self.RDT-rq_RDT)) #lay down l leg
+                            # P_X_ref = hhLth
+                            # P_Y_ref = 0.0
                             L_X_ref = hLth
                             L_Z_ref = 0.0
                         else:
@@ -727,13 +731,17 @@ class UpperLevelController(Node):
                             R_X_ref = -hLth+hLth*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                             R_Z_ref = hight*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                         elif self.LSS_time > h_LDT and self.LSS_time <= rq_LDT:
-                            P_X_ref = hhLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                            P_Y_ref = pyLth-pyLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            P_X_ref = 0.0
+                            P_Y_ref = pyLth
+                            # P_X_ref = hhLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            # P_Y_ref = pyLth-pyLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                             R_X_ref = hLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                             R_Z_ref = hight-hight*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                         elif self.LSS_time > rq_LDT:
-                            P_X_ref = hhLth
-                            P_Y_ref = 0.0
+                            P_X_ref = hhLth*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT)) #lay down r leg
+                            P_Y_ref = pyLth-pyLth*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT)) #lay down r leg
+                            # P_X_ref = hhLth
+                            # P_Y_ref = 0.0
                             R_X_ref = hLth
                             R_Z_ref = 0.0
                         else:
