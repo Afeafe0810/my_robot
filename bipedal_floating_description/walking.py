@@ -155,9 +155,9 @@ class UpperLevelController(Node):
         self.RSS_time = 0.0
         self.LSS_time = 0.0
         self.RSS_count = 0
-        self.DDT = 10.0
-        self.RDT = 10.0
-        self.LDT = 10.0
+        self.DDT = 2.5
+        self.RDT = 2.5
+        self.LDT = 2.5
 
         #ALIP
         #time
@@ -623,7 +623,9 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-
+            Lth = 0.03
+            hLth = 0.015
+            hhLth = 0.0075
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -632,10 +634,10 @@ class UpperLevelController(Node):
                         P_X_ref = 0.0
                         P_Y_ref = -0.1
                         if self.DS_time <= 7.5:
-                            L_X_ref = -0.05*((self.DS_time-5.0)/2.5)
+                            L_X_ref = -hhLth*((self.DS_time-5.0)/2.5)
                             L_Z_ref = 0.03*((self.DS_time-5.0)/2.5)
                         else:
-                            L_X_ref = -0.05*((self.DS_time-7.5)/2.5)
+                            L_X_ref = -hhLth-hhLth*((self.DS_time-7.5)/2.5)
                             L_Z_ref = 0.03-0.03*((self.DS_time-7.5)/2.5)                            
                     else:
                         P_X_ref = 0.0
@@ -645,7 +647,7 @@ class UpperLevelController(Node):
                 else:
                     P_X_ref = 0.0
                     P_Y_ref = -0.1
-                    L_X_ref = -0.1
+                    L_X_ref = -Lth
                     L_Z_ref = 0.0
 
             if state == 2:
@@ -654,19 +656,25 @@ class UpperLevelController(Node):
                     R_Z_ref = 0.0
                     if self.DS_time > 0.0 and self.DS_time <= self.DDT:
                         if self.RSS_count == 0:
+                            P_X_ref = hLth+hLth*(self.DS_time/self.DDT)
                             P_Y_ref = -0.1*(self.DS_time/self.DDT)
+                            L_X_ref = 0.0
+                            R_X_ref = Lth
                         else:
-                            P_X_ref = 0.05+0.05*(self.DS_time/self.DDT)
+                            P_X_ref = hLth+hLth*(self.DS_time/self.DDT)
                             P_Y_ref = 0.1*(self.DS_time/self.DDT)
-                            L_X_ref = 0.1
+                            L_X_ref = Lth
                             R_X_ref = 0.0
                     else:
                         if abs(px_in_rf[1,0])<=0.08:
+                            P_X_ref = Lth
                             P_Y_ref = -0.1
+                            L_X_ref = 0.0
+                            R_X_ref = Lth
                         elif abs(px_in_lf[1,0])<=0.08:
-                            P_X_ref = 0.1
-                            P_Y_ref = 0.08
-                            L_X_ref = 0.1
+                            P_X_ref = Lth
+                            P_Y_ref = 0.1
+                            L_X_ref = Lth
                             R_X_ref = 0.0
                         else:
                             P_Y_ref = 0.0
@@ -681,25 +689,25 @@ class UpperLevelController(Node):
                         if self.RSS_time > fq_RDT and self.RSS_time <= h_RDT:
                             P_X_ref = 0.0
                             P_Y_ref = -0.1
-                            L_X_ref = -0.1+0.1*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
+                            L_X_ref = -Lth+Lth*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                             L_Z_ref = 0.03*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
                         elif self.RSS_time > h_RDT and self.RSS_time <= rq_RDT:
-                            P_X_ref = 0.05*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            P_X_ref = hLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             P_Y_ref = -0.1+0.1*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            L_X_ref = 0.1*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
+                            L_X_ref = Lth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                             L_Z_ref = 0.03-0.03*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
                         elif self.RSS_time > rq_RDT:
-                            P_X_ref = 0.05
+                            P_X_ref = hLth
                             P_Y_ref = 0.0
-                            L_X_ref = 0.1
+                            L_X_ref = Lth
                             L_Z_ref = 0.0
                         else:
                             P_X_ref = 0.0
                             P_Y_ref = -0.1
-                            L_X_ref = -0.1
+                            L_X_ref = -Lth
                             L_Z_ref = 0.0
                     else:
-                        P_X_ref = 0.05
+                        P_X_ref = hLth
                         P_Y_ref = 0.0
                         L_X_ref = 0.1
                         L_Z_ref = 0.0
@@ -714,27 +722,27 @@ class UpperLevelController(Node):
                         if self.LSS_time > fq_LDT and self.LSS_time <= h_LDT:
                             P_X_ref = 0.0
                             P_Y_ref = 0.1 #
-                            R_X_ref = -0.1+0.1*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
+                            R_X_ref = -Lth+Lth*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                             R_Z_ref = 0.03*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
                         elif self.LSS_time > h_LDT and self.LSS_time <= rq_LDT:
-                            P_X_ref = 0.05*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            P_X_ref = hLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                             P_Y_ref = 0.1-0.1*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                            R_X_ref = 0.1*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
+                            R_X_ref = Lth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                             R_Z_ref = 0.03-0.03*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
                         elif self.LSS_time > rq_LDT:
-                            P_X_ref = 0.05
+                            P_X_ref = hLth
                             P_Y_ref = 0.0
-                            R_X_ref = 0.1
+                            R_X_ref = Lth
                             R_Z_ref = 0.0
                         else:
                             P_X_ref = 0.0
                             P_Y_ref = 0.1 #
-                            R_X_ref = -0.1
+                            R_X_ref = -Lth
                             R_Z_ref = 0.0
                     else:
-                        P_X_ref = 0.05
+                        P_X_ref = hLth
                         P_Y_ref = 0.0
-                        R_X_ref = 0.1
+                        R_X_ref = Lth
                         R_Z_ref = 0.0
 
 
@@ -812,9 +820,9 @@ class UpperLevelController(Node):
                     stance = 1
                     self.LSS_time += self.timer_period
                 else:
-                    stance = 1 #雙支撐
+                    stance = 2 #雙支撐
                     self.DS_time = 0.01
-                    self.LSS_time = 10.1
+                    self.LSS_time = 0
                     self.RSS_count = 0
 
         self.stance = stance
@@ -928,14 +936,12 @@ class UpperLevelController(Node):
         c_L_DS = np.zeros((6,1))
         L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
         L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-        # L_DS_gravity = np.array([[0],[0],[l_leg_gravity[2,0]],[l_leg_gravity[3,0]],[l_leg_gravity[4,0]],[0]])
 
         jp_R_DS = np.flip(-jp_r,axis=0)
         jv_R_DS = np.zeros((6,1))
         c_R_DS = np.zeros((6,1))
         R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
         R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        # r_leg_gravity = np.array([[0],[0],[r_leg_gravity[2,0]],[r_leg_gravity[3,0]],[r_leg_gravity[4,0]],[0]])
         DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
 
         #RSS_gravity
@@ -963,8 +969,14 @@ class UpperLevelController(Node):
         LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
 
         if stance == 2:
-            kl = 1
-            kr = 1
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kr = np.array([[1],[1],[1],[1],[1],[1]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kl = np.array([[1],[1],[1],[1],[1],[1]])
             if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
                 Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
             
@@ -975,8 +987,11 @@ class UpperLevelController(Node):
                 Leg_gravity = DS_gravity
         
         elif stance == 0:
-            kr = 1.2
-            kl = 0.8
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+            else:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
             Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
             # if l_contact ==1:
             #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
@@ -984,9 +999,11 @@ class UpperLevelController(Node):
             #     Leg_gravity = RSS_gravity
         
         elif stance == 1:
-            kr = 0.8
-            kl = 1.2
-            # Leg_gravity = LSS_gravity
+            kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+            else:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
             # if r_contact ==1:
             #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
@@ -994,8 +1011,8 @@ class UpperLevelController(Node):
             #     Leg_gravity = LSS_gravity
 
         else:
-            kr = 0.8
-            kl = 0.8
+            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
+            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
             Leg_gravity = np.zeros((12,1))
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
@@ -1061,19 +1078,19 @@ class UpperLevelController(Node):
 
         torque = np.zeros((12,1))
 
-        torque[0,0] = kl*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
-        torque[1,0] = kl*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
-        torque[2,0] = kl*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = kl*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = 2*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = 2*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
 
-        torque[6,0] = kr*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = kr*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
-        torque[8,0] = kr*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
+        torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
