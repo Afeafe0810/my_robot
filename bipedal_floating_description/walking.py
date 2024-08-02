@@ -624,10 +624,14 @@ class UpperLevelController(Node):
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
             Lth = 0.16
-            hLth = 0.05
-            hhLth = 0.025
-            pyLth = 0.05
+            hLth = 0.06
+            hhLth = 0.03
+            pyLth = 0.06
             hight  = 0.05
+            # hLth = 0.0
+            # hhLth = 0.0
+            # pyLth = 0.06
+            # hight  = 0.0
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -987,38 +991,82 @@ class UpperLevelController(Node):
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             else:
                 kl = np.array([[1],[1],[1],[1],[1],[1]])
-            if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-                Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
+
+            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
+                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
             
-            elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-                Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
+            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
+                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
+            
+            else:
+                Leg_gravity = DS_gravity
+
+            # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
+            #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
+            
+            # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
+            #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
+            
+            # else:
+            #     Leg_gravity = DS_gravity
+        
+        elif stance == 0:
+            # if r_contact == 1:
+            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+            # else:
+            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            # kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            # # if l_contact ==1:
+            # #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            # # else:
+            # #     Leg_gravity = RSS_gravity
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kr = np.array([[1],[1],[1],[1],[1],[1]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kl = np.array([[1],[1],[1],[1],[1],[1]])
+
+            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
+                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
+            
+            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
+                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
             
             else:
                 Leg_gravity = DS_gravity
         
-        elif stance == 0:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            else:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            # if l_contact ==1:
-            #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            # else:
-            #     Leg_gravity = RSS_gravity
-        
         elif stance == 1:
-            kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            else:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            # if r_contact ==1:
-            #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            # if l_contact == 1:
+            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
             # else:
-            #     Leg_gravity = LSS_gravity
+            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # # if r_contact ==1:
+            # #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # # else:
+            # #     Leg_gravity = LSS_gravity
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kr = np.array([[1],[1],[1],[1],[1],[1]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kl = np.array([[1],[1],[1],[1],[1],[1]])
+
+            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
+                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
+            
+            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
+                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
+            
+            else:
+                Leg_gravity = DS_gravity
 
         else:
             kr = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
