@@ -91,6 +91,13 @@ class UpperLevelController(Node):
         #joint_velocity_cal
         self.joint_position_past = np.zeros((12,1))
 
+        #joint_velocity_filter (jp = after filter)
+        self.jp = np.zeros((12,1))
+        self.jp_p = np.zeros((12,1))
+        self.jp_pp = np.zeros((12,1))
+        self.jp_sub_p = np.zeros((12,1))
+        self.jp_sub_pp = np.zeros((12,1))
+
         #joint_velocity_filter (jv = after filter)
         self.jv = np.zeros((12,1))
         self.jv_p = np.zeros((12,1))
@@ -326,12 +333,34 @@ class UpperLevelController(Node):
 
         return joint_position,joint_velocity
 
+    def joint_position_filter(self,joint_position):
+        
+        jp_sub = copy.deepcopy(joint_position)
+
+        self.jp = 1.1580*self.jp_p - 0.4112*self.jp_pp + 0.1453*self.jp_sub_p + 0.1078*self.jp_sub_pp #10Hz
+
+        self.jp_pp = copy.deepcopy(self.jp_p)
+        self.jp_p = copy.deepcopy(self.jp)
+        self.jp_sub_pp = copy.deepcopy(self.jp_sub_p)
+        self.jp_sub_p = copy.deepcopy(jp_sub)
+
+        return self.jp
+
     def joint_velocity_cal(self,joint_position):
         joint_position_now = copy.deepcopy(joint_position)
-        joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
-        self.joint_position_past = joint_position_now
-
+        # joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
+        joint_velocity_cal = (joint_position_now - self.joint_position_past)/0.01
+        self.joint_position_past = joint_position_now     
+        
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
+
+        for i in range(len(joint_velocity_cal)):
+            if joint_velocity_cal[i,0]>= 0.25:
+                joint_velocity_cal[i,0] = 0.25
+            elif joint_velocity_cal[i,0]<= -0.25:
+                joint_velocity_cal[i,0] = -0.25
+            i += 1
+
         return joint_velocity_cal
 
     def joint_velocity_filter(self,joint_velocity):
@@ -1074,8 +1103,8 @@ class UpperLevelController(Node):
 
 
         if state == 1:
-            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
-            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
+            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
+            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
@@ -1316,15 +1345,13 @@ class UpperLevelController(Node):
         torque[8,0] = 4*(p[8,0]-jp[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = 6*(p[9,0]-jp[9,0]) + r_leg_gravity[3,0]
         torque[10,0] = 6*(p[10,0]-jp[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = 40*(p[11,0]-jp[11,0]) + r_leg_gravity[5,0]
+        torque[11,0] = 4*(p[11,0]-jp[11,0]) + r_leg_gravity[5,0]
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def swing_leg(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf,com_in_rf):
+    def swing_leg(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf,com_in_rf):
         print("swing_mode")
         self.tt += 0.0157
-        jp = copy.deepcopy(joint_position)
-        print("ankle_roll_angle:",jp[5,0])
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
         vr_cmd = copy.deepcopy(r_leg_vcmd)
@@ -1737,8 +1764,12 @@ class UpperLevelController(Node):
     def main_controller_callback(self):
 
         joint_position,joint_velocity = self.collect_joint_data()
+        # jp_f = self.joint_position_filter(joint_position)
+
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
+        # joint_velocity_cal = self.joint_velocity_cal(jp_f)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
+
         self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
         self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
         
@@ -1775,7 +1806,7 @@ class UpperLevelController(Node):
             # print(0)
 
         elif state == 1 or state == 2 :
-            torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
+            torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
             # self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
             # torque_R = self.alip_R(stance,px_in_rf,torque_kine,com_in_rf)
