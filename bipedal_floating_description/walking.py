@@ -136,6 +136,8 @@ class UpperLevelController(Node):
         self.viz.initViewer(open=True)
         self.viz.loadViewerModel()
 
+        #
+        self.call = 0
 
         # Set initial robot configuration
         print(self.robot.model)
@@ -146,16 +148,21 @@ class UpperLevelController(Node):
         # Tasks initialization for IK
         self.tasks = self.tasks_init()
 
-        self.timer_period = 0.01 # seconds
-        self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
+        self.timer_period = 0.01 # seconds 跟joint state update rate&取樣次數有關
+        # self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
 
         self.tt = 0
         self.P_Y_ref = 0.0
 
         #path_data_norman(減過後的軌跡)
-
         self.L_ref_data = pd.read_csv('/home/ldsc/Path_norman/LX.csv', header=None).values
         self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
+
+        #path_data_ALIP
+        self.APX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/PX_ref.csv', header=None).values
+        self.ALX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/LX_ref.csv', header=None).values
+        self.ARX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/RX_ref.csv', header=None).values
+
         self.count = 0
         self.stance = 2
         self.DS_time = 0.0
@@ -168,6 +175,7 @@ class UpperLevelController(Node):
 
         #ALIP
         #time
+        self.ALIP_count = 0
         self.alip_t = 0.0
         #--velocity
         self.CX_past_L = 0.0
@@ -348,8 +356,7 @@ class UpperLevelController(Node):
 
     def joint_velocity_cal(self,joint_position):
         joint_position_now = copy.deepcopy(joint_position)
-        # joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
-        joint_velocity_cal = (joint_position_now - self.joint_position_past)/0.01
+        joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
         self.joint_position_past = joint_position_now     
         
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
@@ -404,6 +411,11 @@ class UpperLevelController(Node):
             self.jp_sub = np.array([position_order_dict[joint] for joint in desired_order])
 
         self.collect_joint_data()
+
+        self.call += 1
+        if self.call == 5:
+            self.main_controller_callback()
+            self.call = 0
 
 
         # print(msg.position)
@@ -645,22 +657,22 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,l_contact):
+    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,l_contact,ALIP_count):
     
         if state == 0:
             self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-            Lth = 0.16
-            hLth = 0.06
-            hhLth = 0.03
-            pyLth = 0.05
-            hight  = 0.05
-            # hLth = 0.0
-            # hhLth = 0.0
-            # pyLth = 0.1
-            # hight  = 0.0
+            # Lth = 0.16
+            # hLth = 0.08
+            # hhLth = 0.04
+            # pyLth = 0.06
+            # hight  = 0.05
+            hLth = 0.0
+            hhLth = 0.0
+            pyLth = -0.06
+            hight  = 0.0
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -788,7 +800,18 @@ class UpperLevelController(Node):
                         R_X_ref = hLth
                         R_Z_ref = 0.0
 
+            if state == 30:
+                P_X_ref = self.APX_ref_data[ALIP_count,0]
+                P_Y_ref = self.APX_ref_data[ALIP_count,1]
+                P_Z_ref = self.APX_ref_data[ALIP_count,2]
 
+                L_X_ref = self.ALX_ref_data[ALIP_count,0]
+                L_Y_ref = self.ALX_ref_data[ALIP_count,1]
+                L_Z_ref = self.ALX_ref_data[ALIP_count,2]
+
+                R_X_ref = self.ARX_ref_data[ALIP_count,0]
+                R_Y_ref = self.ARX_ref_data[ALIP_count,1]
+                R_Z_ref = self.ARX_ref_data[ALIP_count,2]
                 
             #pelvis
             P_Z_ref = 0.55
@@ -882,10 +905,11 @@ class UpperLevelController(Node):
         state - copy.deepcopy(state)
         # print(self.L_ref_data[:,0])
         
-        if state==20 and self.count < 4200:
+        if state == 20 and self.count < 4200:
             #foot_trajectory(by norman)
             L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
             R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
+
         else:
             #foot_trajectory(by myself)
             L_ref = LX_ref - PX_ref 
@@ -1387,7 +1411,46 @@ class UpperLevelController(Node):
         self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
 
         return torque
+   
+    def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf,com_in_rf):
+        print("ALIP_mode")
+        self.tt += 0.0157
+        jv = copy.deepcopy(joint_velocity)
+        vl_cmd = copy.deepcopy(l_leg_vcmd)
+        vr_cmd = copy.deepcopy(r_leg_vcmd)
+        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
+        print("com_lf:",com_in_lf)
+        print("com_rf:",com_in_rf)
+        # #L_leg_velocity
+        # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
+
+        torque = np.zeros((12,1))
+
+        torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
+        torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
+        torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
+        torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+
+        torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
+        torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
+        torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
+        torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+
+        # self.effort_publisher.publish(Float64MultiArray(data=torque))
+        
+        vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
+        self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
+        jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
+        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
+
+        return torque
+    
     def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf):
         print("walking_mode")
         self.tt += 0.0157
@@ -1790,11 +1853,9 @@ class UpperLevelController(Node):
         if state == 20:
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate2(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
         else:
-            self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact)
+            self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
             # l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_by_com(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state,com_in_rf)
-
-        
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
@@ -1805,7 +1866,7 @@ class UpperLevelController(Node):
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
             # print(0)
 
-        elif state == 1 or state == 2 :
+        elif state == 1 or state == 2:
             torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
             # self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
             # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
@@ -1821,9 +1882,14 @@ class UpperLevelController(Node):
                 self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
                 
         elif state == 20:
-            torque_kine = self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
+            torque_walking = self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_walking))
 
+        elif state == 30:
+            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+            self.ALIP_count += 1
+       
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
@@ -1840,26 +1906,6 @@ class UpperLevelController(Node):
         elif state == 5:
             torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
             self.effort_publisher.publish(Float64MultiArray(data=torque_test))
-
-        # # for trajectory controller
-        # p = joint_position + self.timer_period*v
-        # v = np.reshape(v,(12))
-        # p = np.reshape(p,(12))
-        # p = np.array([0.0,0.0,-0.37,0.74,-0.36,0.0,0.0,0.0,-0.37,0.74,-0.36,0.0])
-        # trajectory_msg  = JointTrajectory()
-        # # trajectory_msg.header.stamp = self.get_clock().now().to_msg()
-        # trajectory_msg.header.frame_id= 'base_link'
-        # trajectory_msg.joint_names = [
-        #     'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
-        #     'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
-        #     'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
-        # ]
-        # point = JointTrajectoryPoint()
-        # point.positions = list(p)
-        # point.velocities = list(v)
-        # point.time_from_start = rclpy.duration.Duration(seconds=self.timer_period).to_msg()
-        # trajectory_msg.points.append(point)
-        # self.joint_trajectory_controller.publish(trajectory_msg)
 
 
 def main(args=None):
