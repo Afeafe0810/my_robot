@@ -1287,6 +1287,99 @@ class UpperLevelController(Node):
         
         return l_leg_gravity,r_leg_gravity,kl,kr
 
+    def gravity_ALIP(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,ALIP_count):
+        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
+        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
+        # stance = copy.deepcopy((stance_type))
+
+        #DS_gravity
+        jp_L_DS = np.flip(-jp_l,axis=0)
+        jv_L_DS = np.zeros((6,1))
+        c_L_DS = np.zeros((6,1))
+        L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
+        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
+
+        jp_R_DS = np.flip(-jp_r,axis=0)
+        jv_R_DS = np.zeros((6,1))
+        c_R_DS = np.zeros((6,1))
+        R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
+        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
+        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
+
+        #RSS_gravity
+        jp_R_RSS = np.flip(-jp_r,axis=0)
+        jp_RSS = np.vstack((jp_R_RSS,jp_l))
+        jv_RSS = np.zeros((12,1))
+        c_RSS = np.zeros((12,1))
+        Leg_RSS_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
+
+        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
+        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
+        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
+        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
+
+        #LSS_gravity
+        jp_L_LSS = np.flip(-jp_l,axis=0)
+        jp_LSS = np.vstack((jp_L_LSS,jp_r))
+        jv_LSS = np.zeros((12,1))
+        c_LSS = np.zeros((12,1))
+        Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
+
+        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
+        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
+        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
+        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
+
+        if ALIP_count % 100 < 50:
+            stance = 1
+        elif ALIP_count % 100 >= 50 and ALIP_count % 100 < 100 :
+            stance = 0
+        else:
+            stance = 2
+
+        if stance == 2:
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kr = np.array([[1],[1],[1],[1],[1],[1]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            else:
+                kl = np.array([[1],[1],[1],[1],[1],[1]])
+
+            if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
+                Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
+            
+            elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
+                Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
+            
+            else:
+                Leg_gravity = DS_gravity
+        
+        elif stance == 0:
+            if r_contact == 1:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+            else:
+                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+        
+        elif stance == 1:
+            kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            if l_contact == 1:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+            else:
+                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+            Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+
+        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
+        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
+
+        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
+        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
+        
+        return l_leg_gravity,r_leg_gravity,kl,kr
+
     def gravity_by_com(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,state,com_in_rf):
 
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
@@ -1852,6 +1945,9 @@ class UpperLevelController(Node):
 
         if state == 20:
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate2(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
+        elif state == 30:
+            self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
+            l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,self.ALIP_count)
         else:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
