@@ -55,8 +55,6 @@ class UpperLevelController(Node):
         self.pelvis_publisher = self.create_publisher(Float64MultiArray , '/pelvis_data', 10)
         self.left_publisher = self.create_publisher(Float64MultiArray , '/left_data', 10)
         self.right_publisher = self.create_publisher(Float64MultiArray , '/right_data', 10)
-        # self.Q0 = np.array([0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
-        # self.Q0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0, 0.0, 0.0, -0.37, 0.74, -0.36, 0.0])
 
         self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
 
@@ -362,10 +360,10 @@ class UpperLevelController(Node):
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
 
         for i in range(len(joint_velocity_cal)):
-            if joint_velocity_cal[i,0]>= 0.25:
-                joint_velocity_cal[i,0] = 0.25
-            elif joint_velocity_cal[i,0]<= -0.25:
-                joint_velocity_cal[i,0] = -0.25
+            if joint_velocity_cal[i,0]>= 0.5:
+                joint_velocity_cal[i,0] = 0.5
+            elif joint_velocity_cal[i,0]<= -0.5:
+                joint_velocity_cal[i,0] = -0.5
             i += 1
 
         return joint_velocity_cal
@@ -507,7 +505,7 @@ class UpperLevelController(Node):
         self.l_ankle_pitch = configuration.get_transform_frame_to_world("l_ankle_1")
         self.l_ankle_roll = configuration.get_transform_frame_to_world("l_foot_1")
         self.l_foot = configuration.get_transform_frame_to_world("l_foot")
-        print("l_foot:",self.l_foot.translation)
+        # print("l_foot:",self.l_foot.translation)
         self.r_hip_roll = configuration.get_transform_frame_to_world("r_hip_yaw_1")
         self.r_hip_yaw = configuration.get_transform_frame_to_world("r_hip_pitch_1")
         self.r_hip_pitch = configuration.get_transform_frame_to_world("r_thigh_1")
@@ -515,14 +513,13 @@ class UpperLevelController(Node):
         self.r_ankle_pitch = configuration.get_transform_frame_to_world("r_ankle_1")
         self.r_ankle_roll = configuration.get_transform_frame_to_world("r_foot_1")
         self.r_foot = configuration.get_transform_frame_to_world("r_foot")
-        print("r_foot:",self.r_foot.translation)
+        # print("r_foot:",self.r_foot.translation)
           
     def get_posture(self):
         cos = math.cos
         sin = math.sin
 
         pelvis_p = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
-        pelvis_p[0,0] = pelvis_p[0,0] - 0.007
         l_foot_p = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
         r_foot_p = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
 
@@ -559,36 +556,12 @@ class UpperLevelController(Node):
         
         # print("PX",self.PX)
         # print("LX",self.LX)
+        # print("RX",self.RX)
 
         px_in_lf = self.PX - self.LX #骨盆中心相對於左腳
         px_in_rf = self.PX - self.RX #骨盆中心相對於右腳
 
         return px_in_lf,px_in_rf
-
-    def stance_mode(self,px_in_lf,px_in_rf,l_contact,r_contact,L_ref,R_ref):
-        Lz = L_ref[2,0]
-        Rz = R_ref[2,0]
-
-        if self.state ==0:
-            #用骨盆相對左右腳掌位置來切換   
-            if abs(px_in_lf[1,0])<=0.06:
-                stance = 1 #左單支撐
-            elif abs(px_in_rf[1,0])<=0.06:
-                stance = 0 #右單支撐
-            else:
-                stance = 2 #雙支撐
-        if self.state == 1 or self.state ==2:
-            # 用contact sensor來切換
-            # if l_contact == 1:
-            #     stance = 2 #雙支撐
-            # else:
-            #     stance = 0 #雙支撐
-            #用命令來切換
-            if Lz > Rz:
-                stance = 0
-            elif Lz < Rz:
-                stance = 2
-        return stance
 
     def left_leg_jacobian(self):
         pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
@@ -799,7 +772,26 @@ class UpperLevelController(Node):
                         P_Y_ref = 0.0
                         R_X_ref = hLth
                         R_Z_ref = 0.0
+            
+            #pelvis
+            P_Z_ref = 0.55
+            P_Roll_ref = 0.0
+            P_Pitch_ref = 0.0
+            P_Yaw_ref = 0.0
 
+            #left_foot
+            L_Y_ref = 0.1
+            L_Roll_ref = 0.0
+            L_Pitch_ref = 0.0
+            L_Yaw_ref = 0.0
+            
+            #right_foot
+            R_Y_ref = -0.1           
+            R_Roll_ref = 0.0
+            R_Pitch_ref = 0.0
+            R_Yaw_ref = 0.0
+
+            
             if state == 30:
                 P_X_ref = self.APX_ref_data[ALIP_count,0]
                 P_Y_ref = self.APX_ref_data[ALIP_count,1]
@@ -812,34 +804,14 @@ class UpperLevelController(Node):
                 R_X_ref = self.ARX_ref_data[ALIP_count,0]
                 R_Y_ref = self.ARX_ref_data[ALIP_count,1]
                 R_Z_ref = self.ARX_ref_data[ALIP_count,2]
-                
-            #pelvis
-            P_Z_ref = 0.55
-            P_Roll_ref = 0.0
-            P_Pitch_ref = 0.0
-            P_Yaw_ref = 0.0
 
             self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
-
-            #left_foot
-            L_Y_ref = 0.1
-            L_Roll_ref = 0.0
-            L_Pitch_ref = 0.0
-            L_Yaw_ref = 0.0
-            
             self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
-
-            #right_foot
-            R_Y_ref = -0.1           
-            R_Roll_ref = 0.0
-            R_Pitch_ref = 0.0
-            R_Yaw_ref = 0.0
-
-            self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])
-    
+            self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])  
+        
         return 
     
-    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance):
+    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance,ALIP_count):
         if state == 0:
             #用骨盆相對左右腳掌位置來切換   
             if abs(px_in_lf[1,0])<=0.06:
@@ -890,6 +862,15 @@ class UpperLevelController(Node):
                     self.DS_time = 0.01
                     self.LSS_time = 0
                     self.RSS_count = 0
+        
+        if state == 30:
+
+            if ALIP_count % 100 < 50:
+                stance = 1
+            elif ALIP_count % 100 >= 50 and ALIP_count % 100 < 100 :
+                stance = 0
+            else:
+                stance = 2
 
         self.stance = stance
 
@@ -962,30 +943,30 @@ class UpperLevelController(Node):
        
         #獲取支撐狀態(有問題)
         stance = copy.deepcopy(stance_type)
-        print(stance)
-        
-        if state == 3:   #(右支撐腳腳踝動態排除測試)
-            R2_41 = np.reshape(R2[2:,0],(4,1)) #R2 z to wz
-            VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
-            
-            R2_41_cal = R2_41 - self.JRR42@VR56
-            
-            rw_41_d = np.dot(np.linalg.pinv(self.JRR44),R2_41_cal)
-            rw_21_d = np.zeros((2,1))
+        # print(stance)
+        if state == 30:
+            if stance == 0:   #(右支撐腳腳踝動態排除測試)
+                R2_41 = np.reshape(R2[2:,0],(4,1)) #R2 z to wz
+                VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
+                
+                R2_41_cal = R2_41 - self.JRR42@VR56
+                
+                rw_41_d = np.dot(np.linalg.pinv(self.JRR44),R2_41_cal)
+                rw_21_d = np.zeros((2,1))
 
-            Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
-            Rw_d = np.vstack((rw_41_d,rw_21_d))
-        elif state == 5 :   #(左支撐腳腳踝動態排除測試)
-            L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
-            VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
-            
-            L2_41_cal = L2_41 - self.JLL42@VL56
-            
-            lw_41_d = np.dot(np.linalg.pinv(self.JLL44),L2_41_cal)
-            lw_21_d = np.zeros((2,1))
+                Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
+                Rw_d = np.vstack((rw_41_d,rw_21_d))
+            elif stance == 1 :   #(左支撐腳腳踝動態排除測試)
+                L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
+                VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
+                
+                L2_41_cal = L2_41 - self.JLL42@VL56
+                
+                lw_41_d = np.dot(np.linalg.pinv(self.JLL44),L2_41_cal)
+                lw_21_d = np.zeros((2,1))
 
-            Lw_d = np.vstack((lw_41_d,lw_21_d))
-            Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
+                Lw_d = np.vstack((lw_41_d,lw_21_d))
+                Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
         else:
             Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
             Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
@@ -1138,10 +1119,10 @@ class UpperLevelController(Node):
         
         return l_leg_gravity,r_leg_gravity,kl,kr
     
-    def gravity_compemsate2(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact):
+    def gravity_ALIP(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        # stance = copy.deepcopy((stance_type))
+        stance = copy.deepcopy((stance_type))
 
         #DS_gravity
         jp_L_DS = np.flip(-jp_l,axis=0)
@@ -1180,162 +1161,6 @@ class UpperLevelController(Node):
         L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
         R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
         LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        if self.count % 300 >= 0 and self.count % 300 < 100:
-            stance = 0
-        elif self.count % 300 >= 100 and self.count % 300 < 150:
-            stance = 2
-        elif self.count % 300 >= 150 and self.count % 300 < 250:
-            stance = 1
-        else:
-            stance = 2
-
-        if stance == 2:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            # if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-            #     Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            # elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-            #     Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            # else:
-            #     Leg_gravity = DS_gravity
-
-            if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-                Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
-            
-            elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-                Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-        
-        elif stance == 0:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            else:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-
-            # if r_contact == 1:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # else:
-            #     kr = np.array([[1],[1],[1],[1],[1],[1]])
-            # if l_contact == 1:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # else:
-            #     kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            # if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-            #     Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            # elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-            #     Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            # else:
-            #     Leg_gravity = DS_gravity
-        
-        elif stance == 1:
-            kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            else:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            if r_contact ==1:
-                Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            else:
-                Leg_gravity = LSS_gravity
-
-            # if r_contact == 1:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # else:
-            #     kr = np.array([[1],[1],[1],[1],[1],[1]])
-            # if l_contact == 1:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # else:
-            #     kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            # if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-            #     Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            # elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-            #     Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            # else:
-            #     Leg_gravity = DS_gravity
-
-        else:
-            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
-            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
-            Leg_gravity = np.zeros((12,1))
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
-        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
-        
-        return l_leg_gravity,r_leg_gravity,kl,kr
-
-    def gravity_ALIP(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,ALIP_count):
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        # stance = copy.deepcopy((stance_type))
-
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l,axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-
-        jp_R_DS = np.flip(-jp_r,axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
-
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r,axis=0)
-        jp_RSS = np.vstack((jp_R_RSS,jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l,axis=0)
-        jp_LSS = np.vstack((jp_L_LSS,jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        if ALIP_count % 100 < 50:
-            stance = 1
-        elif ALIP_count % 100 >= 50 and ALIP_count % 100 < 100 :
-            stance = 0
-        else:
-            stance = 2
 
         if stance == 2:
             if r_contact == 1:
@@ -1466,7 +1291,7 @@ class UpperLevelController(Node):
 
         self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-    def swing_leg(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf,com_in_rf):
+    def swing_leg(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
         print("swing_mode")
         self.tt += 0.0157
         jv = copy.deepcopy(joint_velocity)
@@ -1475,8 +1300,8 @@ class UpperLevelController(Node):
         l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
         r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
-        print("com_lf:",com_in_lf)
-        print("com_rf:",com_in_rf)
+        # print("com_lf:",com_in_lf)
+        # print("com_rf:",com_in_rf)
         # #L_leg_velocity
         # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
 
@@ -1505,7 +1330,7 @@ class UpperLevelController(Node):
 
         return torque
    
-    def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf,com_in_rf):
+    def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
         print("ALIP_mode")
         self.tt += 0.0157
         jv = copy.deepcopy(joint_velocity)
@@ -1514,8 +1339,6 @@ class UpperLevelController(Node):
         l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
         r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
-        print("com_lf:",com_in_lf)
-        print("com_rf:",com_in_rf)
         # #L_leg_velocity
         # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
 
@@ -1525,16 +1348,19 @@ class UpperLevelController(Node):
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[4,0] = 0
+        torque[5,0] = 0
 
         torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-
+        # torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        # torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[10,0] = 0
+        torque[11,0] = 0
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
         vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
@@ -1544,44 +1370,6 @@ class UpperLevelController(Node):
 
         return torque
     
-    def walking(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,com_in_lf):
-        print("walking_mode")
-        self.tt += 0.0157
-        jp = copy.deepcopy(joint_position)
-        jv = copy.deepcopy(joint_velocity)
-        vl_cmd = copy.deepcopy(l_leg_vcmd)
-        vr_cmd = copy.deepcopy(r_leg_vcmd)
-        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
-        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
-
-        print("com:",com_in_lf)
-
-        torque = np.zeros((12,1))
-
-        torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
-        torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
-        torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-
-        torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
-        torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-
-        # self.effort_publisher.publish(Float64MultiArray(data=torque))
-        
-        vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
-        self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
-        jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
-
-        self.count += 1
-        return torque
-
     def com_position(self,joint_position,stance_type):
         #get com position
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
@@ -1916,7 +1704,29 @@ class UpperLevelController(Node):
             #     # Write the data
             #     csv_writer.writerow(collect_data)
             # print(f'Data has been written to {csv_file_name}.')
-        
+
+    def to_matlab(self):
+        #only x_y_z
+        px_in_pin = np.reshape(copy.deepcopy(self.PX[0:3,0]),(3,1))
+        lx_in_pin = np.reshape(copy.deepcopy(self.LX[0:3,0]),(3,1))
+        rx_in_pin = np.reshape(copy.deepcopy(self.RX[0:3,0]),(3,1))
+
+        lx_initial = np.array([[0.0],[0.1],[0.0]])
+        rx_initial = np.array([[0.0],[-0.1],[0.0]])
+    
+        #要改
+        px_in_wf = px_in_pin - lx_in_pin + lx_initial
+        lx_in_wf = lx_initial
+        rx_in_wf = rx_in_pin - lx_in_pin + lx_initial
+
+        # print("px_in_wf",px_in_wf)
+        # print("lx_in_wf",lx_in_wf)
+        # print("rx_in_wf",rx_in_wf)
+
+        self.pelvis_publisher.publish(Float64MultiArray(data=px_in_wf))
+        self.left_publisher.publish(Float64MultiArray(data=lx_in_wf))
+        self.right_publisher.publish(Float64MultiArray(data=rx_in_wf))
+
     def main_controller_callback(self):
 
         joint_position,joint_velocity = self.collect_joint_data()
@@ -1936,22 +1746,18 @@ class UpperLevelController(Node):
         self.get_position(configuration)
         px_in_lf,px_in_rf = self.get_posture()
         self.viz.display(configuration.q)
-
+        self.to_matlab()
 
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
-        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance)
-        com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance,self.ALIP_count)
 
-        if state == 20:
-            l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate2(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
-        elif state == 30:
+        if state == 30:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
-            l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,self.ALIP_count)
+            l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
         else:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
-            # l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_by_com(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state,com_in_rf)
 
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
@@ -1960,30 +1766,24 @@ class UpperLevelController(Node):
         
         if state == 0:   
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
-            # print(0)
 
         elif state == 1 or state == 2:
-            torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
-            # self.foot_data(px_in_lf,px_in_rf,L,torque_kine,com_in_lf)
-            # torque_L = self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-            # torque_R = self.alip_R(stance,px_in_rf,torque_kine,com_in_rf)
-
-            if stance == 0:
-                # self.effort_publisher.publish(Float64MultiArray(data=torque_R))
-                self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
-            elif stance == 1:
-                # self.effort_publisher.publish(Float64MultiArray(data=torque_L))
-                self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
-            elif stance == 2:
-                self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
-                
-        elif state == 20:
-            torque_walking = self.walking(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_walking))
+            torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
 
         elif state == 30:
-            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf,com_in_rf)
+            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+
+            # com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+            # torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
+            # torque_R =  self.alip_R(stance,px_in_lf,torque_kine,com_in_lf)
+            # if stance == 1:
+            #     self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            # elif stance == 0:
+            #     self.effort_publisher.publish(Float64MultiArray(data=torque_R))
+
             self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+
             self.ALIP_count += 1
        
         # elif self.state == 3:
@@ -1991,17 +1791,17 @@ class UpperLevelController(Node):
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
         #         self.alip_R(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,stance, com_in_lf,com_in_rf)
 
-        elif state == 4 or state == 7:
-            if stance == 0 or stance == 1 :
-                com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-                torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,com_in_lf)
-                torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
-                self.foot_data(px_in_lf,px_in_rf,L,torque_L,com_in_lf)
+        # elif state == 4 or state == 7:
+        #     if stance == 0 or stance == 1 :
+        #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
+        #         torque_kine = self.swing_leg(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+        #         torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
+        #         self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+        #         self.foot_data(px_in_lf,px_in_rf,L,torque_L,com_in_lf)
 
-        elif state == 5:
-            torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_test))
+        # elif state == 5:
+        #     torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
+        #     self.effort_publisher.publish(Float64MultiArray(data=torque_test))
 
 
 def main(args=None):
