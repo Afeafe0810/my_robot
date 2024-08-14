@@ -218,11 +218,11 @@ class UpperLevelController(Node):
         self.ap_past_R = 0.0
         self.ar_R = 0.0
         self.ar_past_R = 0.0
-        #--ref        
-        self.ref_x_L = np.zeros((2,1))
-        self.ref_y_L = np.zeros((2,1))
-        self.ref_x_R = np.zeros((2,1))
-        self.ref_y_R = np.zeros((2,1))
+        #--ref    
+        self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values
+        self.yc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/yc_ref.csv', header=None).values
+        self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values
+        self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values
         
     def load_URDF(self, urdf_path):
         robot = pin.RobotWrapper.BuildFromURDF(
@@ -865,7 +865,7 @@ class UpperLevelController(Node):
         
         if state == 30:
 
-            if ALIP_count % 100 < 50:
+            if ALIP_count % 100 <= 50:
                 stance = 1
             elif ALIP_count % 100 >= 50 and ALIP_count % 100 < 100 :
                 stance = 0
@@ -1370,48 +1370,33 @@ class UpperLevelController(Node):
 
         return torque
     
-    def com_position(self,joint_position,stance_type):
+    def com_position(self,joint_position):
         #get com position
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
         
-        # #得到支撐狀態
-        # stance = copy.deepcopy(stance_type)
-
-        # #右腳為支撐腳
-        # if stance == 0:
-        #     jp_r = np.flip(-jp_r,axis=0)
-        #     joint_angle = np.vstack((jp_r,jp_l))
-        #     pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,joint_angle)
-        #     com_in_wf = np.reshape(self.bipedal_r_data.com[0],(3,1))
-        #     r_foot_in_wf = np.array([[0.007],[-0.1],[0]])
-        #     com_in_rf = com_in_wf - r_foot_in_wf
-        #     com_in_lf = np.zeros((3,1))
-
-        # #左腳為支撐腳
-        # elif stance == 1:
-        #     jp_l = np.flip(-jp_l,axis=0)
-        #     joint_angle = np.vstack((jp_l,jp_r))
-        #     pin.centerOfMass(self.bipedal_l_model,self.bipedal_l_data,joint_angle)
-        #     com_in_wf = np.reshape(self.bipedal_l_data.com[0],(3,1))
-        #     l_foot_in_wf = np.array([[0.007],[0.1],[0]])
-        #     com_in_lf = com_in_wf - l_foot_in_wf
-        #     com_in_rf = np.zeros((3,1))
-
-        # else:
-        #     com_in_lf = np.zeros((3,1))
-        #     com_in_rf = np.zeros((3,1))
-
-        jp_r = np.flip(-jp_r,axis=0)
-        joint_angle = np.vstack((jp_r,jp_l))
-        pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,joint_angle)
+        #右腳為支撐腳
+        R_jp_r = np.flip(-jp_r,axis=0)
+        R_jp_l = jp_l
+        R_joint_angle = np.vstack((R_jp_r,R_jp_l))
+        pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,R_joint_angle)
         com_in_wf = np.reshape(self.bipedal_r_data.com[0],(3,1))
         r_foot_in_wf = np.array([[0.007],[-0.1],[0]])
         com_in_rf = com_in_wf - r_foot_in_wf
-        com_in_lf = np.zeros((3,1))
 
+        #左腳為支撐腳
+        L_jp_l = np.flip(-jp_l,axis=0)
+        L_jp_r = jp_r
+        L_joint_angle = np.vstack((L_jp_l,L_jp_r))
+        pin.centerOfMass(self.bipedal_l_model,self.bipedal_l_data,L_joint_angle)
+        com_in_wf = np.reshape(self.bipedal_l_data.com[0],(3,1))
+        l_foot_in_wf = np.array([[0.007],[0.1],[0]])
+        com_in_lf = com_in_wf - l_foot_in_wf
 
-        return com_in_lf,com_in_rf 
+        print('clf:',com_in_lf)
+        print('crf:',com_in_rf)
+
+        return com_in_lf,com_in_rf
 
     def alip_test(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,px_in_lf):
         print("alip_test")
@@ -1451,30 +1436,20 @@ class UpperLevelController(Node):
 
         return torque
 
-    def alip_L(self,stance_type,px_in_lf,torque_kine,com_in_lf):
+    def alip_L(self,stance_type,px_in_lf,torque_ALIP,com_in_lf,ALIP_count):
         print("ALIP_L")
-        PX_ref = np.reshape(copy.deepcopy(self.PX_ref[0:2,0]),(2,1)) #質心(xy)在大地座標下的軌跡
 
-        #支撐狀態
-        stance = copy.deepcopy(stance_type) 
         #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
-        torque = copy.deepcopy(torque_kine) 
-
-        #獲取量測值(相對於左腳腳底)
-        # print("骨盆位置：",px_in_lf[1,0])
-        # PX_l = copy.deepcopy(px_in_lf)
-
-        print("骨盆位置：",px_in_lf)
-        print("質心位置：",com_in_lf)
+        torque = copy.deepcopy(torque_ALIP) 
 
         PX_l = copy.deepcopy(com_in_lf)
-        PX_l[0,0] = PX_l[0,0]
-        PX_l[1,0] = PX_l[1,0] 
+        PX_l[0,0] = PX_l[0,0] #xc
+        PX_l[1,0] = PX_l[1,0] #yc
 
         #計算質心速度
-        self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/0.01
+        self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
         self.CX_past_L = PX_l[0,0]
-        self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/0.01
+        self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
         self.CY_past_L = PX_l[1,0]
 
         #velocity filter
@@ -1488,27 +1463,18 @@ class UpperLevelController(Node):
 
         #量測值
         Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.43
+        Ly_mea = 9*self.Vx_L*0.45
         Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.Vy_L*0.43 #(記得加負號)
+        Lx_mea = -9*self.Vy_L*0.45 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
 
-        #骨盆在大地座標下的參考軌跡以左腳frame表示
-        L_foot = np.array([[0.007],[0.1]])
-        PX_ref_in_L  = PX_ref - L_foot
-        # print("PX_L:",PX_ref_in_L)
-        #比對
-        # px_data = np.array([[PX_ref_in_L[0,0]],[PX_ref_in_L[1,0]],[PX_l[0,0]],[PX_l[1,0]]])
-        # self.PXL_publisher.publish(Float64MultiArray(data=px_data))
         #參考值
-        Xc_ref = 0.03*math.sin(self.alip_t) - 0.03
-        Xc_dot_ref = 0.0471*math.cos(self.alip_t)
-        Ly_ref = 9*Xc_dot_ref*0.45
-        Yc_ref = 0.0
-        Lx_ref = 0.0
-        self.alip_t += 0.0157
-        
+        Xc_ref = self.xc_ref[ALIP_count,0]
+        Ly_ref = self.ly_ref[ALIP_count,0]
+        Yc_ref = self.yc_ref[ALIP_count,0]
+        Lx_ref = self.lx_ref[ALIP_count,0]
+       
         self.ref_x_L = np.array([[Xc_ref],[Ly_ref]])
         self.ref_y_L = np.array([[Yc_ref],[Lx_ref]])
 
@@ -1526,8 +1492,7 @@ class UpperLevelController(Node):
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
         self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
         #--torque assign
-        torque[4,0] = -self.ap_L
-        # torque[4,0] = 0
+        torque[4,0] = -self.ap_L#(所以使用時要加負號)
         #----update
         self.mea_x_past_L = self.mea_x_L
         self.ob_x_past_L = self.ob_x_L
@@ -1547,7 +1512,7 @@ class UpperLevelController(Node):
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
         self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)
         #--torque assign
-        torque[5,0] = -self.ar_L
+        torque[5,0] = -self.ar_L #(所以使用時要加負號)
         # torque[5,0] = 0
         #----update
         self.mea_y_past_L = self.mea_y_L
@@ -1573,18 +1538,13 @@ class UpperLevelController(Node):
         # print(f'Data has been written to {csv_file_name}.')
         return torque
 
-    def alip_R(self,stance_type,px_in_rf,torque_kine,com_in_rf):
+    def alip_R(self,stance_type,px_in_rf,torque_ALIP,com_in_rf,ALIP_count):
         print("ALIP_R")
-        PX_ref = np.reshape(copy.deepcopy(self.PX_ref[0:2,0]),(2,1)) #質心(xy)在大地座標下的軌跡
 
-        #支撐狀態
-        stance = copy.deepcopy(stance_type) 
-        #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
-        torque = copy.deepcopy(torque_kine) 
+        torque = copy.deepcopy(torque_ALIP) 
 
         #獲取量測值(相對於右腳腳底)
-        PX_r = copy.deepcopy(px_in_rf) #pelvis position in right foot frame
-        # PX_r = copy.deepcopy(com_in_rf)
+        PX_r = copy.deepcopy(com_in_rf)
        
         #計算質心速度
         self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/0.01
@@ -1598,18 +1558,14 @@ class UpperLevelController(Node):
         Lx_mea = -9*self.CY_dot_R*0.45 #(記得加負號)
         self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
-        #骨盆在大地座標下的軌跡以右腳frame表示
-        R_foot = np.array([[0.007],[-0.1]])
-        PX_ref_in_R  = PX_ref - R_foot
-        print("PX_R:",PX_ref_in_R)
-        #比對
-        self.PXR_publisher.publish(Float64MultiArray(data=PX_ref_in_R))
+
         #參考值
-        Xc_ref = PX_ref_in_R[0,0]
-        Ly_ref = 0
-        Yc_ref = PX_ref_in_R[1,0]
-        Yc_ref_dot = 0.2199*math.cos(self.tt)
-        Lx_ref = 9*-Yc_ref_dot*0.45
+        #參考值
+        Xc_ref = self.xc_ref[ALIP_count,0]
+        Ly_ref = self.ly_ref[ALIP_count,0]
+        Yc_ref = self.yc_ref[ALIP_count,0]
+        Lx_ref = self.lx_ref[ALIP_count,0]
+       
         self.ref_x_R = np.array([[Xc_ref],[Ly_ref]])
         self.ref_y_R = np.array([[Yc_ref],[Lx_ref]])
 
@@ -1647,17 +1603,17 @@ class UpperLevelController(Node):
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
         self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)
         #--torque assign
-        torque[11,0] = -self.ar_R*0.2
+        torque[11,0] = -self.ar_R
         #----update
         self.mea_y_past_R = self.mea_y_R
         self.ob_y_past_R = self.ob_y_R
         self.ar_past_R = self.ar_R
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
-        tr_data= np.array([[torque[10,0]],[torque[11,0]]])
-        self.torque_R_publisher.publish(Float64MultiArray(data=tr_data))
-        alip_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]],[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-        self.alip_R_publisher.publish(Float64MultiArray(data=alip_data))
+        # tr_data= np.array([[torque[10,0]],[torque[11,0]]])
+        # self.torque_R_publisher.publish(Float64MultiArray(data=tr_data))
+        # alip_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]],[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+        # self.alip_R_publisher.publish(Float64MultiArray(data=alip_data))
     
         return torque
     
@@ -1768,21 +1724,28 @@ class UpperLevelController(Node):
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
 
         elif state == 1 or state == 2:
+            # com_in_lf,com_in_rf = self.com_position(joint_position)
             torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
 
+            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            com_in_lf,com_in_rf = self.com_position(joint_position)
+            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
+            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
+
         elif state == 30:
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            com_in_lf,com_in_rf = self.com_position(joint_position)
 
-            # com_in_lf,com_in_rf = self.com_position(joint_position,stance)
-            # torque_L =  self.alip_L(stance,px_in_lf,torque_kine,com_in_lf)
-            # torque_R =  self.alip_R(stance,px_in_lf,torque_kine,com_in_lf)
-            # if stance == 1:
-            #     self.effort_publisher.publish(Float64MultiArray(data=torque_L))
-            # elif stance == 0:
-            #     self.effort_publisher.publish(Float64MultiArray(data=torque_R))
+            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
+            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
 
-            self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+            if stance == 1:
+                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            elif stance == 0:
+                self.effort_publisher.publish(Float64MultiArray(data=torque_R))
+
+            # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
 
             self.ALIP_count += 1
        
