@@ -232,7 +232,9 @@ class UpperLevelController(Node):
         self.yc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/yc_ref.csv', header=None).values
         self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values
         self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values
-
+        #touch for am tracking check
+        self.touch = 0
+ 
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
@@ -334,7 +336,7 @@ class UpperLevelController(Node):
     def contact_collect(self):
         l_contact = copy.deepcopy(self.l_contact)
         r_contact = copy.deepcopy(self.r_contact)
-        print("L:",l_contact,"R:",r_contact)
+        # print("L:",l_contact,"R:",r_contact)
 
         return l_contact,r_contact
 
@@ -391,10 +393,10 @@ class UpperLevelController(Node):
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
 
         for i in range(len(joint_velocity_cal)):
-            if joint_velocity_cal[i,0]>= 0.5:
-                joint_velocity_cal[i,0] = 0.5
-            elif joint_velocity_cal[i,0]<= -0.5:
-                joint_velocity_cal[i,0] = -0.5
+            if joint_velocity_cal[i,0]>= 1.0:
+                joint_velocity_cal[i,0] = 1.0
+            elif joint_velocity_cal[i,0]<= -1.0:
+                joint_velocity_cal[i,0] = -1.0
             i += 1
 
         return joint_velocity_cal
@@ -1203,17 +1205,19 @@ class UpperLevelController(Node):
        
         if stance == 0:
             if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+                # kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+                kr = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
             else:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            kl = np.array([[1.2],[1.2],[1.2],[1.2],[0.8],[0.8]])
             # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
             Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
         
         elif stance == 1:
-            kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
+            kr = np.array([[1.2],[1.2],[1.2],[1.2],[0.8],[0.8]])
             if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
+                # kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+                kl = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
             else:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
@@ -1370,6 +1374,8 @@ class UpperLevelController(Node):
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+        # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
         torque[4,0] = 0
         torque[5,0] = 0
 
@@ -1378,8 +1384,8 @@ class UpperLevelController(Node):
         torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = 0
-        torque[11,0] = 0
+        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
@@ -1510,7 +1516,8 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.5
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
+        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
         #--torque assign
         torque[4,0] = -self.ap_L
         #----update
@@ -1531,6 +1538,13 @@ class UpperLevelController(Node):
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
         self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.1
+        # self.ap_L = -Kx@(self.mea_y_L-self.ref_y_L)
+
+        # if self.ar_L >= 3:
+        #     self.ar_L =3
+        # elif self.ar_L <= -3:
+        #     self.ar_L =-3
+
         #--torque assign
         torque[5,0] = -self.ar_L
         # torque[5,0] = 0
@@ -1547,6 +1561,8 @@ class UpperLevelController(Node):
         if stance == 1:
             alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
             alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
@@ -1604,12 +1620,16 @@ class UpperLevelController(Node):
         # Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
         Kx = np.array([[184.7274,9.9032]])
         Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
+       
         #--compensator
         self.ob_x_R = Ax@self.ob_x_past_R + self.ap_past_R*Bx + Lx@(self.mea_x_past_R - Cx@self.ob_x_past_R)
+        
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
+        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
+       
         #--torque assign
         torque[10,0] = -self.ap_R
         #----update
@@ -1632,6 +1652,13 @@ class UpperLevelController(Node):
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
         self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.1
+        # self.ap_R = -Kx@(self.mea_y_R-self.ref_y_R)
+
+        # if self.ar_R >= 3:
+        #     self.ar_R =3
+        # elif self.ar_R <= -5:
+        #     self.ar_R =-5
+
         #--torque assign
         torque[11,0] = -self.ar_R
         #----update
@@ -1642,6 +1669,8 @@ class UpperLevelController(Node):
         if stance == 0:
             alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
             alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
     
@@ -1767,7 +1796,7 @@ class UpperLevelController(Node):
 
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
-            print(stance)
+            # print(stance)
             if stance == 1:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
@@ -1777,6 +1806,29 @@ class UpperLevelController(Node):
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
 
             self.ALIP_count += 1
+            # if self.ALIP_count % 50 == 0:
+            #     print(self.touch)
+            #     if self.touch % 2 == 0:
+            #         #check l leg
+            #         lly_e = self.ob_x_L[1,0] - self.ly_ref[self.ALIP_count,0]
+            #         llx_e = self.ob_y_L[1,0] - self.lx_ref[self.ALIP_count,0]
+            #         if abs(lly_e)<= 0.5:
+            #             self.touch += 1
+            #             self.ALIP_count += 1
+            #         else:
+            #             self.ALIP_count = self.ALIP_count
+
+            #     elif self.touch % 2 != 0:
+            #         #check r leg
+            #         rly_e = self.ob_x_R[1,0] - self.ly_ref[self.ALIP_count,0]
+            #         rlx_e = self.ob_y_R[1,0] - self.lx_ref[self.ALIP_count,0]
+            #         if abs(rly_e)<= 0.5:
+            #             self.touch += 1
+            #             self.ALIP_count += 1
+            #         else:
+            #             self.ALIP_count = self.ALIP_count
+            # else:
+            #     self.ALIP_count += 1
        
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
