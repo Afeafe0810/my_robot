@@ -53,11 +53,11 @@
   <material>${body_color}</material>
   <mu1>15</mu1>
   <mu2>15</mu2>
-  <minDepth>0.0001</minDepth>
-  <!-- <max_vel>0.00</max_vel> -->
+  <!-- <minDepth>0.0001</minDepth>
+  <max_vel>0.00</max_vel>
   <kp>15000</kp>
-  <kd>1000</kd>
-  <maxContacts>30</maxContacts>
+  <kd>1000</kd> -->
+  <maxContacts>100</maxContacts>
   <self_collide>true</self_collide>
 </gazebo>
 
@@ -100,11 +100,11 @@
   <material>${body_color}</material>
   <mu1>15</mu1>
   <mu2>15</mu2>
-  <minDepth>0.0001</minDepth>
-  <!-- <max_vel>0.00</max_vel> -->
+  <!-- <minDepth>0.0001</minDepth>
+  <max_vel>0.00</max_vel>
   <kp>15000</kp>
-  <kd>1000</kd>
-  <maxContacts>30</maxContacts>
+  <kd>1000</kd> -->
+  <maxContacts>100</maxContacts>
   <selfCollide>true</selfCollide>
 </gazebo>
 

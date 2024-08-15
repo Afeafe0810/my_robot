@@ -160,7 +160,7 @@ class UpperLevelController(Node):
         self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
 
         #path_data_ALIP
-        self.APX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/PX_ref.csv', header=None).values
+        self.ACX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/CX_ref.csv', header=None).values
         self.ALX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/LX_ref.csv', header=None).values
         self.ARX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/RX_ref.csv', header=None).values
 
@@ -661,7 +661,7 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,l_contact,ALIP_count):
+    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,ALIP_count,com_in_lf,com_in_rf):
     
         if state == 0:
             self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
@@ -824,10 +824,6 @@ class UpperLevelController(Node):
 
             
             if state == 30:
-                P_X_ref = self.APX_ref_data[ALIP_count,0]
-                P_Y_ref = self.APX_ref_data[ALIP_count,1]
-                P_Z_ref = self.APX_ref_data[ALIP_count,2]
-
                 L_X_ref = self.ALX_ref_data[ALIP_count,0]
                 L_Y_ref = self.ALX_ref_data[ALIP_count,1]
                 L_Z_ref = self.ALX_ref_data[ALIP_count,2]
@@ -835,6 +831,17 @@ class UpperLevelController(Node):
                 R_X_ref = self.ARX_ref_data[ALIP_count,0]
                 R_Y_ref = self.ARX_ref_data[ALIP_count,1]
                 R_Z_ref = self.ARX_ref_data[ALIP_count,2]
+
+                if stance == 1:
+                    P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+                    P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
+                    P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+                elif stance == 0:
+                    P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+                    P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
+                    P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+
+
 
             self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
             self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
@@ -902,33 +909,6 @@ class UpperLevelController(Node):
                 stance = 0
             else:
                 stance = 2
-
-            # if ALIP_count % 100 == 51:
-            #     self.detach_links(
-            #         model1_name='bipedal_floating',
-            #         link1_name='l_foot_1',
-            #         model2_name='ggground_plane',
-            #         link2_name='link'
-            #     )
-            #     self.attach_links(
-            #     model1_name='bipedal_floating',
-            #     link1_name='r_foot_1',
-            #     model2_name='ggground_plane',
-            #     link2_name='link'
-            #     )
-            # elif ALIP_count % 100 == 1 and ALIP_count > 100:
-            #     self.detach_links(
-            #         model1_name='bipedal_floating',
-            #         link1_name='r_foot_1',
-            #         model2_name='ggground_plane',
-            #         link2_name='link'
-            #     )
-            #     self.attach_links(
-            #     model1_name='bipedal_floating',
-            #     link1_name='l_foot_1',
-            #     model2_name='ggground_plane',
-            #     link2_name='link'
-            #     )
 
         self.stance = stance
 
@@ -1220,32 +1200,15 @@ class UpperLevelController(Node):
         R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
         LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
 
-        if stance == 2:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-                Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
-            
-            elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-                Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-        
-        elif stance == 0:
+       
+        if stance == 0:
             if r_contact == 1:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
             else:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
+            Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
         
         elif stance == 1:
             kr = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
@@ -1253,7 +1216,8 @@ class UpperLevelController(Node):
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
             else:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
+            Leg_gravity =  0.2*DS_gravity+0.8*LSS_gravity
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
@@ -1406,16 +1370,16 @@ class UpperLevelController(Node):
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        torque[4,0] = 0
+        torque[5,0] = 0
 
 
         torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        torque[10,0] = 0
+        torque[11,0] = 0
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
@@ -1546,7 +1510,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.4
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.5
         #--torque assign
         torque[4,0] = -self.ap_L
         #----update
@@ -1645,7 +1609,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.4
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
         #--torque assign
         torque[10,0] = -self.ap_R
         #----update
@@ -1767,6 +1731,7 @@ class UpperLevelController(Node):
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.get_position(configuration)
         px_in_lf,px_in_rf = self.get_posture()
+        com_in_lf,com_in_rf = self.com_position(joint_position)
         self.viz.display(configuration.q)
         self.to_matlab()
 
@@ -1775,10 +1740,10 @@ class UpperLevelController(Node):
         stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance,self.ALIP_count)
 
         if state == 30:
-            self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
+            self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
         else:
-            self.ref_cmd(state,px_in_lf,px_in_rf,stance,l_contact,self.ALIP_count)
+            self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
 
         JLL = self.left_leg_jacobian()
@@ -1790,18 +1755,15 @@ class UpperLevelController(Node):
             self.balance(joint_position,l_leg_gravity,r_leg_gravity)
 
         elif state == 1 or state == 2:
-            # com_in_lf,com_in_rf = self.com_position(joint_position)
             torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
 
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            com_in_lf,com_in_rf = self.com_position(joint_position)
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
 
         elif state == 30:
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            com_in_lf,com_in_rf = self.com_position(joint_position)
 
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
