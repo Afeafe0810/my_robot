@@ -174,6 +174,12 @@ class UpperLevelController(Node):
         self.RDT = 1
         self.LDT = 1
 
+        #data in wf_initial_data
+        self.PX_in_wf = np.array([[0.0],[0.0],[0.6]])
+        self.COM_in_wf = np.array([[0.0],[0.0],[0.6]])
+        self.LX_in_wf = np.array([[0.0],[0.1],[0.0]])
+        self.RX_in_wf = np.array([[0.0],[-0.1],[0.0]])
+
         #ALIP
         #time
         self.ALIP_count = 0
@@ -448,12 +454,6 @@ class UpperLevelController(Node):
             self.main_controller_callback()
             self.call = 0
 
-
-        # print(msg.position)
-        # print(msg.velocity)
-
-        # print("-------")
-
     def xyz_rotation(self,axis,theta):
         cos = math.cos
         sin = math.sin
@@ -595,7 +595,35 @@ class UpperLevelController(Node):
         px_in_rf = self.PX - self.RX #骨盆中心相對於右腳
 
         return px_in_lf,px_in_rf
+ 
+    def com_position(self,joint_position):
+        #get com position
+        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
+        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
+        
+        #右腳為支撐腳
+        R_jp_r = np.flip(-jp_r,axis=0)
+        R_jp_l = jp_l
+        R_joint_angle = np.vstack((R_jp_r,R_jp_l))
+        pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,R_joint_angle)
+        com_r_in_pink = np.reshape(self.bipedal_r_data.com[0],(3,1))
+        r_foot_in_wf = np.array([[0.0],[-0.1],[0.0]])
+        com_in_rf = com_r_in_pink - r_foot_in_wf
 
+        #左腳為支撐腳
+        L_jp_l = np.flip(-jp_l,axis=0)
+        L_jp_r = jp_r
+        L_joint_angle = np.vstack((L_jp_l,L_jp_r))
+        pin.centerOfMass(self.bipedal_l_model,self.bipedal_l_data,L_joint_angle)
+        com_l_in_pink = np.reshape(self.bipedal_l_data.com[0],(3,1))
+        l_foot_in_wf = np.array([[0.0],[0.1],[0]])
+        com_in_lf = com_l_in_pink - l_foot_in_wf
+
+        # print('clf:',com_in_lf)
+        # print('crf:',com_in_rf)
+
+        return com_in_lf,com_in_rf
+    
     def left_leg_jacobian(self):
         pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
         l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
@@ -868,7 +896,7 @@ class UpperLevelController(Node):
                 print("DS",self.DS_time)
             else:
                 self.DS_time = 10.1
-                stance = 0
+                stance = 1
                 self.RSS_time = 0.01
 
         if state == 2:
@@ -915,6 +943,46 @@ class UpperLevelController(Node):
         self.stance = stance
 
         return stance
+
+    def data_in_wf(self,stance_type,com_in_lf,com_in_rf):
+        print(stance_type)
+        stance = copy.deepcopy(stance_type)
+        px_in_pink = np.reshape(self.PX[0:3,0],(3,1)) 
+        lx_in_pink = np.reshape(self.LX[0:3,0],(3,1)) 
+        rx_in_pink = np.reshape(self.RX[0:3,0],(3,1)) 
+
+        px_in_wf = copy.deepcopy(self.PX_in_wf)
+        com_in_wf = copy.deepcopy(self.COM_in_wf)
+        lx_in_wf = copy.deepcopy(self.LX_in_wf)
+        rx_in_wf = copy.deepcopy(self.RX_in_wf)
+
+        if stance == 0:
+            px_in_wf = (px_in_pink- rx_in_pink) + rx_in_wf 
+            com_in_wf = com_in_rf + rx_in_wf 
+            lx_in_wf = (lx_in_pink- rx_in_pink) + rx_in_wf 
+            rx_in_wf = rx_in_wf 
+        elif stance == 1:
+            px_in_wf = (px_in_pink- lx_in_pink) + lx_in_wf 
+            com_in_wf = com_in_rf + rx_in_wf 
+            lx_in_wf = lx_in_wf
+            rx_in_wf = (rx_in_pink- lx_in_pink) + lx_in_wf 
+        else:
+            lx_in_wf = lx_in_wf
+            rx_in_wf = rx_in_wf 
+            px_in_wf = 0.5*((px_in_pink- lx_in_pink) + lx_in_wf + (px_in_pink- rx_in_pink) + rx_in_wf)
+            com_in_wf = 0.5*(com_in_lf + lx_in_wf + com_in_rf + rx_in_wf)
+
+        self.PX_in_wf = px_in_wf
+        self.COM_in_wf = com_in_wf
+        self.LX_in_wf = lx_in_wf
+        self.RX_in_wf = rx_in_wf
+
+        print('px_wf',self.PX_in_wf)
+        print('com_wf',self.COM_in_wf)
+        print('lx_wf',self.LX_in_wf)
+        print('rx_wf',self.RX_in_wf)
+
+        return px_in_wf,com_in_wf,lx_in_wf,rx_in_wf
 
     def calculate_err(self,state):
         PX_ref = copy.deepcopy(self.PX_ref)
@@ -1229,68 +1297,6 @@ class UpperLevelController(Node):
         
         return l_leg_gravity,r_leg_gravity,kl,kr
 
-    def gravity_by_com(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,state,com_in_rf):
-
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        stance = copy.deepcopy((stance_type))
-        com_in_rf = copy.deepcopy((com_in_rf))
-        
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l,axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-
-        jp_R_DS = np.flip(-jp_r,axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
-
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r,axis=0)
-        jp_RSS = np.vstack((jp_R_RSS,jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l,axis=0)
-        jp_LSS = np.vstack((jp_L_LSS,jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        Leg_gravity = (abs(com_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-
-        if state == 1:
-            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
-            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0.8],[0.8]])
-        else:
-            kl = np.array([[1],[1],[1],[1],[1],[1]])
-            kr = np.array([[1],[1],[1],[1],[1],[1]])
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
-        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
-        
-        return l_leg_gravity,r_leg_gravity,kl,kr
-
     def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
         #balance the robot to initial state by p_control
         jp = copy.deepcopy(joint_position)
@@ -1394,34 +1400,6 @@ class UpperLevelController(Node):
 
         return torque
     
-    def com_position(self,joint_position):
-        #get com position
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        
-        #右腳為支撐腳
-        R_jp_r = np.flip(-jp_r,axis=0)
-        R_jp_l = jp_l
-        R_joint_angle = np.vstack((R_jp_r,R_jp_l))
-        pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,R_joint_angle)
-        com_in_wf = np.reshape(self.bipedal_r_data.com[0],(3,1))
-        r_foot_in_wf = np.array([[0.007],[-0.1],[0]])
-        com_in_rf = com_in_wf - r_foot_in_wf
-
-        #左腳為支撐腳
-        L_jp_l = np.flip(-jp_l,axis=0)
-        L_jp_r = jp_r
-        L_joint_angle = np.vstack((L_jp_l,L_jp_r))
-        pin.centerOfMass(self.bipedal_l_model,self.bipedal_l_data,L_joint_angle)
-        com_in_wf = np.reshape(self.bipedal_l_data.com[0],(3,1))
-        l_foot_in_wf = np.array([[0.007],[0.1],[0]])
-        com_in_lf = com_in_wf - l_foot_in_wf
-
-        print('clf:',com_in_lf)
-        print('crf:',com_in_rf)
-
-        return com_in_lf,com_in_rf
-
     def alip_test(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,px_in_lf):
         print("alip_test")
         jp = copy.deepcopy(joint_position)
@@ -1465,16 +1443,23 @@ class UpperLevelController(Node):
         stance = copy.deepcopy(stance_type) 
         #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
         torque = copy.deepcopy(torque_ALIP) 
+        com_in_wf = copy.deepcopy(self.COM_in_wf)
+        lx_in_wf = copy.deepcopy(self.LX_in_wf)
 
-        PX_l = copy.deepcopy(com_in_lf)
+        # PX_l = copy.deepcopy(com_in_lf)
+        PX_l = com_in_wf - lx_in_wf
         PX_l[0,0] = PX_l[0,0] #xc
         PX_l[1,0] = PX_l[1,0] #yc
 
         #計算質心速度
-        self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
-        self.CX_past_L = PX_l[0,0]
-        self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
-        self.CY_past_L = PX_l[1,0]
+        # self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
+        # self.CX_past_L = PX_l[0,0]
+        # self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
+        # self.CY_past_L = PX_l[1,0]
+        self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
+        self.CX_past_L = com_in_wf[0,0]
+        self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
+        self.CY_past_L = com_in_wf[1,0]
 
         #velocity filter
         self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
@@ -1514,7 +1499,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.1
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
         # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
 
         # if self.ap_L >= 5:
@@ -1563,10 +1548,10 @@ class UpperLevelController(Node):
 
 
         if stance == 1:
-            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
+            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
@@ -1581,13 +1566,20 @@ class UpperLevelController(Node):
         torque = copy.deepcopy(torque_ALIP) 
         stance = copy.deepcopy(stance_type) 
         #獲取量測值(相對於右腳腳底)
-        PX_r = copy.deepcopy(com_in_rf)
+        # PX_r = copy.deepcopy(com_in_rf)
+        com_in_wf = copy.deepcopy(self.COM_in_wf)
+        rx_in_wf = copy.deepcopy(self.RX_in_wf)
+        PX_r = com_in_wf - rx_in_wf
        
         #計算質心速度
-        self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/self.timer_period
-        self.CX_past_R = PX_r[0,0]
-        self.CY_dot_R = (PX_r[1,0] - self.CY_past_R)/self.timer_period
-        self.CY_past_R = PX_r[1,0]
+        # self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/self.timer_period
+        # self.CX_past_R = PX_r[0,0]
+        # self.CY_dot_R = (PX_r[1,0] - self.CY_past_R)/self.timer_period
+        # self.CY_past_R = PX_r[1,0]
+        self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
+        self.CX_past_R = com_in_wf[0,0]
+        self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
+        self.CY_past_R = com_in_wf[1,0]
 
         #velocity filter
         self.Vx_R = 0.7408*self.Vx_past_R + 0.2592*self.CX_dot_past_R  #濾過後的速度(5Hz)
@@ -1631,7 +1623,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.1
         # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
 
         # if self.ap_R >= 3:
@@ -1676,10 +1668,10 @@ class UpperLevelController(Node):
         self.ar_past_R = self.ar_R
 
         if stance == 0:
-            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
-            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
+            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
     
@@ -1767,15 +1759,18 @@ class UpperLevelController(Node):
         self.relative_axis()
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
+        self.viz.display(configuration.q)
+
         self.get_position(configuration)
         px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf = self.com_position(joint_position)
-        self.viz.display(configuration.q)
+
         self.to_matlab()
 
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
         stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance,self.ALIP_count)
+        self.data_in_wf(stance,com_in_lf,com_in_rf)
 
         if state == 30:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
