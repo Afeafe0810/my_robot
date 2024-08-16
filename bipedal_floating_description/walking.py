@@ -61,6 +61,8 @@ class UpperLevelController(Node):
 
         self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
 
+        self.COM_publisher = self.create_publisher(Float64MultiArray , '/com_data', 10)
+
         #l_foot_contact_state_subscribe
         self.l_foot_contact_subscriber = self.create_subscription(
             ContactsState,
@@ -981,6 +983,8 @@ class UpperLevelController(Node):
         print('com_wf',self.COM_in_wf)
         print('lx_wf',self.LX_in_wf)
         print('rx_wf',self.RX_in_wf)
+
+        self.COM_publisher.publish(Float64MultiArray(data=self.COM_in_wf))
 
         return px_in_wf,com_in_wf,lx_in_wf,rx_in_wf
 
