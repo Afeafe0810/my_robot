@@ -48,18 +48,18 @@
           <surface>
             <contact>
               <ode>
-                <max_vel>0.1</max_vel>
-                <min_depth>0.0001</min_depth>
+                <max_vel>1</max_vel>
+                <min_depth>0.001</min_depth>
                 <kp>45000000</kp>
                 <kd>3622430.124</kd>
-                <!-- <kp>1e13</kp>
-                <kd>1e12</kd> -->
+                <!-- <kp>15000</kp>
+                <kd>1000</kd> -->
               </ode>
             </contact>
             <friction>
               <ode>
-                <mu>100</mu>
-                <mu2>100</mu2>
+                <mu>15</mu>
+                <mu2>15</mu2>
               </ode>
               <torsional>
                 <ode/>

@@ -1205,19 +1205,17 @@ class UpperLevelController(Node):
        
         if stance == 0:
             if r_contact == 1:
-                # kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
-                kr = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+                kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
             else:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            kl = np.array([[1.2],[1.2],[1.2],[1.2],[0.8],[0.8]])
+            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
             # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
             Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
         
         elif stance == 1:
-            kr = np.array([[1.2],[1.2],[1.2],[1.2],[0.8],[0.8]])
+            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
             if l_contact == 1:
-                # kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
-                kl = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+                kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
             else:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
@@ -1516,8 +1514,14 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.1
         # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
+
+        # if self.ap_L >= 5:
+        #     self.ap_L =5
+        # elif self.ap_L <= -5:
+        #     self.ap_L =-5
+
         #--torque assign
         torque[4,0] = -self.ap_L
         #----update
@@ -1537,13 +1541,13 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.1
+        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)
         # self.ap_L = -Kx@(self.mea_y_L-self.ref_y_L)
 
-        # if self.ar_L >= 3:
-        #     self.ar_L =3
-        # elif self.ar_L <= -3:
-        #     self.ar_L =-3
+        if self.ar_L >= 3:
+            self.ar_L =3
+        elif self.ar_L <= -3:
+            self.ar_L =-3
 
         #--torque assign
         torque[5,0] = -self.ar_L
@@ -1629,6 +1633,11 @@ class UpperLevelController(Node):
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
         self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
         # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
+
+        # if self.ap_R >= 3:
+        #     self.ap_R =3
+        # elif self.ap_R <= -3:
+        #     self.ap_R =-3
        
         #--torque assign
         torque[10,0] = -self.ap_R
@@ -1651,13 +1660,13 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.1
+        self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)
         # self.ap_R = -Kx@(self.mea_y_R-self.ref_y_R)
 
-        # if self.ar_R >= 3:
-        #     self.ar_R =3
-        # elif self.ar_R <= -5:
-        #     self.ar_R =-5
+        if self.ar_R >= 3:
+            self.ar_R =3
+        elif self.ar_R <= -3:
+            self.ar_R =-3
 
         #--torque assign
         torque[11,0] = -self.ar_R
