@@ -166,6 +166,7 @@ class UpperLevelController(Node):
 
         self.count = 0
         self.stance = 2
+        self.stance_past = 2
         self.DS_time = 0.0
         self.RSS_time = 0.0
         self.LSS_time = 0.0
@@ -718,15 +719,15 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-            Lth = 0.16
-            hLth = 0.06
-            hhLth = 0.03
-            pyLth = 0.06
-            hight  = 0.03
-            # hLth = 0.0
-            # hhLth = 0.0
-            # pyLth = -0.06
-            # hight  = 0.0
+            # Lth = 0.16
+            # hLth = 0.06
+            # hhLth = 0.03
+            # pyLth = 0.06
+            # hight  = 0.03
+            hLth = 0.0
+            hhLth = 0.0
+            pyLth = -0.06
+            hight  = 0.0
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -900,6 +901,9 @@ class UpperLevelController(Node):
         return 
     
     def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance,ALIP_count):
+
+        self.stance_past =  copy.deepcopy(stance)
+
         if state == 0:
             #用骨盆相對左右腳掌位置來切換   
             if abs(px_in_lf[1,0])<=0.06:
@@ -916,7 +920,7 @@ class UpperLevelController(Node):
                 print("DS",self.DS_time)
             else:
                 self.DS_time = 10.1
-                stance = 0
+                stance = 1
                 self.RSS_time = 0.01
 
         if state == 2:
@@ -1531,6 +1535,11 @@ class UpperLevelController(Node):
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
 
+        #角動量連續性
+        if self.stance_past == 0 and self.stance == 1:
+            self.mea_x_L[1,0] = self.mea_x_past_R[1,0]
+            self.mea_y_L[1,0] = self.mea_y_past_R[1,0]
+
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
         Ly_ref = self.ly_ref[ALIP_count,0]
@@ -1650,6 +1659,11 @@ class UpperLevelController(Node):
         Lx_mea = -9*self.Vy_R*0.45 #(記得加負號)
         self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
+
+        #角動量連續性
+        if self.stance_past == 1 and self.stance == 0:
+            self.mea_x_R[1,0] = self.mea_x_past_L[1,0]
+            self.mea_y_R[1,0] = self.mea_y_past_L[1,0]
 
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
