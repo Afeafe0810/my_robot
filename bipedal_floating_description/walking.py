@@ -902,6 +902,7 @@ class UpperLevelController(Node):
     
     def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance,ALIP_count):
 
+
         self.stance_past =  copy.deepcopy(stance)
 
         if state == 0:
@@ -909,7 +910,7 @@ class UpperLevelController(Node):
             if abs(px_in_lf[1,0])<=0.06:
                 stance = 1 #左單支撐
             elif abs(px_in_rf[1,0])<=0.06:
-                stance = 0 #右單支撐
+                stance = 1 #右單支撐
             else:
                 stance = 2 #雙支撐
 
@@ -1327,7 +1328,28 @@ class UpperLevelController(Node):
         R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
         LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
 
-       
+        # if stance == 0:
+        #     if self.stance_past == 1:
+        #         kr = np.array([[0.0],[0.0],[0.0],[0.0],[0.0],[0.0]])
+        #         kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+        #         zero_gravity = np.zeros((6,1))
+        #         Leg_gravity = np.vstack((L_LSS_gravity, zero_gravity))
+        #     else:
+        #         kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
+        #         Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
+        
+        # elif stance == 1:
+        #     if self.stance_past == 0:
+        #         kl = np.array([[0.0],[0.0],[0.0],[0.0],[0.0],[0.0]])
+        #         kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+        #         zero_gravity = np.zeros((6,1))
+        #         Leg_gravity = np.vstack((zero_gravity,R_RSS_gravity))
+        #     else:
+        #         kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
+        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
+        #         Leg_gravity =  0.2*DS_gravity+0.8*LSS_gravity
+
         if stance == 0:
             if r_contact == 1:
                 kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
@@ -1435,10 +1457,10 @@ class UpperLevelController(Node):
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-        torque[4,0] = 0
-        torque[5,0] = 0
+        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        # torque[4,0] = 0
+        # torque[5,0] = 0
 
 
         torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
@@ -1534,12 +1556,7 @@ class UpperLevelController(Node):
         Lx_mea = -9*self.Vy_L*0.45 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
-
-        #角動量連續性
-        if self.stance_past == 0 and self.stance == 1:
-            self.mea_x_L[1,0] = self.mea_x_past_R[1,0]
-            self.mea_y_L[1,0] = self.mea_y_past_R[1,0]
-
+       
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
         Ly_ref = self.ly_ref[ALIP_count,0]
@@ -1554,6 +1571,8 @@ class UpperLevelController(Node):
         Bx = np.array([[0],[0.01]])
         Cx = np.array([[1,0],[0,1]])  
         #--LQR
+        # Kx = np.array([[290.3274,15.0198]])
+        # Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
         Kx = np.array([[184.7274,9.9032]])
         Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
         #--compensator
@@ -1561,8 +1580,8 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.5
-        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.3
+        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)*0.3
 
         # if self.ap_L >= 5:
         #     self.ap_L =5
@@ -1581,15 +1600,23 @@ class UpperLevelController(Node):
         By = np.array([[0],[0.01]])
         Cy = np.array([[1,0],[0,1]])  
         #--LQR
+        # Ky = np.array([[-290.3274,15.0198]])
+        # Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
         Ky = np.array([[-177.0596,9.6014]])
         Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
         #--compensator
         self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
+
+        #角動量連續性 & 扭矩合理性
+        if self.stance_past == 0 and self.stance == 1:
+            self.mea_y_L[1,0] = self.mea_y_past_R[1,0]
+            self.ob_y_L[1,0] = self.mea_y_past_R[1,0]
+
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
         self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.1
-        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)
+        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
 
         # if self.ar_L >= 3:
         #     self.ar_L =3
@@ -1610,10 +1637,10 @@ class UpperLevelController(Node):
 
 
         if stance == 1:
-            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
-            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
+            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
+            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
@@ -1660,11 +1687,6 @@ class UpperLevelController(Node):
         self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
 
-        #角動量連續性
-        if self.stance_past == 1 and self.stance == 0:
-            self.mea_x_R[1,0] = self.mea_x_past_L[1,0]
-            self.mea_y_R[1,0] = self.mea_y_past_L[1,0]
-
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
         Ly_ref = self.ly_ref[ALIP_count,0]
@@ -1690,8 +1712,8 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
-        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.3
+        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)*0.3
 
         # if self.ap_R >= 3:
         #     self.ap_R =3
@@ -1716,6 +1738,12 @@ class UpperLevelController(Node):
         Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
         #--compensator
         self.ob_y_R = Ay@self.ob_y_past_R + self.ar_past_R*By + Ly@(self.mea_y_past_R - Cy@self.ob_y_past_R)
+
+        #角動量連續性 & 扭矩合理性
+        if self.stance_past == 1 and self.stance == 0:
+            self.mea_y_R[1,0] = self.mea_y_past_L[1,0]
+            self.ob_y_R[1,0] = self.mea_y_past_L[1,0]
+
         #----calculate toruqe
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
@@ -1740,10 +1768,10 @@ class UpperLevelController(Node):
         # self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
         # self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
         if stance == 0:
-            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
+            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
+            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
     
