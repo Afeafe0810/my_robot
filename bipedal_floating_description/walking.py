@@ -718,15 +718,15 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-            # Lth = 0.16
-            # hLth = 0.06
-            # hhLth = 0.03
-            # pyLth = 0.06
-            # hight  = 0.03
-            hLth = 0.0
-            hhLth = 0.0
-            pyLth = -0.06
-            hight  = 0.0
+            Lth = 0.16
+            hLth = 0.06
+            hhLth = 0.03
+            pyLth = 0.06
+            hight  = 0.03
+            # hLth = 0.0
+            # hhLth = 0.0
+            # pyLth = -0.06
+            # hight  = 0.0
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -916,7 +916,7 @@ class UpperLevelController(Node):
                 print("DS",self.DS_time)
             else:
                 self.DS_time = 10.1
-                stance = 1
+                stance = 0
                 self.RSS_time = 0.01
 
         if state == 2:
@@ -1601,10 +1601,10 @@ class UpperLevelController(Node):
 
 
         if stance == 1:
-            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
+            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
@@ -1726,10 +1726,10 @@ class UpperLevelController(Node):
         # self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
         # self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
         if stance == 0:
-            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
-            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
+            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
     
