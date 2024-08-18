@@ -179,6 +179,7 @@ class UpperLevelController(Node):
         self.COM_in_wf = np.array([[0.0],[0.0],[0.6]])
         self.LX_in_wf = np.array([[0.0],[0.1],[0.0]])
         self.RX_in_wf = np.array([[0.0],[-0.1],[0.0]])
+        
         self.PX_in_wf_f_past = np.array([[0.0],[0.0],[0.6]])
         self.PX_in_wf_past = np.array([[0.0],[0.0],[0.6]])
         self.COM_in_wf_f_past = np.array([[0.0],[0.0],[0.6]])
@@ -971,6 +972,9 @@ class UpperLevelController(Node):
         rx_in_pink = np.reshape(copy.deepcopy(self.RX[0:3,0]),(3,1)) 
         com_in_pink = copy.deepcopy(com_in_pink)
 
+        l_foot_o = copy.deepcopy(self.l_foot.rotation)
+        l_foot_o_t = np.transpose(l_foot_o)
+
         px_in_wf = copy.deepcopy(self.PX_in_wf)
         com_in_wf = copy.deepcopy(self.COM_in_wf)
         lx_in_wf = copy.deepcopy(self.LX_in_wf)
@@ -991,9 +995,11 @@ class UpperLevelController(Node):
         else:
             lx_in_wf = lx_in_wf
             rx_in_wf = rx_in_wf
-            px_in_wf = 0.5*((px_in_pink - lx_in_pink) + lx_in_wf + (px_in_pink- rx_in_pink) + rx_in_wf)
+            # px_in_wf = 0.5*((px_in_pink - lx_in_pink) + lx_in_wf + (px_in_pink- rx_in_pink) + rx_in_wf)
+            px_in_wf = l_foot_o_t@(px_in_pink - lx_in_pink) + lx_in_wf
             # com_in_wf = 0.5*(com_in_lf + lx_in_wf + com_in_rf + rx_in_wf)
             # com_in_wf = (com_in_pink - px_in_pink) + px_in_wf_f
+
 
         #px_filter
         px_in_wf_f = 0.8353*self.PX_in_wf_f_past + 0.1647*self.PX_in_wf_past
