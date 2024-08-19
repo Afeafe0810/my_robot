@@ -865,15 +865,15 @@ class UpperLevelController(Node):
             self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
             self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         else:
-            Lth = 0.16
-            hLth = 0.06
-            hhLth = 0.03
-            pyLth = 0.06
-            hight  = 0.03
-            # hLth = 0.0
-            # hhLth = 0.0
-            # pyLth = -0.06
-            # hight  = 0.0
+            # Lth = 0.16
+            # hLth = 0.06
+            # hhLth = 0.03
+            # pyLth = 0.06
+            # hight  = 0.03
+            hLth = 0.0
+            hhLth = 0.0
+            pyLth = -0.06
+            hight  = 0.0
             if state == 1:
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
@@ -1590,8 +1590,8 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.3
-        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)*0.3
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
+        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)*0.5
 
         # if self.ap_L >= 5:
         #     self.ap_L =5
@@ -1626,12 +1626,12 @@ class UpperLevelController(Node):
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
         self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.2
-        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
+        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.2
 
-        if self.ar_L >= 3:
-            self.ar_L =3
-        elif self.ar_L <= -3:
-            self.ar_L =-3
+        # if self.ar_L >= 3:
+        #     self.ar_L =3
+        # elif self.ar_L <= -3:
+        #     self.ar_L =-3
 
         #--torque assign
         torque[5,0] = -self.ar_L
@@ -1647,10 +1647,10 @@ class UpperLevelController(Node):
 
 
         if stance == 1:
-            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
-            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
+            alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
+            alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
@@ -1722,8 +1722,8 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.3
-        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)*0.3
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
+        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)*0.5
 
         # if self.ap_R >= 3:
         #     self.ap_R =3
@@ -1753,12 +1753,12 @@ class UpperLevelController(Node):
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
         self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.2
-        # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.1
+        # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.2
 
-        if self.ar_R >= 3:
-            self.ar_R =3
-        elif self.ar_R <= -3:
-            self.ar_R =-3
+        # if self.ar_R >= 3:
+        #     self.ar_R =3
+        # elif self.ar_R <= -3:
+        #     self.ar_R =-3
 
         #--torque assign
         torque[11,0] = -self.ar_R
@@ -1773,10 +1773,10 @@ class UpperLevelController(Node):
         # self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
         # self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
         if stance == 0:
-            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
+            alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
+            alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
+            # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
+            # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
     
