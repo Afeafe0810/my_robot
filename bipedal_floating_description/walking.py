@@ -583,9 +583,17 @@ class UpperLevelController(Node):
         l_foot_p = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
         r_foot_p = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
 
+        # pelvis_p = copy.deepcopy(self.P_PV_wf)
+        # l_foot_p = copy.deepcopy(self.P_L_wf)
+        # r_foot_p = copy.deepcopy(self.P_R_wf)
+
         pelvis_o = copy.deepcopy(self.pelvis.rotation)
         l_foot_o = copy.deepcopy(self.l_foot.rotation)
         r_foot_o = copy.deepcopy(self.r_foot.rotation)
+
+        # pelvis_o = copy.deepcopy(self.O_wfPV)
+        # l_foot_o = copy.deepcopy(self.O_wfL)
+        # r_foot_o = copy.deepcopy(self.O_wfR)
 
         pR = R.from_matrix(pelvis_o).as_euler('zyx', degrees=False)   
         P_Yaw = pR[0]
@@ -605,6 +613,7 @@ class UpperLevelController(Node):
         self.PX = np.array([[pelvis_p[0,0]],[pelvis_p[1,0]],[pelvis_p[2,0]],[P_Roll],[P_Pitch],[P_Yaw]])
         self.LX = np.array([[l_foot_p[0,0]],[l_foot_p[1,0]],[l_foot_p[2,0]],[L_Roll],[L_Pitch],[L_Yaw]])
         self.RX = np.array([[r_foot_p[0,0]],[r_foot_p[1,0]],[r_foot_p[2,0]],[R_Roll],[R_Pitch],[R_Yaw]])
+
 
         self.L_Body_transfer = np.array([[cos(L_Pitch)*cos(L_Yaw), -sin(L_Yaw),0],
                                 [cos(L_Pitch)*sin(L_Yaw), cos(L_Yaw), 0],
@@ -724,7 +733,7 @@ class UpperLevelController(Node):
         self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def stance_change(self,state,px_in_lf,px_in_rf,l_contact,r_contact,stance,ALIP_count):
+    def stance_change(self,state,px_in_lf,px_in_rf,stance,ALIP_count):
 
 
         self.stance_past =  copy.deepcopy(stance)
@@ -1874,9 +1883,19 @@ class UpperLevelController(Node):
 
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
-        stance = self.stance_change(state,px_in_lf,px_in_rf,l_contact,r_contact,self.stance,self.ALIP_count)
+
+        stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
         self.pelvis_in_wf()
         self.data_in_wf(com_in_pink)
+
+        if self.P_L_wf[2,0] <= 0.01:
+            l_contact == 1
+        else:
+            l_contact == 0
+        if self.P_R_wf[2,0] <= 0.01:
+            r_contact == 1
+        else:
+            r_contact == 0
 
         if state == 30:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
