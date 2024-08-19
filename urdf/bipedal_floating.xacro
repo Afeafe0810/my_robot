@@ -5,12 +5,6 @@
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.trans" />
 <xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.gazebo" />
 
-<!-- <link name="world"/>
-<joint name="fixed" type="fixed">
-  <parent link="world"/>
-  <child link="base_link"/>
-</joint> -->
-
 <link name="l_foot"/>
 <joint name="l_foot_joint" type="fixed">
   <parent link="l_foot_1"/>
@@ -556,7 +550,19 @@
     <!-- <parameters>$(find bipedal_floating_description)/config/velocity_controller.yaml</parameters> -->
     <parameters>$(find bipedal_floating_description)/config/effort_controller.yaml</parameters>
   </plugin>
+
   <plugin name="gazebo_link_attacher" filename="libgazebo_link_attacher.so"/>
+
+  <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
+    <update_rate>500.0</update_rate>
+    <body_name>base_link</body_name>
+    <frame_name>world</frame_name>
+    <gaussian_noise>0.0</gaussian_noise>
+    <xyz_offset>0 0 0</xyz_offset>
+    <rpy_offset>0 0 0</rpy_offset>
+  </plugin>
+
 </gazebo>
+
 
 </robot>
