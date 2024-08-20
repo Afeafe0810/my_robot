@@ -833,10 +833,9 @@ class UpperLevelController(Node):
         P_R_pf = np.reshape(copy.deepcopy(self.RX[0:3,0]),(3,1)) 
         P_COM_pf = copy.deepcopy(com_in_pink)
         #pf_o
-        O_Lpf= copy.deepcopy(self.l_foot.rotation)
-        O_pfL = np.transpose(copy.deepcopy(self.l_foot.rotation))
-        O_Rpf = copy.deepcopy(self.r_foot.rotation)
-        O_pfR = np.transpose(copy.deepcopy(self.r_foot.rotation))
+        O_pfL = copy.deepcopy(self.l_foot.rotation)
+        O_pfR = copy.deepcopy(self.r_foot.rotation)
+        
         #PV_o
         O_PVpf = np.identity(3)
         #wf_p
@@ -857,13 +856,13 @@ class UpperLevelController(Node):
         self.P_R_wf = copy.deepcopy(P_R_wf)
         #orientation in wf
         self.O_wfPV = copy.deepcopy(O_wfPV)
-        self.O_wfL = copy.deepcopy(O_wfR)
-        self.O_wfR = copy.deepcopy(O_wfL)
+        self.O_wfL = copy.deepcopy(O_wfL)
+        self.O_wfR = copy.deepcopy(O_wfR)
 
-        self.PX_publisher.publish(Float64MultiArray(data=P_PV_wf))
-        self.COM_publisher.publish(Float64MultiArray(data=P_COM_wf))
-        self.LX_publisher.publish(Float64MultiArray(data=P_L_wf))
-        self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
+        # self.PX_publisher.publish(Float64MultiArray(data=P_PV_wf))
+        # self.COM_publisher.publish(Float64MultiArray(data=P_COM_wf))
+        # self.LX_publisher.publish(Float64MultiArray(data=P_L_wf))
+        # self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
         return 
 
@@ -1124,7 +1123,7 @@ class UpperLevelController(Node):
         v =  copy.deepcopy(jv_f) #joint_velocity
         state = copy.deepcopy(state)
        
-        #獲取支撐狀態(有問題)
+        #獲取支撐狀態
         stance = copy.deepcopy(stance_type)
         # print(stance)
         if state == 30:
@@ -1465,8 +1464,20 @@ class UpperLevelController(Node):
         l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
         r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
-        # #L_leg_velocity
-        # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
+        L_matrix = R.from_matrix(self.O_wfL)
+        L_euler = L_matrix.as_euler('zyx', degrees=False)
+        L_yaw = L_euler[0]
+        L_pitch = L_euler[1]
+        L_roll = L_euler[2]
+
+        R_matrix = R.from_matrix(self.O_wfR)
+        R_euler = R_matrix.as_euler('zyx', degrees=False)
+        R_yaw = R_euler[0]
+        R_pitch = R_euler[1]
+        R_roll = R_euler[2]
+
+        print(L_pitch)
+
 
         torque = np.zeros((12,1))
 
@@ -1474,20 +1485,24 @@ class UpperLevelController(Node):
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-        # torque[4,0] = 0
-        # torque[5,0] = 0
+        # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
+        # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
+        # torque[4,0] = 0.1*(0-L_pitch)
+        # torque[5,0] = 0.1*(0-L_roll)
+        torque[4,0] = 0
+        torque[5,0] = 0
 
 
         torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-        # torque[10,0] = 0
-        # torque[11,0] = 0
+        # torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
+        # torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
+        # torque[10,0] = 0.1*(0-R_pitch)
+        # torque[11,0] = 0.1*(0-R_roll)
+        torque[10,0] = 0
+        torque[11,0] = 0
 
         # self.effort_publisher.publish(Float64MultiArray(data=torque))
         
@@ -1550,14 +1565,14 @@ class UpperLevelController(Node):
         PX_l[1,0] = PX_l[1,0] #yc
 
         #計算質心速度
-        self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
-        self.CX_past_L = PX_l[0,0]
-        self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
-        self.CY_past_L = PX_l[1,0]
-        # self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
-        # self.CX_past_L = com_in_wf[0,0]
-        # self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
-        # self.CY_past_L = com_in_wf[1,0]
+        # self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
+        # self.CX_past_L = PX_l[0,0]
+        # self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
+        # self.CY_past_L = PX_l[1,0]
+        self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
+        self.CX_past_L = com_in_wf[0,0]
+        self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
+        self.CY_past_L = com_in_wf[1,0]
 
         #velocity filter
         self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
@@ -1600,7 +1615,7 @@ class UpperLevelController(Node):
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
         self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
-        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)*0.5
+        # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
 
         # if self.ap_L >= 5:
         #     self.ap_L =5
@@ -1626,16 +1641,16 @@ class UpperLevelController(Node):
         #--compensator
         self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
 
-        #角動量連續性 & 扭矩合理性
+        #角動量連續性
         if self.stance_past == 0 and self.stance == 1:
             self.mea_y_L[1,0] = self.mea_y_past_R[1,0]
-            self.ob_y_L[1,0] = self.mea_y_past_R[1,0]
+            self.ob_y_L[1,0] = self.ob_y_past_R[1,0]
 
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
         self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.2
-        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.2
+        # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
 
         # if self.ar_L >= 3:
         #     self.ar_L =3
@@ -1680,14 +1695,14 @@ class UpperLevelController(Node):
         PX_r = com_in_wf - rx_in_wf
        
         #計算質心速度
-        self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/self.timer_period
-        self.CX_past_R = PX_r[0,0]
-        self.CY_dot_R = (PX_r[1,0] - self.CY_past_R)/self.timer_period
-        self.CY_past_R = PX_r[1,0]
-        # self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
-        # self.CX_past_R = com_in_wf[0,0]
-        # self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
-        # self.CY_past_R = com_in_wf[1,0]
+        # self.CX_dot_R = (PX_r[0,0] - self.CX_past_R)/self.timer_period
+        # self.CX_past_R = PX_r[0,0]
+        # self.CY_dot_R = (PX_r[1,0] - self.CY_past_R)/self.timer_period
+        # self.CY_past_R = PX_r[1,0]
+        self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
+        self.CX_past_R = com_in_wf[0,0]
+        self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
+        self.CY_past_R = com_in_wf[1,0]
 
         #velocity filter
         self.Vx_R = 0.7408*self.Vx_past_R + 0.2592*self.CX_dot_past_R  #濾過後的速度(5Hz)
@@ -1727,12 +1742,17 @@ class UpperLevelController(Node):
        
         #--compensator
         self.ob_x_R = Ax@self.ob_x_past_R + self.ap_past_R*Bx + Lx@(self.mea_x_past_R - Cx@self.ob_x_past_R)
+
+        #角動量連續性 
+        if self.stance_past == 1 and self.stance == 0:
+            self.mea_y_R[1,0] = self.mea_y_past_L[1,0]
+            self.ob_y_R[1,0] = self.ob_y_past_L[1,0]
         
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
         self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
-        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)*0.5
+        # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
 
         # if self.ap_R >= 3:
         #     self.ap_R =3
@@ -1762,7 +1782,7 @@ class UpperLevelController(Node):
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
         self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.2
-        # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.2
+        # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.1
 
         # if self.ar_R >= 3:
         #     self.ar_R =3
@@ -1837,25 +1857,15 @@ class UpperLevelController(Node):
 
     def to_matlab(self):
         #only x_y_z
-        px_in_pin = np.reshape(copy.deepcopy(self.PX[0:3,0]),(3,1))
-        lx_in_pin = np.reshape(copy.deepcopy(self.LX[0:3,0]),(3,1))
-        rx_in_pin = np.reshape(copy.deepcopy(self.RX[0:3,0]),(3,1))
-
-        lx_initial = np.array([[0.0],[0.1],[0.0]])
-        rx_initial = np.array([[0.0],[-0.1],[0.0]])
-    
-        #要改
-        px_in_wf = px_in_pin - lx_in_pin + lx_initial
-        lx_in_wf = lx_initial
-        rx_in_wf = rx_in_pin - lx_in_pin + lx_initial
-
-        # print("px_in_wf",px_in_wf)
-        # print("lx_in_wf",lx_in_wf)
-        # print("rx_in_wf",rx_in_wf)
-
-        # self.pelvis_publisher.publish(Float64MultiArray(data=px_in_wf))
-        # self.left_publisher.publish(Float64MultiArray(data=lx_in_wf))
-        # self.right_publisher.publish(Float64MultiArray(data=rx_in_wf))
+        P_PV_wf = copy.deepcopy(self.P_PV_wf)
+        P_COM_wf = copy.deepcopy(self.P_COM_wf)
+        P_L_wf = copy.deepcopy(self.P_L_wf)
+        P_R_wf = copy.deepcopy(self.P_R_wf)
+        
+        self.PX_publisher.publish(Float64MultiArray(data=P_PV_wf))
+        self.COM_publisher.publish(Float64MultiArray(data=P_COM_wf))
+        self.LX_publisher.publish(Float64MultiArray(data=P_L_wf))
+        self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
     def main_controller_callback(self):
         
@@ -1879,14 +1889,13 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf,com_in_pink = self.com_position(joint_position)
 
-        self.to_matlab()
-
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
 
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
         self.pelvis_in_wf()
         self.data_in_wf(com_in_pink)
+
 
         if self.P_L_wf[2,0] <= 0.01:
             l_contact == 1
@@ -1921,6 +1930,7 @@ class UpperLevelController(Node):
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
 
         elif state == 30:
+            self.to_matlab()
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
@@ -1931,33 +1941,9 @@ class UpperLevelController(Node):
 
             elif stance == 0:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_R))
-
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
 
             self.ALIP_count += 1
-            # if self.ALIP_count % 50 == 0:
-            #     print(self.touch)
-            #     if self.touch % 2 == 0:
-            #         #check l leg
-            #         lly_e = self.ob_x_L[1,0] - self.ly_ref[self.ALIP_count,0]
-            #         llx_e = self.ob_y_L[1,0] - self.lx_ref[self.ALIP_count,0]
-            #         if abs(lly_e)<= 0.5:
-            #             self.touch += 1
-            #             self.ALIP_count += 1
-            #         else:
-            #             self.ALIP_count = self.ALIP_count
-
-            #     elif self.touch % 2 != 0:
-            #         #check r leg
-            #         rly_e = self.ob_x_R[1,0] - self.ly_ref[self.ALIP_count,0]
-            #         rlx_e = self.ob_y_R[1,0] - self.lx_ref[self.ALIP_count,0]
-            #         if abs(rly_e)<= 0.5:
-            #             self.touch += 1
-            #             self.ALIP_count += 1
-            #         else:
-            #             self.ALIP_count = self.ALIP_count
-            # else:
-            #     self.ALIP_count += 1
        
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
