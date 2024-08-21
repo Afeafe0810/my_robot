@@ -198,6 +198,8 @@ class UpperLevelController(Node):
         self.O_wfL = np.zeros((3,3))
         self.O_wfR = np.zeros((3,3))
 
+        #data_in_pf 
+
         #ALIP
         #time
         self.ALIP_count = 0
@@ -426,10 +428,10 @@ class UpperLevelController(Node):
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
 
         for i in range(len(joint_velocity_cal)):
-            if joint_velocity_cal[i,0]>= 0.5:
-                joint_velocity_cal[i,0] = 0.5
-            elif joint_velocity_cal[i,0]<= -0.5:
-                joint_velocity_cal[i,0] = -0.5
+            if joint_velocity_cal[i,0]>= 0.75:
+                joint_velocity_cal[i,0] = 0.75
+            elif joint_velocity_cal[i,0]<= -0.75:
+                joint_velocity_cal[i,0] = -0.75
             i += 1
 
         return joint_velocity_cal
@@ -438,9 +440,9 @@ class UpperLevelController(Node):
         
         jv_sub = copy.deepcopy(joint_velocity)
 
-        self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
+        # self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
         # self.jv = 0.5186*self.jv_p - 0.1691*self.jv_pp + 0.4215*self.jv_sub_p + 0.229*self.jv_sub_pp #20Hz
-        # self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
+        self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
 
         self.jv_pp = copy.deepcopy(self.jv_p)
         self.jv_p = copy.deepcopy(self.jv)
@@ -556,40 +558,78 @@ class UpperLevelController(Node):
         # print("AR6: ",self.AR6) 
 
     def get_position(self,configuration):
-        self.pelvis = configuration.get_transform_frame_to_world("pelvis_link")
+
+        #frame data in pf
+        PV_pf = configuration.get_transform_frame_to_world("pelvis_link")
         # print("p",pelvis)
-        self.l_hip_roll = configuration.get_transform_frame_to_world("l_hip_yaw_1")
-        self.l_hip_yaw = configuration.get_transform_frame_to_world("l_hip_pitch_1")
-        self.l_hip_pitch = configuration.get_transform_frame_to_world("l_thigh_1")
-        self.l_knee_pitch = configuration.get_transform_frame_to_world("l_shank_1")
-        self.l_ankle_pitch = configuration.get_transform_frame_to_world("l_ankle_1")
-        self.l_ankle_roll = configuration.get_transform_frame_to_world("l_foot_1")
-        self.l_foot = configuration.get_transform_frame_to_world("l_foot")
+        Lhr_pf = configuration.get_transform_frame_to_world("l_hip_yaw_1")
+        Lhy_pf = configuration.get_transform_frame_to_world("l_hip_pitch_1")
+        Lhp_pf = configuration.get_transform_frame_to_world("l_thigh_1")
+        Lkp_pf = configuration.get_transform_frame_to_world("l_shank_1")
+        Lap_pf = configuration.get_transform_frame_to_world("l_ankle_1")
+        Lar_pf = configuration.get_transform_frame_to_world("l_foot_1")
+        L_pf = configuration.get_transform_frame_to_world("l_foot")
         # print("l_foot:",self.l_foot.translation)
-        self.r_hip_roll = configuration.get_transform_frame_to_world("r_hip_yaw_1")
-        self.r_hip_yaw = configuration.get_transform_frame_to_world("r_hip_pitch_1")
-        self.r_hip_pitch = configuration.get_transform_frame_to_world("r_thigh_1")
-        self.r_knee_pitch = configuration.get_transform_frame_to_world("r_shank_1")
-        self.r_ankle_pitch = configuration.get_transform_frame_to_world("r_ankle_1")
-        self.r_ankle_roll = configuration.get_transform_frame_to_world("r_foot_1")
-        self.r_foot = configuration.get_transform_frame_to_world("r_foot")
-        # print("r_foot:",self.r_foot.translation)
+        Rhr_pf = configuration.get_transform_frame_to_world("r_hip_yaw_1")
+        Rhy_pf = configuration.get_transform_frame_to_world("r_hip_pitch_1")
+        Rhp_pf = configuration.get_transform_frame_to_world("r_thigh_1")
+        Rkp_pf = configuration.get_transform_frame_to_world("r_shank_1")
+        Rap_pf = configuration.get_transform_frame_to_world("r_ankle_1")
+        Rar_pf = configuration.get_transform_frame_to_world("r_foot_1")
+        R_pf = configuration.get_transform_frame_to_world("r_foot")
+        # print("r_foot:",self.r_foot.translation)        
+
+        #frame origin position in pf
+        self.P_PV_pf = np.reshape(PV_pf.translation,(3,1))
+        self.P_Lhr_pf = np.reshape(Lhr_pf.translation,(3,1))
+        self.P_Lhy_pf = np.reshape(Lhy_pf.translation,(3,1))
+        self.P_Lhp_pf = np.reshape(Lhp_pf.translation,(3,1))
+        self.P_Lkp_pf = np.reshape(Lkp_pf.translation,(3,1))
+        self.P_Lap_pf = np.reshape(Lap_pf.translation,(3,1))
+        self.P_Lar_pf = np.reshape(Lar_pf.translation,(3,1))
+        self.P_L_pf = np.reshape(L_pf.translation,(3,1))
+
+        self.P_Rhr_pf = np.reshape(Rhr_pf.translation,(3,1))
+        self.P_Rhy_pf = np.reshape(Rhy_pf.translation,(3,1))
+        self.P_Rhp_pf = np.reshape(Rhp_pf.translation,(3,1))
+        self.P_Rkp_pf = np.reshape(Rkp_pf.translation,(3,1))
+        self.P_Rap_pf = np.reshape(Rap_pf.translation,(3,1))
+        self.P_Rar_pf = np.reshape(Rar_pf.translation,(3,1))
+        self.P_R_pf = np.reshape(R_pf.translation,(3,1))
+
+        #frame orientation in pf
+        self.O_pfPV = np.reshape(PV_pf.rotation,(3,3))
+        self.O_pfLhr = np.reshape(Lhr_pf.rotation,(3,3))
+        self.O_pfLhy = np.reshape(Lhy_pf.rotation,(3,3))
+        self.O_pfLhp = np.reshape(Lhp_pf.rotation,(3,3))
+        self.O_pfLkp = np.reshape(Lkp_pf.rotation,(3,3))
+        self.O_pfLap = np.reshape(Lap_pf.rotation,(3,3))
+        self.O_pfLar = np.reshape(Lar_pf.rotation,(3,3))
+        self.O_pfL = np.reshape(L_pf.rotation,(3,3))
+
+        self.O_pfRhr = np.reshape(Rhr_pf.rotation,(3,3))
+        self.O_pfRhy = np.reshape(Rhy_pf.rotation,(3,3))
+        self.O_pfRhp = np.reshape(Rhp_pf.rotation,(3,3))
+        self.O_pfRkp = np.reshape(Rkp_pf.rotation,(3,3))
+        self.O_pfRap = np.reshape(Rap_pf.rotation,(3,3))
+        self.O_pfRar = np.reshape(Rar_pf.rotation,(3,3))
+        self.O_pfR = np.reshape(R_pf.rotation,(3,3))
           
     def get_posture(self):
         cos = math.cos
         sin = math.sin
 
-        pelvis_p = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
-        l_foot_p = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
-        r_foot_p = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
+        pelvis_p = copy.deepcopy(self.P_PV_pf)
+        l_foot_p = copy.deepcopy(self.P_L_pf)
+        r_foot_p = copy.deepcopy(self.P_R_pf)
 
         # pelvis_p = copy.deepcopy(self.P_PV_wf)
         # l_foot_p = copy.deepcopy(self.P_L_wf)
         # r_foot_p = copy.deepcopy(self.P_R_wf)
 
-        pelvis_o = copy.deepcopy(self.pelvis.rotation)
-        l_foot_o = copy.deepcopy(self.l_foot.rotation)
-        r_foot_o = copy.deepcopy(self.r_foot.rotation)
+        pelvis_o = copy.deepcopy(self.O_pfPV)
+        l_foot_o = copy.deepcopy(self.O_pfL)
+        r_foot_o = copy.deepcopy(self.O_pfR)
 
         # pelvis_o = copy.deepcopy(self.O_wfPV)
         # l_foot_o = copy.deepcopy(self.O_wfL)
@@ -667,25 +707,15 @@ class UpperLevelController(Node):
         return com_in_lf,com_in_rf,com_floating_in_pink
     
     def left_leg_jacobian(self):
-        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
-        l_hip_roll = np.reshape(copy.deepcopy(self.l_hip_roll.translation),(3,1))
-        l_hip_yaw = np.reshape(copy.deepcopy(self.l_hip_yaw.translation),(3,1))
-        l_hip_pitch = np.reshape(copy.deepcopy(self.l_hip_pitch.translation),(3,1))
-        l_knee_pitch = np.reshape(copy.deepcopy(self.l_knee_pitch.translation),(3,1))
-        l_ankle_pitch = np.reshape(copy.deepcopy(self.l_ankle_pitch.translation),(3,1))
-        l_ankle_roll = np.reshape(copy.deepcopy(self.l_ankle_roll.translation),(3,1))
-        l_foot = np.reshape(copy.deepcopy(self.l_foot.translation),(3,1))
-        # print("l_hip_roll:",l_hip_roll)
-        # print("l_hip_yaw:",l_hip_yaw)
-        # print("l_hip_pitch:",l_hip_pitch)
-        # print("l_knee_pitch:",l_knee_pitch)
-        # print("l_ankle_pitch:",l_ankle_pitch)
-        # print("l_ankle_roll:",l_ankle_roll)
-        # print("l_foot:",l_foot)
+        pelvis = copy.deepcopy(self.P_PV_pf)
+        l_hip_roll = copy.deepcopy(self.P_Lhr_pf)
+        l_hip_yaw = copy.deepcopy(self.P_Lhy_pf)
+        l_hip_pitch = copy.deepcopy(self.P_Lhp_pf)
+        l_knee_pitch = copy.deepcopy(self.P_Lkp_pf)
+        l_ankle_pitch = copy.deepcopy(self.P_Lap_pf)
+        l_ankle_roll = copy.deepcopy(self.P_Lar_pf)
+        l_foot = copy.deepcopy(self.P_L_pf)
 
-
-        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
-        # l_foot = copy.deepcopy(l_foot)
         JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
         JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
         JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
@@ -705,17 +735,15 @@ class UpperLevelController(Node):
         return self.JLL
 
     def right_leg_jacobian(self):
-        pelvis = np.reshape(copy.deepcopy(self.pelvis.translation),(3,1))
-        r_hip_roll = np.reshape(copy.deepcopy(self.r_hip_roll.translation),(3,1))
-        r_hip_yaw = np.reshape(copy.deepcopy(self.r_hip_yaw.translation),(3,1))
-        r_hip_pitch = np.reshape(copy.deepcopy(self.r_hip_pitch.translation),(3,1))
-        r_knee_pitch = np.reshape(copy.deepcopy(self.r_knee_pitch.translation),(3,1))
-        r_ankle_pitch = np.reshape(copy.deepcopy(self.r_ankle_pitch.translation),(3,1))
-        r_ankle_roll = np.reshape(copy.deepcopy(self.r_ankle_roll.translation),(3,1))
-        r_foot = np.reshape(copy.deepcopy(self.r_foot.translation),(3,1))
-        # print("1:",l_hip_roll,l_hip_yaw,l_hip_pitch)
-        # print("2",l_knee_pitch,l_ankle_pitch,l_ankle_roll)
-        # l_foot = copy.deepcopy(l_foot)
+        pelvis = copy.deepcopy(self.P_PV_pf)
+        r_hip_roll = copy.deepcopy(self.P_Rhr_pf)
+        r_hip_yaw = copy.deepcopy(self.P_Rhy_pf)
+        r_hip_pitch = copy.deepcopy(self.P_Rhp_pf)
+        r_knee_pitch = copy.deepcopy(self.P_Rkp_pf)
+        r_ankle_pitch = copy.deepcopy(self.P_Rap_pf)
+        r_ankle_roll = copy.deepcopy(self.P_Rar_pf)
+        r_foot = copy.deepcopy(self.P_R_pf)
+
         JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
         JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
         JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
@@ -754,7 +782,7 @@ class UpperLevelController(Node):
                 print("DS",self.DS_time)
             else:
                 self.DS_time = 10.1
-                stance = 0
+                stance = 1
                 self.RSS_time = 0.01
 
         if state == 2:
@@ -828,13 +856,13 @@ class UpperLevelController(Node):
 
     def data_in_wf(self,com_in_pink):
         #pf_p
-        P_PV_pf = np.reshape(copy.deepcopy(self.PX[0:3,0]),(3,1)) 
-        P_L_pf= np.reshape(copy.deepcopy(self.LX[0:3,0]),(3,1)) 
-        P_R_pf = np.reshape(copy.deepcopy(self.RX[0:3,0]),(3,1)) 
+        P_PV_pf = copy.deepcopy(self.P_PV_pf)
+        P_L_pf= copy.deepcopy(self.P_L_pf) 
+        P_R_pf = copy.deepcopy(self.P_R_pf) 
         P_COM_pf = copy.deepcopy(com_in_pink)
         #pf_o
-        O_pfL = copy.deepcopy(self.l_foot.rotation)
-        O_pfR = copy.deepcopy(self.r_foot.rotation)
+        O_pfL = copy.deepcopy(self.O_pfL)
+        O_pfR = copy.deepcopy(self.O_pfR)
         
         #PV_o
         O_PVpf = np.identity(3)
@@ -1038,14 +1066,14 @@ class UpperLevelController(Node):
                 R_Z_ref = self.ARX_ref_data[ALIP_count,2]
 
                 if stance == 1:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.PX_in_wf[0,0] - self.COM_in_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.PX_in_wf[1,0] - self.COM_in_wf[1,0])
+                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
                     P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
                     P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
                     P_Z_ref = self.ACX_ref_data[ALIP_count,2]
                 elif stance == 0:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.PX_in_wf[0,0] - self.COM_in_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.PX_in_wf[1,0] - self.COM_in_wf[1,0])
+                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
                     P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
                     P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
                     P_Z_ref = self.ACX_ref_data[ALIP_count,2]
@@ -1344,7 +1372,7 @@ class UpperLevelController(Node):
         R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
         LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
 
-        # if stance == 0:
+        # if r_contact == 1:
         #     if self.stance_past == 1:
         #         kr = np.array([[0.0],[0.0],[0.0],[0.0],[0.0],[0.0]])
         #         kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
@@ -1353,9 +1381,9 @@ class UpperLevelController(Node):
         #     else:
         #         kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
         #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-        #         Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
+        #         Leg_gravity = 0.15*DS_gravity+0.85*RSS_gravity
         
-        # elif stance == 1:
+        # elif l_contact == 1:
         #     if self.stance_past == 0:
         #         kl = np.array([[0.0],[0.0],[0.0],[0.0],[0.0],[0.0]])
         #         kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
@@ -1364,7 +1392,12 @@ class UpperLevelController(Node):
         #     else:
         #         kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
         #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #         Leg_gravity =  0.2*DS_gravity+0.8*LSS_gravity
+        #         Leg_gravity =  0.15*DS_gravity+0.85*LSS_gravity
+        # else:
+        #     kr = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+        #     kl = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+        #     zero_gravity = np.zeros((6,1))
+        #     Leg_gravity = np.vstack((zero_gravity, zero_gravity))
 
         if stance == 0:
             if r_contact == 1:
@@ -1559,16 +1592,12 @@ class UpperLevelController(Node):
         com_in_wf = copy.deepcopy(self.P_COM_wf)
         lx_in_wf = copy.deepcopy(self.P_L_wf)
 
-        # PX_l = copy.deepcopy(com_in_lf)
+        #質心相對L frame的位置
         PX_l = com_in_wf - lx_in_wf
         PX_l[0,0] = PX_l[0,0] #xc
         PX_l[1,0] = PX_l[1,0] #yc
 
-        #計算質心速度
-        # self.CX_dot_L = (PX_l[0,0] - self.CX_past_L)/self.timer_period
-        # self.CX_past_L = PX_l[0,0]
-        # self.CY_dot_L = (PX_l[1,0] - self.CY_past_L)/self.timer_period
-        # self.CY_past_L = PX_l[1,0]
+        #計算質心速度(v從世界座標下求出)
         self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
         self.CX_past_L = com_in_wf[0,0]
         self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
@@ -1605,10 +1634,10 @@ class UpperLevelController(Node):
         Bx = np.array([[0],[0.01]])
         Cx = np.array([[1,0],[0,1]])  
         #--LQR
-        # Kx = np.array([[290.3274,15.0198]])
-        # Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
-        Kx = np.array([[184.7274,9.9032]])
-        Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
+        Kx = np.array([[290.3274,15.0198]])
+        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
+        # Kx = np.array([[184.7274,9.9032]])
+        # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
         #--compensator
         self.ob_x_L = Ax@self.ob_x_past_L + self.ap_past_L*Bx + Lx@(self.mea_x_past_L - Cx@self.ob_x_past_L)
         #----calculate toruqe
@@ -1634,17 +1663,16 @@ class UpperLevelController(Node):
         By = np.array([[0],[0.01]])
         Cy = np.array([[1,0],[0,1]])  
         #--LQR
-        # Ky = np.array([[-290.3274,15.0198]])
-        # Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
         Ky = np.array([[-177.0596,9.6014]])
         Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
         #--compensator
         self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
 
-        #角動量連續性
+        #由於程式邏輯 使得左腳在擺動過程也會估測 然而並不會拿來使用
+        #為了確保支撐腳切換過程 角動量估測連續性
         if self.stance_past == 0 and self.stance == 1:
-            self.mea_y_L[1,0] = self.mea_y_past_R[1,0]
-            self.ob_y_L[1,0] = self.ob_y_past_R[1,0]
+            self.mea_y_L[1,0] = copy.deepcopy(self.mea_y_past_R[1,0])
+            self.ob_y_L[1,0] = copy.deepcopy(self.ob_y_past_R[1,0])
 
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
@@ -1656,6 +1684,10 @@ class UpperLevelController(Node):
         #     self.ar_L =3
         # elif self.ar_L <= -3:
         #     self.ar_L =-3
+
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 0 and self.stance == 1:
+            self.ar_L = 0
 
         #--torque assign
         torque[5,0] = -self.ar_L
@@ -1735,18 +1767,20 @@ class UpperLevelController(Node):
         Bx = np.array([[0],[0.01]])
         Cx = np.array([[1,0],[0,1]])  
         #--LQR
-        # Kx = np.array([[290.3274,15.0198]])
-        # Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
-        Kx = np.array([[184.7274,9.9032]])
-        Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
+        Kx = np.array([[290.3274,15.0198]])
+        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
+        # Kx = np.array([[184.7274,9.9032]])
+        # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
        
         #--compensator
         self.ob_x_R = Ax@self.ob_x_past_R + self.ap_past_R*Bx + Lx@(self.mea_x_past_R - Cx@self.ob_x_past_R)
 
-        #角動量連續性 
+        #由於程式邏輯 使得右腳在擺動過程也會估測 然而並不會拿來使用
+        #為了確保支撐腳切換過程 角動量估測連續性
+
         if self.stance_past == 1 and self.stance == 0:
-            self.mea_y_R[1,0] = self.mea_y_past_L[1,0]
-            self.ob_y_R[1,0] = self.ob_y_past_L[1,0]
+            self.mea_y_R[1,0] = copy.deepcopy(self.mea_y_past_L[1,0])
+            self.ob_y_R[1,0] = copy.deepcopy(self.ob_y_past_L[1,0])
         
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
@@ -1758,6 +1792,10 @@ class UpperLevelController(Node):
         #     self.ap_R =3
         # elif self.ap_R <= -3:
         #     self.ap_R =-3
+
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 1 and self.stance == 0:
+            self.ar_R = 0
        
         #--torque assign
         torque[10,0] = -self.ap_R
@@ -1797,10 +1835,6 @@ class UpperLevelController(Node):
         self.ar_past_R = self.ar_R
 
 
-        # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-        # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
-        # self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
-        # self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
         if stance == 0:
             alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
             alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
