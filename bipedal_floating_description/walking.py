@@ -495,69 +495,7 @@ class UpperLevelController(Node):
             R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
         return R    
 
-    def rotation_matrix(self,joint_position):
-        jp = copy.deepcopy(joint_position)
-
-        #骨盆姿態(要確認！)
-        self.RP = np.array([[1,0,0],[0,1,0],[0,0,1]])
-        # 各關節角度
-        Theta1 = jp[0,0] #L_Hip_Roll
-        Theta2 = jp[1,0]
-        Theta3 = jp[2,0]
-        Theta4 = jp[3,0]
-        Theta5 = jp[4,0]
-        Theta6 = jp[5,0] #L_Ankle_Roll
-
-        Theta7 = jp[6,0] #R_Hip_Roll
-        Theta8 = jp[7,0]
-        Theta9 = jp[8,0]
-        Theta10 = jp[9,0]
-        Theta11 = jp[10,0]
-        Theta12 = jp[11,0] #R_Ankle_Roll
-
-        #calculate rotation matrix
-        self.L_R01 = self.xyz_rotation('x',Theta1) #L_Hip_roll
-        self.L_R12 = self.xyz_rotation('z',Theta2)
-        self.L_R23 = self.xyz_rotation('y',Theta3)
-        self.L_R34 = self.xyz_rotation('y',Theta4)
-        self.L_R45 = self.xyz_rotation('y',Theta5)
-        self.L_R56 = self.xyz_rotation('x',Theta6) #L_Ankle_roll
-
-        self.R_R01 = self.xyz_rotation('x',Theta7) #R_Hip_roll
-        self.R_R12 = self.xyz_rotation('z',Theta8)
-        self.R_R23 = self.xyz_rotation('y',Theta9)
-        self.R_R34 = self.xyz_rotation('y',Theta10)
-        self.R_R45 = self.xyz_rotation('y',Theta11)
-        self.R_R56 = self.xyz_rotation('x',Theta12) #R_Ankle_roll
-
-    def relative_axis(self):
-        self.AL1 = self.RP@(np.array([[1],[0],[0]])) #L_Hip_roll
-        self.AL2 = self.RP@self.L_R01@(np.array([[0],[0],[1]])) 
-        self.AL3 = self.RP@self.L_R01@self.L_R12@(np.array([[0],[1],[0]])) 
-        self.AL4 = self.RP@self.L_R01@self.L_R12@self.L_R23@(np.array([[0],[1],[0]]))
-        self.AL5 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@(np.array([[0],[1],[0]])) 
-        self.AL6 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@self.L_R45@(np.array([[1],[0],[0]])) #L_Ankle_Roll
-        # print("AL1: ",self.AL1)
-        # print("AL2: ",self.AL2)
-        # print("AL3: ",self.AL3)
-        # print("AL4: ",self.AL4)
-        # print("AL5: ",self.AL5)
-        # print("AL6: ",self.AL6)  
-
-        self.AR1 = self.RP@(np.array([[1],[0],[0]])) #R_Hip_roll
-        self.AR2 = self.RP@self.R_R01@(np.array([[0],[0],[1]])) 
-        self.AR3 = self.RP@self.R_R01@self.R_R12@(np.array([[0],[1],[0]])) 
-        self.AR4 = self.RP@self.R_R01@self.R_R12@self.R_R23@(np.array([[0],[1],[0]]))
-        self.AR5 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@(np.array([[0],[1],[0]])) 
-        self.AR6 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@self.R_R45@(np.array([[1],[0],[0]])) #R_Ankle_Roll
-        # print("AR1: ",self.AR1)
-        # print("AR2: ",self.AR2)
-        # print("AR3: ",self.AR3)
-        # print("AR4: ",self.AR4)
-        # print("AR5: ",self.AR5)
-        # print("AR6: ",self.AR6) 
-
-    def get_position(self,configuration):
+    def get_position_pf(self,configuration):
 
         #frame data in pf
         PV_pf = configuration.get_transform_frame_to_world("pelvis_link")
@@ -705,64 +643,8 @@ class UpperLevelController(Node):
         # print('crf:',com_in_rf)
 
         return com_in_lf,com_in_rf,com_floating_in_pink
-    
-    def left_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        l_hip_roll = copy.deepcopy(self.P_Lhr_pf)
-        l_hip_yaw = copy.deepcopy(self.P_Lhy_pf)
-        l_hip_pitch = copy.deepcopy(self.P_Lhp_pf)
-        l_knee_pitch = copy.deepcopy(self.P_Lkp_pf)
-        l_ankle_pitch = copy.deepcopy(self.P_Lap_pf)
-        l_ankle_roll = copy.deepcopy(self.P_Lar_pf)
-        l_foot = copy.deepcopy(self.P_L_pf)
-
-        JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
-        JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
-        JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
-        JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
-        JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
-        JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
-
-        JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
-        JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
-        self.JLL = np.vstack((JLL_upper,JLL_lower))  
-        # print(self.JLL)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JLL44 = np.reshape(self.JLL[2:,0:4],(4,4))  
-        self.JLL42 = np.reshape(self.JLL[2:,4:],(4,2))
-
-        return self.JLL
-
-    def right_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        r_hip_roll = copy.deepcopy(self.P_Rhr_pf)
-        r_hip_yaw = copy.deepcopy(self.P_Rhy_pf)
-        r_hip_pitch = copy.deepcopy(self.P_Rhp_pf)
-        r_knee_pitch = copy.deepcopy(self.P_Rkp_pf)
-        r_ankle_pitch = copy.deepcopy(self.P_Rap_pf)
-        r_ankle_roll = copy.deepcopy(self.P_Rar_pf)
-        r_foot = copy.deepcopy(self.P_R_pf)
-
-        JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
-        JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
-        JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
-        JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
-        JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
-        JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
-
-        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
-        JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
-        self.JRR = np.vstack((JRR_upper,JRR_lower))  
-        # print(self.JRR)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JRR44 = np.reshape(self.JRR[2:,0:4],(4,4))  
-        self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
-        return self.JRR
 
     def stance_change(self,state,px_in_lf,px_in_rf,stance,ALIP_count):
-
 
         self.stance_past =  copy.deepcopy(stance)
 
@@ -857,9 +739,26 @@ class UpperLevelController(Node):
     def data_in_wf(self,com_in_pink):
         #pf_p
         P_PV_pf = copy.deepcopy(self.P_PV_pf)
-        P_L_pf= copy.deepcopy(self.P_L_pf) 
-        P_R_pf = copy.deepcopy(self.P_R_pf) 
         P_COM_pf = copy.deepcopy(com_in_pink)
+
+        P_Lhr_pf = copy.deepcopy(self.P_Lhr_pf)
+        P_Lhy_pf = copy.deepcopy(self.P_Lhy_pf)
+        P_Lhp_pf = copy.deepcopy(self.P_Lhp_pf)
+        P_Lkp_pf = copy.deepcopy(self.P_Lkp_pf)
+        P_Lap_pf = copy.deepcopy(self.P_Lap_pf)
+        P_Lar_pf = copy.deepcopy(self.P_Lar_pf)
+
+        P_L_pf= copy.deepcopy(self.P_L_pf) 
+
+        P_Rhr_pf = copy.deepcopy(self.P_Rhr_pf)
+        P_Rhy_pf = copy.deepcopy(self.P_Rhy_pf)
+        P_Rhp_pf = copy.deepcopy(self.P_Rhp_pf)
+        P_Rkp_pf = copy.deepcopy(self.P_Rkp_pf)
+        P_Rap_pf = copy.deepcopy(self.P_Rap_pf)
+        P_Rar_pf = copy.deepcopy(self.P_Rar_pf)
+
+        P_R_pf = copy.deepcopy(self.P_R_pf) 
+
         #pf_o
         O_pfL = copy.deepcopy(self.O_pfL)
         O_pfR = copy.deepcopy(self.O_pfR)
@@ -870,8 +769,25 @@ class UpperLevelController(Node):
         P_PV_wf = copy.deepcopy(self.P_PV_wf) #ros-3d
         O_wfPV = copy.deepcopy(self.O_wfPV) #ros-3d
         P_COM_wf = O_wfPV@O_PVpf@(P_COM_pf - P_PV_pf) + P_PV_wf
+
+        P_Lhr_wf = O_wfPV@O_PVpf@(P_Lhr_pf - P_PV_pf) + P_PV_wf
+        P_Lhy_wf = O_wfPV@O_PVpf@(P_Lhy_pf - P_PV_pf) + P_PV_wf
+        P_Lhp_wf = O_wfPV@O_PVpf@(P_Lhp_pf - P_PV_pf) + P_PV_wf
+        P_Lkp_wf = O_wfPV@O_PVpf@(P_Lkp_pf - P_PV_pf) + P_PV_wf
+        P_Lap_wf = O_wfPV@O_PVpf@(P_Lap_pf - P_PV_pf) + P_PV_wf
+        P_Lar_wf = O_wfPV@O_PVpf@(P_Lar_pf - P_PV_pf) + P_PV_wf
+    
         P_L_wf = O_wfPV@O_PVpf@(P_L_pf - P_PV_pf) + P_PV_wf
+
+        P_Rhr_wf = O_wfPV@O_PVpf@(P_Rhr_pf - P_PV_pf) + P_PV_wf
+        P_Rhy_wf = O_wfPV@O_PVpf@(P_Rhy_pf - P_PV_pf) + P_PV_wf
+        P_Rhp_wf = O_wfPV@O_PVpf@(P_Rhp_pf - P_PV_pf) + P_PV_wf
+        P_Rkp_wf = O_wfPV@O_PVpf@(P_Rkp_pf - P_PV_pf) + P_PV_wf
+        P_Rap_wf = O_wfPV@O_PVpf@(P_Rap_pf - P_PV_pf) + P_PV_wf
+        P_Rar_wf = O_wfPV@O_PVpf@(P_Rar_pf - P_PV_pf) + P_PV_wf
+
         P_R_wf = O_wfPV@O_PVpf@(P_R_pf - P_PV_pf) + P_PV_wf
+
         #wf_o
         O_wfR = O_wfPV@O_PVpf@O_pfR
         O_wfL = O_wfPV@O_PVpf@O_pfL
@@ -880,7 +796,23 @@ class UpperLevelController(Node):
         #position in wf
         self.P_PV_wf = copy.deepcopy(P_PV_wf)
         self.P_COM_wf = copy.deepcopy(P_COM_wf)
+
+        self.P_Lhr_wf = copy.deepcopy(P_Lhr_wf)
+        self.P_Lhy_wf = copy.deepcopy(P_Lhy_wf)
+        self.P_Lhp_wf = copy.deepcopy(P_Lhp_wf)
+        self.P_Lkp_wf = copy.deepcopy(P_Lkp_wf)
+        self.P_Lap_wf = copy.deepcopy(P_Lap_wf)
+        self.P_Lar_wf = copy.deepcopy(P_Lar_wf)
+
         self.P_L_wf = copy.deepcopy(P_L_wf)
+
+        self.P_Rhr_wf = copy.deepcopy(P_Rhr_wf)
+        self.P_Rhy_wf = copy.deepcopy(P_Rhy_wf)
+        self.P_Rhp_wf = copy.deepcopy(P_Rhp_wf)
+        self.P_Rkp_wf = copy.deepcopy(P_Rkp_wf)
+        self.P_Rap_wf = copy.deepcopy(P_Rap_wf)
+        self.P_Rar_wf = copy.deepcopy(P_Rar_wf)
+
         self.P_R_wf = copy.deepcopy(P_R_wf)
         #orientation in wf
         self.O_wfPV = copy.deepcopy(O_wfPV)
@@ -893,6 +825,58 @@ class UpperLevelController(Node):
         # self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
         return 
+
+    def rotation_matrix(self,joint_position):
+        jp = copy.deepcopy(joint_position)
+        
+        # 各關節角度
+        Theta1 = jp[0,0] #L_Hip_Roll
+        Theta2 = jp[1,0]
+        Theta3 = jp[2,0]
+        Theta4 = jp[3,0]
+        Theta5 = jp[4,0]
+        Theta6 = jp[5,0] #L_Ankle_Roll
+
+        Theta7 = jp[6,0] #R_Hip_Roll
+        Theta8 = jp[7,0]
+        Theta9 = jp[8,0]
+        Theta10 = jp[9,0]
+        Theta11 = jp[10,0]
+        Theta12 = jp[11,0] #R_Ankle_Roll
+
+        #calculate rotation matrix
+        self.L_R01 = self.xyz_rotation('x',Theta1) #L_Hip_roll
+        self.L_R12 = self.xyz_rotation('z',Theta2)
+        self.L_R23 = self.xyz_rotation('y',Theta3)
+        self.L_R34 = self.xyz_rotation('y',Theta4)
+        self.L_R45 = self.xyz_rotation('y',Theta5)
+        self.L_R56 = self.xyz_rotation('x',Theta6) #L_Ankle_roll
+
+        self.R_R01 = self.xyz_rotation('x',Theta7) #R_Hip_roll
+        self.R_R12 = self.xyz_rotation('z',Theta8)
+        self.R_R23 = self.xyz_rotation('y',Theta9)
+        self.R_R34 = self.xyz_rotation('y',Theta10)
+        self.R_R45 = self.xyz_rotation('y',Theta11)
+        self.R_R56 = self.xyz_rotation('x',Theta12) #R_Ankle_roll
+
+    def relative_axis(self):
+        #骨盆姿態(要確認！)
+        self.RP = np.array([[1,0,0],[0,1,0],[0,0,1]])
+        # self.RP = copy.deepcopy(self.O_wfPV)
+
+        self.AL1 = self.RP@(np.array([[1],[0],[0]])) #L_Hip_roll
+        self.AL2 = self.RP@self.L_R01@(np.array([[0],[0],[1]])) 
+        self.AL3 = self.RP@self.L_R01@self.L_R12@(np.array([[0],[1],[0]])) 
+        self.AL4 = self.RP@self.L_R01@self.L_R12@self.L_R23@(np.array([[0],[1],[0]]))
+        self.AL5 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@(np.array([[0],[1],[0]])) 
+        self.AL6 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@self.L_R45@(np.array([[1],[0],[0]])) #L_Ankle_Roll
+
+        self.AR1 = self.RP@(np.array([[1],[0],[0]])) #R_Hip_roll
+        self.AR2 = self.RP@self.R_R01@(np.array([[0],[0],[1]])) 
+        self.AR3 = self.RP@self.R_R01@self.R_R12@(np.array([[0],[1],[0]])) 
+        self.AR4 = self.RP@self.R_R01@self.R_R12@self.R_R23@(np.array([[0],[1],[0]]))
+        self.AR5 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@(np.array([[0],[1],[0]])) 
+        self.AR6 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@self.R_R45@(np.array([[1],[0],[0]])) #R_Ankle_Roll
 
     def ref_cmd(self,state,px_in_lf,px_in_rf,stance,ALIP_count,com_in_lf,com_in_rf):
     
@@ -911,6 +895,14 @@ class UpperLevelController(Node):
             pyLth = -0.06
             hight  = 0.0
             if state == 1:
+                # P_X_ref = 0.0
+                # P_Y_ref = 0.0
+
+                # L_X_ref = 0.0
+                # L_Z_ref = 0.0
+
+                # R_X_ref = 0.0
+                # R_Z_ref = 0.0
                 R_X_ref = 0.0
                 R_Z_ref = 0.0
                 if self.DS_time > 0.0 and self.DS_time <= self.DDT:
@@ -1078,8 +1070,6 @@ class UpperLevelController(Node):
                     P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
                     P_Z_ref = self.ACX_ref_data[ALIP_count,2]
 
-
-
             self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
             self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
             self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])  
@@ -1144,6 +1134,116 @@ class UpperLevelController(Node):
 
         return Le_2,Re_2,L
     
+    def left_leg_jacobian(self):
+        pelvis = copy.deepcopy(self.P_PV_pf)
+        l_hip_roll = copy.deepcopy(self.P_Lhr_pf)
+        l_hip_yaw = copy.deepcopy(self.P_Lhy_pf)
+        l_hip_pitch = copy.deepcopy(self.P_Lhp_pf)
+        l_knee_pitch = copy.deepcopy(self.P_Lkp_pf)
+        l_ankle_pitch = copy.deepcopy(self.P_Lap_pf)
+        l_ankle_roll = copy.deepcopy(self.P_Lar_pf)
+        l_foot = copy.deepcopy(self.P_L_pf)
+
+        JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
+        JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
+        JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
+        JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
+        JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
+        JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
+
+        JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
+        JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
+        self.JLL = np.vstack((JLL_upper,JLL_lower))  
+        # print(self.JLL)
+
+        #排除支撐腳腳踝對末端速度的影響
+        self.JLL44 = np.reshape(self.JLL[2:,0:4],(4,4))  
+        self.JLL42 = np.reshape(self.JLL[2:,4:],(4,2))
+
+        return self.JLL
+
+    # def left_leg_jacobian(self):
+    #     pelvis = copy.deepcopy(self.P_PV_wf)
+    #     l_hip_roll = copy.deepcopy(self.P_Lhr_wf)
+    #     l_hip_yaw = copy.deepcopy(self.P_Lhy_wf)
+    #     l_hip_pitch = copy.deepcopy(self.P_Lhp_wf)
+    #     l_knee_pitch = copy.deepcopy(self.P_Lkp_wf)
+    #     l_ankle_pitch = copy.deepcopy(self.P_Lap_wf)
+    #     l_ankle_roll = copy.deepcopy(self.P_Lar_wf)
+    #     l_foot = copy.deepcopy(self.P_L_wf)
+
+    #     JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
+    #     JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
+    #     JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
+    #     JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
+    #     JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
+    #     JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
+
+    #     JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
+    #     JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
+    #     self.JLL = np.vstack((JLL_upper,JLL_lower))  
+    #     # print(self.JLL)
+
+    #     #排除支撐腳腳踝對末端速度的影響
+    #     self.JLL44 = np.reshape(self.JLL[2:,0:4],(4,4))  
+    #     self.JLL42 = np.reshape(self.JLL[2:,4:],(4,2))
+
+    #     return self.JLL
+
+    def right_leg_jacobian(self):
+        pelvis = copy.deepcopy(self.P_PV_pf)
+        r_hip_roll = copy.deepcopy(self.P_Rhr_pf)
+        r_hip_yaw = copy.deepcopy(self.P_Rhy_pf)
+        r_hip_pitch = copy.deepcopy(self.P_Rhp_pf)
+        r_knee_pitch = copy.deepcopy(self.P_Rkp_pf)
+        r_ankle_pitch = copy.deepcopy(self.P_Rap_pf)
+        r_ankle_roll = copy.deepcopy(self.P_Rar_pf)
+        r_foot = copy.deepcopy(self.P_R_pf)
+
+        JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
+        JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
+        JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
+        JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
+        JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
+        JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
+
+        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
+        JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
+        self.JRR = np.vstack((JRR_upper,JRR_lower))  
+        # print(self.JRR)
+
+        #排除支撐腳腳踝對末端速度的影響
+        self.JRR44 = np.reshape(self.JRR[2:,0:4],(4,4))  
+        self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
+        return self.JRR
+
+    # def right_leg_jacobian(self):
+    #     pelvis = copy.deepcopy(self.P_PV_wf)
+    #     r_hip_roll = copy.deepcopy(self.P_Rhr_wf)
+    #     r_hip_yaw = copy.deepcopy(self.P_Rhy_wf)
+    #     r_hip_pitch = copy.deepcopy(self.P_Rhp_wf)
+    #     r_knee_pitch = copy.deepcopy(self.P_Rkp_wf)
+    #     r_ankle_pitch = copy.deepcopy(self.P_Rap_wf)
+    #     r_ankle_roll = copy.deepcopy(self.P_Rar_wf)
+    #     r_foot = copy.deepcopy(self.P_R_wf)
+
+    #     JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
+    #     JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
+    #     JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
+    #     JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
+    #     JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
+    #     JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
+
+    #     JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
+    #     JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
+    #     self.JRR = np.vstack((JRR_upper,JRR_lower))  
+    #     # print(self.JRR)
+
+    #     #排除支撐腳腳踝對末端速度的影響
+    #     self.JRR44 = np.reshape(self.JRR[2:,0:4],(4,4))  
+    #     self.JRR42 = np.reshape(self.JRR[2:,4:],(4,2))
+    #     return self.JRR
+
     def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type,state):
 
         L2 = copy.deepcopy(Le_2)
@@ -1909,27 +2009,27 @@ class UpperLevelController(Node):
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
         # joint_velocity_cal = self.joint_velocity_cal(jp_f)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
-
-        self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
-        
-        self.rotation_matrix(joint_position)
-        self.relative_axis()
-
+        # self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
+        # self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.viz.display(configuration.q)
 
-        self.get_position(configuration)
+        #從pink拿相對base_frame的位置及姿態
+        self.get_position_pf(configuration)
         px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf,com_in_pink = self.com_position(joint_position)
+        #算wf下的位置及姿態
+        self.pelvis_in_wf()
+        self.data_in_wf(com_in_pink)
+        #這邊算相對的矩陣
+        self.rotation_matrix(joint_position)
+        #這邊算wf下各軸姿態
+        self.relative_axis()
 
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
 
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
-        self.pelvis_in_wf()
-        self.data_in_wf(com_in_pink)
-
 
         if self.P_L_wf[2,0] <= 0.01:
             l_contact == 1
