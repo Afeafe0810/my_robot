@@ -1159,6 +1159,14 @@ class UpperLevelController(Node):
         #排除支撐腳腳踝對末端速度的影響
         self.JL_sp44 = np.reshape(self.JLL[2:,0:4],(4,4))  
         self.JL_sp42 = np.reshape(self.JLL[2:,4:],(4,2))
+        #排除擺動.腳踝對末端速度的影響
+        JL_sw34 = np.reshape(self.JLL[0:3,0:4],(3,4)) 
+        JL_sw14 = np.reshape(self.JLL[5,0:4],(1,4)) 
+        self.JL_sw44 = np.vstack((JL_sw34,JL_sw14))
+
+        JL_sw32 = np.reshape(self.JLL[0:3,4:],(3,2)) 
+        JL_sw12 = np.reshape(self.JLL[5,4:],(1,2)) 
+        self.JL_sw42 = np.vstack((JL_sw32,JL_sw12))
 
         return self.JLL
 
@@ -1264,17 +1272,30 @@ class UpperLevelController(Node):
         stance = copy.deepcopy(stance_type)
         # print(stance)
         if state == 30:
-            if stance == 0:   #(右支撐腳腳踝動態排除測試)
+            if stance == 0:   
+                #(右支撐腳腳踝動態排除)
                 R2_41 = np.reshape(R2[2:,0],(4,1)) #R2 z to wz
                 VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
-                
+                #計算右膝關節以上速度
                 R2_41_cal = R2_41 - self.JR_sp42@VR56
-                
+                #彙整右腳速度
                 rw_41_d = np.dot(np.linalg.pinv(self.JR_sp44),R2_41_cal)
                 rw_21_d = np.zeros((2,1))
-
-                Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
                 Rw_d = np.vstack((rw_41_d,rw_21_d))
+
+                #(左擺動腳腳踝動態排除)
+                #拿左腳 誤差及腳踝速度
+                L2_41 = np.array([[L2[0,0]],[L2[1,0]],[L2[2,0]],[L2[5,0]]]) #x y z yaw
+                VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
+                #計算左膝關節以上速度
+                L2_41_cal = L2_41 - self.JL_sw42@VL56
+                #彙整左腳速度
+                lw_41_d = np.dot(np.linalg.pinv(self.JL_sw44),L2_41_cal)
+                lw_21_d = np.zeros((2,1))
+                Lw_d = np.vstack((lw_41_d,lw_21_d))
+
+                # Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
+                
             elif stance == 1 :   
                 #(左支撐腳腳踝動態排除)
                 #拿左腳 誤差及腳踝速度
@@ -1287,14 +1308,15 @@ class UpperLevelController(Node):
                 lw_21_d = np.zeros((2,1))
                 Lw_d = np.vstack((lw_41_d,lw_21_d))
 
+                #(右擺動腳腳踝動態排除)
                 #拿右腳 誤差及腳踝速度
                 R2_41 = np.array([[R2[0,0]],[R2[1,0]],[R2[2,0]],[R2[5,0]]]) #x y z yaw
                 VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
+                #計算右膝關節以上速度
                 R2_41_cal = R2_41 - self.JR_sw42@VR56
                 #彙整右腳速度
                 rw_41_d = np.dot(np.linalg.pinv(self.JR_sw44),R2_41_cal)
                 rw_21_d = np.zeros((2,1))
-                #計算右膝關節以上速度
                 Rw_d = np.vstack((rw_41_d,rw_21_d))
                 # Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
         else:
@@ -1526,11 +1548,11 @@ class UpperLevelController(Node):
                 kr = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
             else:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            kl = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+            kl = np.array([[1],[1],[1],[1],[0],[0]])
             Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
         
         elif stance == 1:
-            kr = np.array([[0.8],[0.8],[0.8],[0.8],[0],[0]])
+            kr = np.array([[1],[1],[1],[1],[0],[0]])
             if l_contact == 1:
                 kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
             else:
@@ -1631,34 +1653,54 @@ class UpperLevelController(Node):
 
         print(L_pitch)
 
-
         torque = np.zeros((12,1))
 
         torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
         torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
         torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
         torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
+
+        #運動學
         # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
         # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-        # torque[4,0] = 5*(0-L_pitch)
-        # torque[5,0] = 5*(0-L_roll)
-        torque[4,0] = 0
-        torque[5,0] = 0
+        
+        #PD
+        if L_pitch <0:
+            torque[4,0] = 5*(0-L_pitch) + 0.2
+        elif L_pitch >=0:
+            torque[4,0] = 5*(0-L_pitch) - 0.2
+        if L_roll <0:
+            torque[5,0] = 5*(0-L_roll) + 0.2
+        elif L_roll >=0:
+            torque[5,0] = 5*(0-L_roll) - 0.2
+        
+        #直接不給
+        # torque[4,0] = 0
+        # torque[5,0] = 0
 
 
         torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
         torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
         torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
         torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
+
+        #運動學
         # torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
         # torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-        # torque[10,0] = 5*(0-R_pitch)
-        # torque[11,0] = 5*(0-R_roll)
-        torque[10,0] = 0
-        torque[11,0] = 0
 
-        # self.effort_publisher.publish(Float64MultiArray(data=torque))
-        
+        #PD
+        if R_pitch <0:
+            torque[10,0] = 5*(0-R_pitch) + 0.2
+        elif R_pitch >=0:
+            torque[10,0] = 5*(0-R_pitch) - 0.2
+        if R_roll <0:
+            torque[11,0] = 5*(0-R_roll) + 0.2
+        elif R_roll >=0:
+            torque[11,0] = 5*(0-R_roll) - 0.2
+        #直接不給
+        # torque[10,0] = 0
+        # torque[11,0] = 0
+       
         vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
         self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
         jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
@@ -1770,7 +1812,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
+        self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)*0.5
         # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
 
         # if self.ap_L >= 3:
@@ -1778,9 +1820,9 @@ class UpperLevelController(Node):
         # elif self.ap_L <= -3:
         #     self.ap_L =-3
 
-        # #切換瞬間 扭矩切成0 避免腳沒踩穩
-        # if self.stance_past == 0 and self.stance == 1:
-        #     self.ap_L = 0
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 0 and self.stance == 1:
+            self.ap_L = 0
 
         #--torque assign
         torque[4,0] = -self.ap_L
@@ -1816,9 +1858,9 @@ class UpperLevelController(Node):
         # elif self.ar_L <= -3:
         #     self.ar_L =-3
 
-        # #切換瞬間 扭矩切成0 避免腳沒踩穩
-        # if self.stance_past == 0 and self.stance == 1:
-        #     self.ar_L = 0
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 0 and self.stance == 1:
+            self.ar_L = 0
 
         #--torque assign
         torque[5,0] = -self.ar_L
@@ -1911,7 +1953,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
         # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
 
         # if self.ap_R >= 3:
@@ -1919,9 +1961,9 @@ class UpperLevelController(Node):
         # elif self.ap_R <= -3:
         #     self.ap_R =-3
 
-        # #切換瞬間 扭矩切成0 避免腳沒踩穩
-        # if self.stance_past == 1 and self.stance == 0:
-        #     self.ap_R = 0
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 1 and self.stance == 0:
+            self.ap_R = 0
        
         #--torque assign
         torque[10,0] = -self.ap_R
@@ -2116,12 +2158,12 @@ class UpperLevelController(Node):
             #踩到地面才切換支撐腳
             if self.ALIP_count%50 == 0:
                 if self.stance == 1:
-                    if self.P_R_wf[2,0] <= 0.1:
+                    if self.P_R_wf[2,0] <= 0.01:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
                 elif self.stance == 0:
-                    if self.P_L_wf[2,0] <= 0.1:
+                    if self.P_L_wf[2,0] <= 0.01:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
