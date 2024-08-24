@@ -1740,16 +1740,27 @@ class UpperLevelController(Node):
         # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
         #--compensator
         self.ob_x_L = Ax@self.ob_x_past_L + self.ap_past_L*Bx + Lx@(self.mea_x_past_L - Cx@self.ob_x_past_L)
+
+        #由於程式邏輯 使得左腳在擺動過程也會估測 然而並不會拿來使用
+        #為了確保支撐腳切換過程 角動量估測連續性
+        if self.stance_past == 0 and self.stance == 1:
+            self.mea_x_L[1,0] = copy.deepcopy(self.mea_x_past_R[1,0])
+            self.ob_x_L[1,0] = copy.deepcopy(self.ob_x_past_R[1,0])
+
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
         self.ap_L = -Kx@(self.ob_x_L-self.ref_x_L)
         # self.ap_L = -Kx@(self.mea_x_L-self.ref_x_L)
 
-        # if self.ap_L >= 5:
-        #     self.ap_L =5
-        # elif self.ap_L <= -5:
-        #     self.ap_L =-5
+        # if self.ap_L >= 3:
+        #     self.ap_L = 3
+        # elif self.ap_L <= -3:
+        #     self.ap_L =-3
+
+        # #切換瞬間 扭矩切成0 避免腳沒踩穩
+        # if self.stance_past == 0 and self.stance == 1:
+        #     self.ap_L = 0
 
         #--torque assign
         torque[4,0] = -self.ap_L
@@ -1877,10 +1888,9 @@ class UpperLevelController(Node):
 
         #由於程式邏輯 使得右腳在擺動過程也會估測 然而並不會拿來使用
         #為了確保支撐腳切換過程 角動量估測連續性
-
         if self.stance_past == 1 and self.stance == 0:
-            self.mea_y_R[1,0] = copy.deepcopy(self.mea_y_past_L[1,0])
-            self.ob_y_R[1,0] = copy.deepcopy(self.ob_y_past_L[1,0])
+            self.mea_x_R[1,0] = copy.deepcopy(self.mea_x_past_L[1,0])
+            self.ob_x_R[1,0] = copy.deepcopy(self.ob_x_past_L[1,0])
         
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
@@ -1893,9 +1903,9 @@ class UpperLevelController(Node):
         # elif self.ap_R <= -3:
         #     self.ap_R =-3
 
-        #切換瞬間 扭矩切成0 避免腳沒踩穩
-        if self.stance_past == 1 and self.stance == 0:
-            self.ar_R = 0
+        # #切換瞬間 扭矩切成0 避免腳沒踩穩
+        # if self.stance_past == 1 and self.stance == 0:
+        #     self.ap_R = 0
        
         #--torque assign
         torque[10,0] = -self.ap_R
@@ -1916,11 +1926,21 @@ class UpperLevelController(Node):
         #--compensator
         self.ob_y_R = Ay@self.ob_y_past_R + self.ar_past_R*By + Ly@(self.mea_y_past_R - Cy@self.ob_y_past_R)
 
+        #由於程式邏輯 使得右腳在擺動過程也會估測 然而並不會拿來使用
+        #為了確保支撐腳切換過程 角動量估測連續性
+        if self.stance_past == 1 and self.stance == 0:
+            self.mea_y_R[1,0] = copy.deepcopy(self.mea_y_past_L[1,0])
+            self.ob_y_R[1,0] = copy.deepcopy(self.ob_y_past_L[1,0])
+
         #----calculate toruqe
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
         self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.2
         # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.1
+
+        #切換瞬間 扭矩切成0 避免腳沒踩穩
+        if self.stance_past == 1 and self.stance == 0:
+            self.ar_R = 0
 
         # if self.ar_R >= 3:
         #     self.ar_R =3
@@ -2031,15 +2051,6 @@ class UpperLevelController(Node):
 
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
 
-        if self.P_L_wf[2,0] <= 0.01:
-            l_contact == 1
-        else:
-            l_contact == 0
-        if self.P_R_wf[2,0] <= 0.01:
-            r_contact == 1
-        else:
-            r_contact == 0
-
         if state == 30:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
@@ -2076,6 +2087,16 @@ class UpperLevelController(Node):
             elif stance == 0:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_R))
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+
+            #踩到地面才切換支撐腳
+        # if self.P_L_wf[2,0] <= 0.01:
+        #     l_contact == 1
+        # else:
+        #     l_contact == 0
+        # if self.P_R_wf[2,0] <= 0.01:
+        #     r_contact == 1
+        # else:
+        #     r_contact == 0
 
             self.ALIP_count += 1
        
