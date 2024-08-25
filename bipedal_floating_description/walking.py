@@ -1550,8 +1550,8 @@ class UpperLevelController(Node):
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             kl = np.array([[1],[1],[1],[1],[0],[0]])
             zero_gravity = np.zeros((12,1))
-            Leg_gravity = 0.25*zero_gravity+0.75*RSS_gravity
-            # Leg_gravity = 0.25*DS_gravity+0.75*RSS_gravity
+            # Leg_gravity = 0.25*zero_gravity+0.75*RSS_gravity
+            Leg_gravity = 0.3*DS_gravity+0.75*RSS_gravity
         
         elif stance == 1:
             kr = np.array([[1],[1],[1],[1],[0],[0]])
@@ -1560,8 +1560,8 @@ class UpperLevelController(Node):
             else:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             zero_gravity = np.zeros((12,1))
-            Leg_gravity =  0.25*zero_gravity+0.75*LSS_gravity
-            # Leg_gravity =  0.25*DS_gravity+0.75*LSS_gravity
+            # Leg_gravity =  0.25*zero_gravity+0.75*LSS_gravity
+            Leg_gravity =  0.3*DS_gravity+0.75*LSS_gravity
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
@@ -1670,13 +1670,13 @@ class UpperLevelController(Node):
         
         #PD
         if L_pitch <0:
-            torque[4,0] = 5*(0-L_pitch) + 0.2
+            torque[4,0] = 0.1*(0-L_pitch) + 0.2
         elif L_pitch >=0:
-            torque[4,0] = 5*(0-L_pitch) - 0.2
+            torque[4,0] = 0.1*(0-L_pitch) - 0.2
         if L_roll <0:
-            torque[5,0] = 5*(0-L_roll) + 0.2
+            torque[5,0] = 0.1*(0-L_roll) + 0.2
         elif L_roll >=0:
-            torque[5,0] = 5*(0-L_roll) - 0.2
+            torque[5,0] = 0.1*(0-L_roll) - 0.2
         
         # # 直接不給
         # torque[4,0] = 0
@@ -1694,13 +1694,14 @@ class UpperLevelController(Node):
 
         #PD
         if R_pitch <0:
-            torque[10,0] = 5*(0-R_pitch) + 0.2
+            torque[10,0] = 0.1*(0-R_pitch) + 0.2
         elif R_pitch >=0:
-            torque[10,0] = 5*(0-R_pitch) - 0.2
+            torque[10,0] = 0.1*(0-R_pitch) - 0.2
         if R_roll <0:
-            torque[11,0] = 5*(0-R_roll) + 0.2
+            torque[11,0] = 0.1*(0-R_roll) + 0.2
         elif R_roll >=0:
-            torque[11,0] = 5*(0-R_roll) - 0.2
+            torque[11,0] = 0.1*(0-R_roll) - 0.2
+
         # # 直接不給
         # torque[10,0] = 0
         # torque[11,0] = 0
@@ -2162,12 +2163,12 @@ class UpperLevelController(Node):
             #踩到地面才切換支撐腳
             if self.ALIP_count%50 == 0:
                 if self.stance == 1:
-                    if self.P_R_wf[2,0] <= 0.05:
+                    if self.P_R_wf[2,0] <= 0.01:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
                 elif self.stance == 0:
-                    if self.P_L_wf[2,0] <= 0.05:
+                    if self.P_L_wf[2,0] <= 0.01:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
