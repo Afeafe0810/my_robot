@@ -442,7 +442,7 @@ class UpperLevelController(Node):
 
         # self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
         # self.jv = 0.5186*self.jv_p - 0.1691*self.jv_pp + 0.4215*self.jv_sub_p + 0.229*self.jv_sub_pp #20Hz
-        self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
+        # self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
 
         self.jv_pp = copy.deepcopy(self.jv_p)
         self.jv_p = copy.deepcopy(self.jv)
@@ -1549,7 +1549,9 @@ class UpperLevelController(Node):
             else:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             kl = np.array([[1],[1],[1],[1],[0],[0]])
-            Leg_gravity = 0.2*DS_gravity+0.8*RSS_gravity
+            zero_gravity = np.zeros((12,1))
+            Leg_gravity = 0.25*zero_gravity+0.75*RSS_gravity
+            # Leg_gravity = 0.25*DS_gravity+0.75*RSS_gravity
         
         elif stance == 1:
             kr = np.array([[1],[1],[1],[1],[0],[0]])
@@ -1557,7 +1559,9 @@ class UpperLevelController(Node):
                 kl = np.array([[1.2],[1.2],[1.2],[1.5],[1.5],[1.5]])
             else:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            Leg_gravity =  0.2*DS_gravity+0.8*LSS_gravity
+            zero_gravity = np.zeros((12,1))
+            Leg_gravity =  0.25*zero_gravity+0.75*LSS_gravity
+            # Leg_gravity =  0.25*DS_gravity+0.75*LSS_gravity
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
@@ -1674,7 +1678,7 @@ class UpperLevelController(Node):
         elif L_roll >=0:
             torque[5,0] = 5*(0-L_roll) - 0.2
         
-        #直接不給
+        # # 直接不給
         # torque[4,0] = 0
         # torque[5,0] = 0
 
@@ -1697,7 +1701,7 @@ class UpperLevelController(Node):
             torque[11,0] = 5*(0-R_roll) + 0.2
         elif R_roll >=0:
             torque[11,0] = 5*(0-R_roll) - 0.2
-        #直接不給
+        # # 直接不給
         # torque[10,0] = 0
         # torque[11,0] = 0
        
@@ -1850,7 +1854,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.15
+        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.2
         # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
 
         # if self.ar_L >= 3:
@@ -1953,7 +1957,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.15
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
         # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
 
         # if self.ap_R >= 3:
