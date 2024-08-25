@@ -1850,7 +1850,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.2
+        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.15
         # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
 
         # if self.ar_L >= 3:
@@ -1953,7 +1953,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
         # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.5
+        self.ap_R = -Kx@(self.ob_x_R-self.ref_x_R)*0.15
         # self.ap_R = -Kx@(self.mea_x_R-self.ref_x_R)
 
         # if self.ap_R >= 3:
@@ -2158,12 +2158,12 @@ class UpperLevelController(Node):
             #踩到地面才切換支撐腳
             if self.ALIP_count%50 == 0:
                 if self.stance == 1:
-                    if self.P_R_wf[2,0] <= 0.01:
+                    if self.P_R_wf[2,0] <= 0.05:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
                 elif self.stance == 0:
-                    if self.P_L_wf[2,0] <= 0.01:
+                    if self.P_L_wf[2,0] <= 0.05:
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
