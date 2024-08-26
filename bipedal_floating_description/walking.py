@@ -198,6 +198,8 @@ class UpperLevelController(Node):
         self.O_wfL = np.zeros((3,3))
         self.O_wfR = np.zeros((3,3))
 
+        self.delay = 0
+
         #data_in_pf 
 
         #ALIP
@@ -1058,14 +1060,14 @@ class UpperLevelController(Node):
                 R_Z_ref = self.ARX_ref_data[ALIP_count,2]
 
                 if stance == 1:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
                     P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
                     P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
                     P_Z_ref = self.ACX_ref_data[ALIP_count,2]
                 elif stance == 0:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
                     P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
                     P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
                     P_Z_ref = self.ACX_ref_data[ALIP_count,2]
@@ -1751,7 +1753,7 @@ class UpperLevelController(Node):
 
         return torque
 
-    def alip_L(self,stance_type,px_in_lf,torque_ALIP,com_in_lf,ALIP_count):
+    def alip_L(self,stance_type,px_in_lf,torque_ALIP,com_in_lf,ALIP_count,state):
         # print("ALIP_L")
         stance = copy.deepcopy(stance_type) 
         #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
@@ -1781,9 +1783,9 @@ class UpperLevelController(Node):
 
         #量測值
         Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.45
+        Ly_mea = 9*self.Vx_L*0.4
         Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.Vy_L*0.45 #(記得加負號)
+        Lx_mea = -9*self.Vy_L*0.4 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
        
@@ -1887,13 +1889,20 @@ class UpperLevelController(Node):
             # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
-
-        collect_data = [str(self.ref_x_L[0,0]),str(self.ref_x_L[1,0]),str(self.ob_x_L[0,0]),str(self.ob_x_L[1,0])
-                        ,str(self.ref_y_L[0,0]),str(self.ref_y_L[1,0]),str(self.ob_y_L[0,0]),str(self.ob_y_L[1,0])]
+            
+            if state == 30:
+                collect_data = [str(self.ref_x_L[0,0]),str(self.ref_x_L[1,0]),str(self.ob_x_L[0,0]),str(self.ob_x_L[1,0]),
+                                str(self.ref_y_L[0,0]),str(self.ref_y_L[1,0]),str(self.ob_y_L[0,0]),str(self.ob_y_L[1,0])]
+                csv_file_name = '/home/ldsc/collect/alip_data.csv'
+                with open(csv_file_name, 'a', newline='') as csvfile:
+                    # Create a CSV writer object
+                    csv_writer = csv.writer(csvfile)
+                    # Write the data
+                    csv_writer.writerow(collect_data)
 
         return torque
 
-    def alip_R(self,stance_type,px_in_rf,torque_ALIP,com_in_rf,ALIP_count):
+    def alip_R(self,stance_type,px_in_rf,torque_ALIP,com_in_rf,ALIP_count,state):
         # print("ALIP_R")
 
         torque = copy.deepcopy(torque_ALIP) 
@@ -1921,9 +1930,9 @@ class UpperLevelController(Node):
 
         #量測值
         Xc_mea = PX_r[0,0]
-        Ly_mea = 9*self.Vx_R*0.45
+        Ly_mea = 9*self.Vx_R*0.4
         Yc_mea = PX_r[1,0]
-        Lx_mea = -9*self.Vy_R*0.45 #(記得加負號)
+        Lx_mea = -9*self.Vy_R*0.4 #(記得加負號)
         self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
         self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
 
@@ -2025,6 +2034,15 @@ class UpperLevelController(Node):
             # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
             self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
             self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
+            if state == 30:
+                collect_data = [str(self.ref_x_R[0,0]),str(self.ref_x_R[1,0]),str(self.ob_x_R[0,0]),str(self.ob_x_R[1,0]),
+                                str(self.ref_y_R[0,0]),str(self.ref_y_R[1,0]),str(self.ob_y_R[0,0]),str(self.ob_y_R[1,0])]
+                csv_file_name = '/home/ldsc/collect/alip_data.csv'
+                with open(csv_file_name, 'a', newline='') as csvfile:
+                    # Create a CSV writer object
+                    csv_writer = csv.writer(csvfile)
+                    # Write the data
+                    csv_writer.writerow(collect_data)
     
         return torque
     
@@ -2143,15 +2161,15 @@ class UpperLevelController(Node):
             self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
 
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
-            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
+            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count,state)
+            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count,state)
 
         elif state == 30:
             self.to_matlab()
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
 
-            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count)
-            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count)
+            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,self.ALIP_count,state)
+            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count,state)
             print(stance)
             if stance == 1:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
@@ -2162,13 +2180,22 @@ class UpperLevelController(Node):
             
             #踩到地面才切換支撐腳
             if self.ALIP_count%50 == 0:
+
                 if self.stance == 1:
                     if self.P_R_wf[2,0] <= 0.01:
+                        # if self.delay%2 == 0:
+                        #     self.ALIP_count += 1
+                        #     self.delay = 0
+                        # self.delay +=1
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
                 elif self.stance == 0:
                     if self.P_L_wf[2,0] <= 0.01:
+                        # if self.delay%2 == 0:
+                        #     self.ALIP_count += 1
+                        #     self.delay = 0
+                        self.delay +=1
                         self.ALIP_count += 1
                     else:
                         self.ALIP_count = self.ALIP_count
