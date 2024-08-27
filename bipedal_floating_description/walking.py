@@ -1857,7 +1857,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.2
+        self.ar_L = -Ky@(self.ob_y_L-self.ref_y_L)*0.15
         # self.ar_L = -Ky@(self.mea_y_L-self.ref_y_L)*0.1
 
         # if self.ar_L >= 3:
@@ -2007,7 +2007,7 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_R = -Ky@(self.ob_y_R)
         # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.2
+        self.ar_R = -Ky@(self.ob_y_R-self.ref_y_R)*0.15
         # self.ar_R = -Ky@(self.mea_y_R-self.ref_y_R)*0.1
 
         #切換瞬間 扭矩切成0 避免腳沒踩穩
