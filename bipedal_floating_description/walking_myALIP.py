@@ -161,7 +161,7 @@ class Allcoodinate():
         #=========ALIP_trajRef_planning=========#
         self.xLy0_com_in_cf = None #切換瞬間拿到的初始值
         self.yLx0_com_in_cf = None
-        123
+        
         self.p0_cf_in_wf = None
         self.p0_sw2com_in_cf = None
         
