@@ -54,9 +54,10 @@
   <mu1>15</mu1>
   <mu2>15</mu2>
   <!-- <max_vel>1</max_vel>
-  <minDepth>0.001</minDepth>
-  <kp>15000</kp>
-  <kd>1000</kd> -->
+  <minDepth>0.001</minDepth> -->
+  <!-- <kp>34300000</kp> -->
+  <!-- <kp>904300000</kp> -->
+  <!-- <kd>46000</kd> -->
   <maxContacts>100</maxContacts>
   <self_collide>true</self_collide>
 </gazebo>
@@ -101,9 +102,9 @@
   <mu1>15</mu1>
   <mu2>15</mu2>
   <!-- <max_vel>1</max_vel>
-  <minDepth>0.001</minDepth>
-  <kp>15000</kp>
-  <kd>1000</kd> -->
+  <minDepth>0.001</minDepth> -->
+  <!-- <kp>34300000</kp> -->
+  <!-- <kd>46000</kd> -->
   <maxContacts>100</maxContacts>
   <selfCollide>true</selfCollide>
 </gazebo>

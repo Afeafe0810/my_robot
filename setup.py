@@ -30,9 +30,9 @@ setup(
         'console_scripts': [
             'controller = bipedal_floating_description.controller:main',
             'ref = bipedal_floating_description.ref:main',
-            'walking = bipedal_floating_description.walking:main',
             '2 = bipedal_floating_description.2:main',
-            'walking_modify = bipedal_floating_description.walking_modify:main',
+            'walking_myALIP = bipedal_floating_description.walking_myALIP:main',
+            'walking_originALIP = bipedal_floating_description.walking_originALIP:main',            
         ],
     },
 )

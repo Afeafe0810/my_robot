@@ -286,7 +286,7 @@
 </joint>
 
 <joint name="R_Ankle_Pitch" type="revolute">
-  <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  <origin xyz="0.0 0.0 0.0" rpy="0 0.37 0"/>
   <parent link="B_UNCA10_ros_v4__1__1"/>
   <child link="shank_ros_v5_1"/>
   <axis xyz="0.0 1.0 0.0"/>
@@ -294,7 +294,7 @@
 </joint>
 
 <joint name="R_Knee_Pitch" type="revolute">
-  <origin xyz="0.0 0.0 0.2555" rpy="0 0 0"/>
+  <origin xyz="0.0 0.0 0.2555" rpy="0 -0.74 0"/>
   <parent link="shank_ros_v5_1"/>
   <child link="Thigh_R_v3_1"/>
   <axis xyz="0.0 1.0 0.0"/>
@@ -302,7 +302,7 @@
 </joint>
 
 <joint name="R_Hip_Pitch" type="revolute">
-  <origin xyz="0.0 0.019 0.22" rpy="0 0 0"/>
+  <origin xyz="0.0 0.019 0.22" rpy="0 0.37 0"/>
   <parent link="Thigh_R_v3_1"/>
   <child link="r_hip_pitch_ros_v2_1"/>
   <axis xyz="0.0 1.0 0.0"/>
@@ -342,7 +342,7 @@
 </joint>
 
 <joint name="L_Hip_Pitch" type="revolute">
-  <origin xyz="0.0 0.032 -0.055" rpy="0 0 0"/>
+  <origin xyz="0.0 0.032 -0.055" rpy="0 -0.37 0"/>
   <parent link="l_hip_pitch_ros_v4_1"/>
   <child link="thigh_l_ros_v4_1"/>
   <axis xyz="0.0 1.0 0.0"/>
@@ -350,7 +350,7 @@
 </joint>
 
 <joint name="L_Knee_Pitch" type="revolute">
-  <origin xyz="-0.0 0.019 -0.22" rpy="0 0 0"/>
+  <origin xyz="-0.0 0.019 -0.22" rpy="0 0.74 0"/>
   <parent link="thigh_l_ros_v4_1"/>
   <child link="shank_ros_v5__1__1"/>
   <axis xyz="0.0 1.0 0.0"/>
@@ -366,7 +366,7 @@
 </joint>
 
 <joint name="L_Ankle_Roll" type="revolute">
-  <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  <origin xyz="0.0 0.0 0.0" rpy="0 -0.37 0"/>
   <parent link="B_UNCA10_ros_v4_1"/>
   <child link="footplate_ros_v5__1__1"/>
   <axis xyz="1.0 0.0 0.0"/>
