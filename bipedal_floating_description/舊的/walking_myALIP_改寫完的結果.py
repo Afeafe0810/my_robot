@@ -14,8 +14,6 @@ from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 import pinocchio as pin
-from pinocchio.visualize import MeshcatVisualizer
-
 import qpsolvers
 
 import pink
@@ -37,8 +35,8 @@ from scipy.spatial.transform import Rotation
 import pandas as pd
 import csv
 
-# from linkattacher_msgs.srv import AttachLink
-# from linkattacher_msgs.srv import DetachLink
+from linkattacher_msgs.srv import AttachLink
+from linkattacher_msgs.srv import DetachLink
 
 #========================常數==================================#
 original_joint_order = ['L_Hip_az', 'L_Hip_ay', 'L_Knee_ay', 'L_Ankle_ay', 'L_Ankle_ax', 'R_Hip_ax',
@@ -57,135 +55,45 @@ g = 9.81 #重力
 l = sqrt(g/H)
 T = 0.5 #支撐間隔時長
 
-def make_2order_bw_iterfilter(wc):
-    '''
-    二階Butterworth filter的transfer function
-        (a0 + a1 z^-1 + a2 z^-2)
-    ----------------------------
-        (b0 + b1 z^-1 + b2 z^-2)
-    '''
-    T=timer_period
-    
-    b0 = (T*wc)**2 + 8**0.5*T*wc +4
-    b1 = 2*(T*wc)**2 - 8
-    b2 = (T*wc)**2 - 8**0.5*T*wc + 4
-    
-    a0 = (T*wc)**2
-    a1 = 2*(T*wc)**2
-    a2 = (T*wc)**2
-    
-    #==================剛啟動沒有歷史值不濾波==========#
-    u_pp = yield
-    y_pp = u_pp
-    u_p = yield y_pp
-    y_p = u_p
-    u = yield y_p
-    
-    while True:
-        #=========================差分方程式==========================#
-        y = (a0*u + a1*u_p + a2*u_pp - b1*y_p -b2*y_pp ) / b0
-        #==================更新舊值且輸出濾波結果,暫停等到下一輪輸入==========#
-        y_pp, y_p = y_p, y
-        u_pp, u_p = u_p, u
-        
-        u = yield y
 
-def diff2vel():
-    position_p = yield
-    position = yield position_p * 0
-    while True:
-        vel = (position-position_p)/timer_period
-        position_p = position
-        position = yield vel
-
-jpfilter = make_2order_bw_iterfilter(2*pi*30) ; next(jpfilter)
-jpdiff = diff2vel(); next(jpdiff)
-jvfilter = make_2order_bw_iterfilter(2*pi*30) ; next(jvfilter)
-
-comdiff = diff2vel(); next(comdiff)
-vcom_filter = make_2order_bw_iterfilter(2*pi*30) ; next(vcom_filter)
-
-def PDcontroller(kp,kd):
-    '''
-    PD控制器
-        (a0 + a1 z^-1)
-    ----------------------------
-        (b0 + b1 z^-1)
-    '''
-    T=timer_period
-    
-    b0 = T
-    b1 = T
-    
-    a0 = 2*kd+T*kp
-    a1 = T*kp-2*kd
-    
-    #==================剛啟動沒有歷史值不濾波==========#
-    
-    u_p = 0
-    y_p = 0
-    u = yield
-    
-    while True:
-        #=========================差分方程式==========================#
-        y = (a0*u + a1*u_p - b1*y_p) / b0
-        #==================更新舊值且輸出濾波結果,暫停等到下一輪輸入==========#
-        y_p = y
-        u_p = u
-        
-        u = yield y
-
-PD_sw_x = PDcontroller(0.1,0); next(PD_sw_x)
-PD_sw_y = PDcontroller(0.1,0); next(PD_sw_y)
-
-PD_cf_x = PDcontroller(0.3,0); next(PD_cf_x)
-PD_cf_y = PDcontroller(0.1,0); next(PD_cf_y)
-
-isGotten = False
-def get_initial_place(self):
-    global isGotten
-    if isGotten:
-        pass
-    else:
-        self.ref_pa_pel_in_wf = self.pt.pa_pel_in_wf
-        self.ref_pa_lf_in_wf  = self.pt.pa_lf_in_wf
-        self.ref_pa_rf_in_wf  = self.pt.pa_rf_in_wf
-        isGotten = True
-        
 class Allcoodinate():
     '''儲存所有座標軸的位置、速度、旋轉矩陣相對其他frame'''
     def __init__(self) -> None:
         #=========base_in_wf_callback=========#
         self.p_base_in_wf = None
         self.r_base2wf = None
+        #=========_get_pL_com_in_foot=========#
+        self.__p_com_in_lfrf_past = np.zeros((6,1)) #只是用來做濾波而已
+        self.__v_com_in_lfrf_past = np.zeros((6,1))
+        self.__vf_com_in_lfrf_past = np.zeros((6,1))
         #=========ALIP_trajRef_planning=========#
         self.xLy0_com_in_cf = None #切換瞬間拿到的初始值
         self.yLx0_com_in_cf = None
         
         self.p0_cf_in_wf = None
         self.p0_sw2com_in_cf = None
+        self.xy_sw2com_in_cf_T = None #切換瞬間計算出的下一步
         
         #=========estimatorcontrol=========#
-        # self.xLy_com_in_lf_past = np.zeros((2,1))
-        # self.xLy_com_in_rf_past = np.zeros((2,1))
-        # self.yLx_com_in_lf_past = np.zeros((2,1))
-        # self.yLx_com_in_rf_past = np.zeros((2,1))        
+        self.xLy_com_in_lf_past = np.zeros((2,1))
+        self.xLy_com_in_rf_past = np.zeros((2,1))
+        self.yLx_com_in_lf_past = np.zeros((2,1))
+        self.yLx_com_in_rf_past = np.zeros((2,1))        
     
-    def get_all_frame_needed(self, config, bipedal_floating_model, bipedal_floating_data, jp, jv, cf) -> None:
-        self._get_in_pf(config, bipedal_floating_model, bipedal_floating_data, jp, jv)
+    def get_all_frame_needed(self, config:pink.Configuration, bipedal_floating_model, bipedal_floating_data, jp:np.ndarray) -> None:
+        self._get_in_pf(config, bipedal_floating_model, bipedal_floating_data, jp)
         self._get_in_wf() #利用座標轉換求得_in_wf
         self._jointframe_rotation(jp)
-        self._get_jv_dir()
-        self._get_pL_com_in_foot(jv, cf)
+        self._get_unitVector_of_jv()
+        self._get_pL_com_in_foot()
             
-    def _get_in_pf(self, config:pink.Configuration, bipedal_floating_model, bipedal_floating_data, jp:np.ndarray, jv:np.ndarray):
+    def _get_in_pf(self, config:pink.Configuration, bipedal_floating_model, bipedal_floating_data, jp:np.ndarray):
         
         def config_to_linkplace():
             '''利用self.robot的config求出各點的齊次矩陣'''
             #===========================用pinocchio求質心==================================#
             pin.centerOfMass(bipedal_floating_model, bipedal_floating_data, jp) # 會變更引數的值, 不會return
-            # bipedal_floating_data.com[0] 是一維的np.array
-            p_com_in_pf = np.vstack([ *bipedal_floating_data.com[0] ]) #todo 可以確認看看不同模型建立出來的質心會不會不一樣
+            p_com_in_pf = np.reshape(bipedal_floating_data.com[0],(3,1)) #todo 可以確認看看不同模型建立出來的質心會不會不一樣
             yield p_com_in_pf
             
             #=============================================================#
@@ -293,23 +201,17 @@ class Allcoodinate():
         def xyz_rotation(axis:str, theta:float) ->np.ndarray:
             '''關節繞自己軸旋轉->和前一個frame的旋轉矩陣'''
             if axis == 'x':
-                return np.array([
-                    [1, 0,           0],
-                    [0, cos(theta), -sin(theta)],
-                    [0, sin(theta),  cos(theta)]
-                    ])
+                return np.array([[1, 0,           0],
+                                [0, cos(theta), -sin(theta)],
+                                [0, sin(theta),  cos(theta)]])
             if axis == 'y':
-                return np.array([
-                    [cos(theta), 0, sin(theta)],
-                    [0,          1, 0],
-                    [-sin(theta),0, cos(theta)]
-                    ])
+                return np.array([[cos(theta), 0, sin(theta)],
+                                [0,          1, 0],
+                                [-sin(theta),0, cos(theta)]])
             if axis == 'z':
-                return np.array([
-                    [cos(theta), -sin(theta),0],
-                    [sin(theta),  cos(theta),0],
-                    [0,           0,         1]
-                    ])
+                return np.array([[cos(theta), -sin(theta),0],
+                                [sin(theta), cos(theta) ,0],
+                                [0,          0,          1]])
                 
         def jointframe_rotation_generator():
             '''生成器, 嗯,我也不知道要怎麼命名'''
@@ -326,130 +228,53 @@ class Allcoodinate():
             
             ) = list(jointframe_rotation_generator())
         
-    def _get_jv_dir(self):
+    def _get_unitVector_of_jv(self):
         '''求每個關節的旋轉軸在wf的方向->為關節角動量的方向'''
-
-        self.u_axis_lj1_in_pf = self.r_lj12pf @ np.vstack(( 1, 0, 0 )) #最後面的向量是指旋轉軸向量in自己的frame
-        self.u_axis_lj2_in_pf = self.r_lj22pf @ np.vstack(( 0, 0, 1 ))
-        self.u_axis_lj3_in_pf = self.r_lj32pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_lj4_in_pf = self.r_lj42pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_lj5_in_pf = self.r_lj52pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_lj6_in_pf = self.r_lj62pf @ np.vstack(( 1, 0, 0 ))
+        # r_pf2wf = self.r_pel2wf @ self.r_pel2pf.T
+        r_pf2wf = np.identity(3)
         
-        self.u_axis_rj1_in_pf = self.r_rj12pf @ np.vstack(( 1, 0, 0 ))
-        self.u_axis_rj2_in_pf = self.r_rj22pf @ np.vstack(( 0, 0, 1 ))
-        self.u_axis_rj3_in_pf = self.r_rj32pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_rj4_in_pf = self.r_rj42pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_rj5_in_pf = self.r_rj52pf @ np.vstack(( 0, 1, 0 ))
-        self.u_axis_rj6_in_pf = self.r_rj62pf @ np.vstack(( 1, 0, 0 ))
+        self.u_axis_lj1_in_wf = r_pf2wf @ np.vstack(( 1, 0, 0 )) #最後面的向量是指旋轉軸向量in自己的frame
+        self.u_axis_lj2_in_wf = r_pf2wf @ self.r_lj12pf @ np.vstack(( 0, 0, 1 ))
+        self.u_axis_lj3_in_wf = r_pf2wf @ self.r_lj12pf @ self.r_lj22lj1 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_lj4_in_wf = r_pf2wf @ self.r_lj12pf @ self.r_lj22lj1 @ self.r_lj32lj2 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_lj5_in_wf = r_pf2wf @ self.r_lj12pf @ self.r_lj22lj1 @ self.r_lj32lj2 @ self.r_lj42lj3 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_lj6_in_wf = r_pf2wf @ self.r_lj12pf @ self.r_lj22lj1 @ self.r_lj32lj2 @ self.r_lj42lj3 @ self.r_lj52lj4 @ np.vstack(( 1, 0, 0 ))
         
-        r_pf2lf = self.r_lf2pf.T
-        r_pf2rf = self.r_rf2pf.T
-        self.u_axis_lj1_in_lf = r_pf2lf @ self.u_axis_lj1_in_pf
-        self.u_axis_lj2_in_lf = r_pf2lf @ self.u_axis_lj2_in_pf
-        self.u_axis_lj3_in_lf = r_pf2lf @ self.u_axis_lj3_in_pf
-        self.u_axis_lj4_in_lf = r_pf2lf @ self.u_axis_lj4_in_pf
-        self.u_axis_lj5_in_lf = r_pf2lf @ self.u_axis_lj5_in_pf
-        self.u_axis_lj6_in_lf = r_pf2lf @ self.u_axis_lj6_in_pf
-        
-        self.u_axis_rj1_in_rf = r_pf2rf @ self.u_axis_rj1_in_pf
-        self.u_axis_rj2_in_rf = r_pf2rf @ self.u_axis_rj2_in_pf
-        self.u_axis_rj3_in_rf = r_pf2rf @ self.u_axis_rj3_in_pf
-        self.u_axis_rj4_in_rf = r_pf2rf @ self.u_axis_rj4_in_pf
-        self.u_axis_rj5_in_rf = r_pf2rf @ self.u_axis_rj5_in_pf
-        self.u_axis_rj6_in_rf = r_pf2rf @ self.u_axis_rj6_in_pf
-        
-        
-    def _get_pL_com_in_foot(self, jv, cf):
+        self.u_axis_rj1_in_wf = r_pf2wf @ np.vstack(( 1, 0, 0 ))
+        self.u_axis_rj2_in_wf = r_pf2wf @ self.r_rj12pf @ np.vstack(( 0, 0, 1 ))
+        self.u_axis_rj3_in_wf = r_pf2wf @ self.r_rj12pf @ self.r_rj22rj1 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_rj4_in_wf = r_pf2wf @ self.r_rj12pf @ self.r_rj22rj1 @ self.r_rj32rj2 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_rj5_in_wf = r_pf2wf @ self.r_rj12pf @ self.r_rj22rj1 @ self.r_rj32rj2 @ self.r_rj42rj3 @ np.vstack(( 0, 1, 0 ))
+        self.u_axis_rj6_in_wf = r_pf2wf @ self.r_rj12pf @ self.r_rj22rj1 @ self.r_rj32rj2 @ self.r_rj42rj3 @ self.r_rj52rj4 @ np.vstack(( 1, 0, 0 ))
+    
+    def _get_pL_com_in_foot(self):
         """ 用wf的相對關係求出com_in_ft, 再差分得到角動量, 在ALIP軌跡規劃的切換瞬間用到"""
         p_com_in_lf = self.r_lf2wf.T @ (self.p_com_in_wf - self.p_lf_in_wf)
         p_com_in_rf = self.r_rf2wf.T @ (self.p_com_in_wf - self.p_rf_in_wf)
-        p_com_in_lfrf = np.vstack(( p_com_in_lf, p_com_in_rf ))
-        v_com_in_lfrf = vcom_filter.send(comdiff.send(p_com_in_lfrf))
         
-        J_cj_in_cf, J_sj_in_pf = self.Jacobian(cf)
-        v_pel_in_lf = J_cj_in_cf @ jv[:6]
-        v_com_in_lf = v_pel_in_lf #先用骨盆的速度代替
+        p_com_in_lfrf = np.vstack((p_com_in_lf, p_com_in_rf)) #照lf rf的順序疊起來
         
         
-        lf2pel_in_wf = (self.p_pel_in_wf - self.p_lf_in_wf)
-        rf2pel_in_wf = (self.p_pel_in_wf - self.p_rf_in_wf)
-        Ly_com_in_lf = m * v_com_in_lf[0,0] * lf2pel_in_wf[2,0]
-        Ly_com_in_rf = m * v_com_in_lfrf[3,0] * rf2pel_in_wf[2,0]
-        Lx_com_in_lf = -m * v_com_in_lf[1,0] * lf2pel_in_wf[2,0]
-        Lx_com_in_rf = -m * v_com_in_lfrf[4,0] * rf2pel_in_wf[2,0]
+        v_com_in_lfrf = (p_com_in_lfrf - self.__p_com_in_lfrf_past) / timer_period
+        vf_com_in_lfrf = 0.7408 * self.__vf_com_in_lfrf_past + 0.2592 * self.__v_com_in_lfrf_past  #濾過後的速度(5Hz)
         
-        # Ly_com_in_lf = m * v_com_in_lfrf[0,0] * H
-        # Ly_com_in_rf = m * v_com_in_lfrf[3,0] * H
-        # Lx_com_in_lf = -m * v_com_in_lfrf[1,0] * H
-        # Lx_com_in_rf = -m * v_com_in_lfrf[4,0] * H
+        Ly_com_in_lf = m * vf_com_in_lfrf[0,0] * H
+        Ly_com_in_rf = m * vf_com_in_lfrf[3,0] * H
+        Lx_com_in_lf = -m * vf_com_in_lfrf[1,0] * H
+        Lx_com_in_rf = -m * vf_com_in_lfrf[4,0] * H
         
         self.xLy_com_in_lf = np.vstack(( p_com_in_lfrf[0,0], Ly_com_in_lf )) #輸出
         self.yLx_com_in_lf = np.vstack(( p_com_in_lfrf[1,0], Lx_com_in_lf ))
         self.xLy_com_in_rf = np.vstack(( p_com_in_lfrf[3,0], Ly_com_in_rf ))
         self.yLx_com_in_rf = np.vstack(( p_com_in_lfrf[4,0], Lx_com_in_rf ))
         
-    
-    def Jacobian(self,cf):
-        '''算出左關節對左腳掌, 右關節對右腳掌的Jacobian'''
-        #===========================左腳位置和方向的Jacobian==================================#
-        # for ft in ['l','r']:
-        #     J_jnt2ft_in_wf = np.array([ [], [], [], [], [], [] ]) #先設6*1全空的一個向量
-            
-        #     for i in range(1,6+1): 
-        #         u_axis_ftjnti_in_wf = self.__dict__[f"u_axis_{ft}j{i}_in_wf"] #關節omega的方向
-        #         p_ftjnti_in_wf = self.__dict__[f"p_{ft}j{i}_in_wf"]
-        #         p_ft_in_wf = self.__dict__[f"p_{ft}f_in_wf"]
-                
-        #         p_ftjnti_to_ft_in_wf = p_ft_in_wf - p_ftjnti_in_wf #力臂方向
-                
-        #         Jpi = np.cross(u_axis_ftjnti_in_wf, p_ftjnti_to_ft_in_wf, axis=0 ) # omega x r
-        #         Jai = np.vstack(u_axis_ftjnti_in_wf)
-        #         Ji = np.vstack(( Jpi, Jai ))
-        #         J_jnt2ft_in_wf = np.hstack(( J_jnt2ft_in_wf,Ji ))
-                
-        #     yield J_jnt2ft_in_wf #先左再右輸出
-            
-        sw = 'rf' if cf == 'lf' else\
-             'lf'
-        cj = cf[0] + 'j'
-        sj = sw[0] + 'j'
+        self.__p_com_in_lfrf_past = p_com_in_lfrf #update
+        self.__v_com_in_lfrf_past = v_com_in_lfrf
+        self.__vf_com_in_lfrf_past = vf_com_in_lfrf
         
-        J_cj_in_cf = np.array([ [],[],[],[],[],[] ])
-    
-        for i in range(1,6+1):
-            u_axis_cji_in_cf = self.__dict__[f"u_axis_{cj}{i}_in_{cf}"] #關節omega的方向
-            p_cji_in_wf = self.__dict__[f"p_{cj}{i}_in_wf"]
-            p_cf_in_wf = self.__dict__[f"p_{cf}_in_wf"]
-            r_wf2cf = self.__dict__[f"r_{cf}2wf"].T
-            
-            p_cji_in_cf = r_wf2cf @ (p_cji_in_wf - p_cf_in_wf) #力臂方向
-            
-            Jp_cj_in_cf_i = np.cross(u_axis_cji_in_cf, p_cji_in_cf, axis=0 ) # omega x r
-            J_cj_in_cf_i = np.vstack(( Jp_cj_in_cf_i, u_axis_cji_in_cf ))
-            J_cj_in_cf = np.hstack(( J_cj_in_cf, J_cj_in_cf_i ))
-            
-        J_sj_in_pf = np.array([ [],[],[],[],[],[] ])
-        for i in range(1,6+1):
-            u_axis_sji_in_pf = self.__dict__[f"u_axis_{sj}{i}_in_pf"] #關節omega的方向
-            
-            p_sji_in_pf = self.__dict__[f"pa_{sj}{i}_in_pf"][:3] #力臂方向
-            
-            Jp_sj_in_pf_i = np.cross(u_axis_sji_in_pf, p_sji_in_pf, axis=0 ) # omega x r
-            J_sj_in_pf_i = np.vstack(( Jp_sj_in_pf_i, u_axis_sji_in_pf ))
-            J_sj_in_pf = np.hstack(( J_sj_in_pf,J_sj_in_pf_i ))
-        
-        return J_cj_in_cf, J_sj_in_pf
-        
-    def zyx_analy_2_gmtry_w(self, ay:float, az:float) -> np.ndarray:
-        '''我們的歐拉角是以zyx做定義, 這個函式把解析角速度轉成幾何角速度'''
-        return np.array([[cos(ay)*cos(az), -sin(az), 0],
-                            [cos(ay)*sin(az),  cos(az), 0],
-                            [-sin(ay),         0,       1]])
-            
 class UpperLevelController(Node):
     def __init__(self):
-        self.cf = 2
+                 
         def publisher_create():
             '''effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩->我們程式的目的就是為了pub他'''
             self.publisher['position'] = self.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
@@ -485,7 +310,6 @@ class UpperLevelController(Node):
                 quaters_base = Rotation.from_quat([quaters_base.x, quaters_base.y, quaters_base.z, quaters_base.w])
                 sub['p_base_in_wf'] = np.vstack(( base.x, base.y, base.z ))
                 sub['r_base2wf'] = quaters_base.as_matrix()
-                # print('base\n',sub['p_base_in_wf'].flatten())
             
             def state_callback(msg):
                 """ 接收我們手動pub出的state """
@@ -495,6 +319,16 @@ class UpperLevelController(Node):
                 '''把訂閱到的關節位置、差分與飽和限制算出速度,並轉成我們想要的順序'''
                 nonlocal callcount
                 callcount += 1
+                
+                def diff2velocity(jp:np.ndarray, jp_p:np.ndarray) -> np.ndarray:
+                    '''差分出速度,加上飽和限制在[-0.75, 0.75]'''                                 
+                    jv = (jp - jp_p)/timer_period
+                    for i in range(len(jv)):
+                        if jv[i]>= 0.75:
+                            jv[i] = 0.75
+                        elif jv[i]<= -0.75:
+                            jv[i] = -0.75
+                    return jv
                                                                     
                 if len(msg.position) == 12: # 將關節順序轉成我們想要的
                     jp_dict = {joint:value for joint,value in zip(original_joint_order, msg.position)}
@@ -505,15 +339,13 @@ class UpperLevelController(Node):
                     self.pt.p_base_in_wf = deepcopy(sub['p_base_in_wf'])
                     self.pt.r_base2wf = deepcopy(sub['r_base2wf'])
                     self.state = deepcopy(sub['state'])
-                    self.jp = jpfilter.send(deepcopy(sub['jp']))
-                    #========================把5次的點差分出速度,加上飽和條件與濾波==================================#
-                    self.jv = jvfilter.send( jpdiff.send(self.jp) )
-                    self.jv = np.maximum( self.jv, -0.75 )
-                    self.jv = np.minimum( self.jv,  0.75 )
-                    
-                    print('jp:',self.jp.flatten()*180/pi)
-                    print('jv:',self.jv.flatten()*180/pi)
-                    
+                    self.jp = deepcopy(sub['jp'])
+                    #========================把5次的點差分出速度==================================#
+                    self.jv = diff2velocity(self.jp, self.__jp_p) 
+                    #========================關節速度濾波==================================#
+                    self.jvf = 0.0063*self.__jvf_p - 0.0001383*self.__jvf_pp + 1.014*self.__jv_p - 0.008067*self.__jv_pp #100Hz
+                    #========================更新==================================#
+                    self.__jvf_pp, self.__jvf_p, self.__jv_pp, self.__jv_p = self.__jvf_p, self.jvf, self.__jv_p, self.jv
                     #==========================================================#
                     self.main_callback()
                     callcount = 0
@@ -547,6 +379,25 @@ class UpperLevelController(Node):
                 data = model.createData() # Create data required by the algorithms
                 yield model, data
         
+        def attach_links(model1_name, link1_name, model2_name, link2_name):
+            req = AttachLink.Request()
+            req.model1_name = model1_name
+            req.link1_name = link1_name
+            req.model2_name = model2_name
+            req.link2_name = link2_name
+
+            self.future = self.attach_link_client.call_async(req)
+
+        def detach_links(model1_name, link1_name, model2_name, link2_name):
+            req = DetachLink.Request()
+            req.model1_name = model1_name
+            req.link1_name = link1_name
+            req.model2_name = model2_name
+            req.link2_name = link2_name
+
+            self.future = self.detach_link_client.call_async(req)
+        
+        
         #========================初始化一些重要的property==================================#
         self.publisher = {} # 存放create的publisher
         self.subscriber = {} # 存放create的subscriber
@@ -554,6 +405,12 @@ class UpperLevelController(Node):
         
         self.jp = None #現在的關節角度數組
         self.jv = None #現在的關節速度數組(不乾淨)
+        self.jvf = None #現在的關節速度數組(濾波)
+        self.__jp_p = np.zeros((12,1)) #用來差分或濾波
+        self.__jv_p = np.zeros((12,1))
+        self.__jv_pp = np.zeros((12,1))
+        self.__jvf_p = np.zeros((12,1))
+        self.__jvf_pp = np.zeros((12,1))
         
         self.state = 0 #放我們pub的mode
         self.isContact = {'lf':True, 'rf':True} #左右腳是否接觸地面
@@ -567,7 +424,6 @@ class UpperLevelController(Node):
         self.ref_pa_pel_in_wf = None #三個控制的參考軌跡
         self.ref_pa_lf_in_wf  = None
         self.ref_pa_rf_in_wf  = None
-        self.ref_xy_sw2com_in_cf_T = None #切換瞬間計算出的下一步
         
         self.ref_pa_com_in_lf = None #用於估測的質心軌跡？
         self.ref_pa_com_in_rf = None
@@ -594,10 +450,10 @@ class UpperLevelController(Node):
         (
             self.robot,
             (self.bipedal_floating_model, self.bipedal_floating_data),
-            (self.stance_l_model,         self.stance_l_data),
-            (self.stance_r_model,         self.stance_r_data),
-            (self.bipedal_l_model,        self.bipedal_l_data),
-            (self.bipedal_r_model,        self.bipedal_r_data),
+            (self.stance_l_model, self.stance_l_data),
+            (self.stance_r_model, self.stance_r_data),
+            (self.bipedal_l_model, self.bipedal_l_data),
+            (self.bipedal_r_model, self.bipedal_r_data),
         ) = list(load_URDF())
         
         # Initialize meschcat visualizer
@@ -606,116 +462,15 @@ class UpperLevelController(Node):
         self.viz.initViewer(open=True)
         self.viz.loadViewerModel()
         
-
-        
         # Set initial robot configuration
         print(self.robot.model)
         print(self.robot.q0)
         self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
         self.viz.display(self.init_configuration.q)
         
-        # self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK') #會把腳底frame跟大地frame在當下的距離固定住
-        # self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
-
-    def main_callback(self):
-        self.state = 2
-        self.cf = 'lf'
-        def judge_step_firmly():
-            '''當腳掌高度(z)在wf<0.01當作踩穩，之後可能要改'''
-            self.isContact['lf'] = (self.pt.p_lf_in_wf[2,0] <= 0.01)
-            self.isContact['rf'] = (self.pt.p_rf_in_wf[2,0] <= 0.01)
-            print(self.pt.p_lf_in_wf[2,0], self.pt.p_rf_in_wf[2,0])
-                
-        def judge_stance(pa_lf2pel_in_pf:np.ndarray,  pa_rf2pel_in_pf:np.ndarray ):
-            """決定不同狀態時支撐模式怎麼做切換"""
-            #========================當state0時, 骨盆距離腳的側向(y)在0.06以內, 決定支撐腳==================================#
-            if self.state == 0: #判斷單雙支撐
-                if abs(pa_lf2pel_in_pf[1,0])<=0.06:
-                    self.cf = 'lf'
-                elif abs(pa_rf2pel_in_pf[1,0])<=0.06:
-                    self.cf = 'rf' #單支撐
-                else:
-                    self.cf = '2f' #雙支撐
-            #===========================================================================#
-            if self.state == 2: #改寫的
-                    self.cf = 'lf'
-            #========================當state1時, 一開始維持雙支撐, 兩秒後換左腳單支撐==================================#
-            elif self.state == 1:
-                if self.DS_time <= DS_timeLength:
-                    self.cf = '2f' #開始雙支撐
-                    self.DS_time += timer_period #更新時間
-                    print("DS",self.DS_time)
-                else:
-                    self.DS_time = 10.1
-                    self.cf = 'lf'
-            
-            #========================當state30時, #地面踩夠久才換支撐腳==================================#
-            elif self.state == 30:
-                if abs( self.contact_t-0.5 )<=0.005:
-                    self.cf, self.sw = self.sw, self.cf
-            
-            #========================擺動腳==================================#
-            self.sw =   'rf' if self.cf == 'lf' else\
-                        'lf' if self.cf == 'rf' else\
-                        ''
-
-        #========================建立現在的模型==================================#
-        config = pink.Configuration(self.robot.model, self.robot.data, self.jp) 
-        self.viz.display(config.q)
-
-        #========================得到各個frame座標==================================#
-        self.pt.get_all_frame_needed(config, self.bipedal_floating_model, self.bipedal_floating_data, self.jp, self.jv, self.cf)
+        self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK') #會把腳底frame跟大地frame在當下的距離固定住
+        self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
         
-        #得到相對姿勢
-        pa_lf2pel_in_pf = self.pt.pa_pel_in_pf - self.pt.pa_lf_in_pf #從pink拿骨盆座標下相對於左右腳掌的骨盆位置
-        pa_rf2pel_in_pf = self.pt.pa_pel_in_pf - self.pt.pa_rf_in_pf
-
-        #===========================================================
-        judge_step_firmly()#判斷是否踩穩
-        # if not all(self.isContact.values()):
-        #     print('no contact')
-        #     self.publisher['effort'].publish( Float64MultiArray( data = np.zeros((12,1)) ))
-        #     return
-        judge_stance(pa_lf2pel_in_pf, pa_rf2pel_in_pf) #怎麼切支撐狀態要改!!!!!
-        #========================軌跡規劃==================================#
-        self.trajRef_planning()
-        #========================得到內環關節速度命令==================================#
-        cmd_jv= self.outerloop()
-        torq = self.innerloop(cmd_jv, pa_lf2pel_in_pf, pa_rf2pel_in_pf)#相對姿勢只有state 0會用到
-        
-        if self.state == 1:
-            self.estimatorcontrol()
-        if self.state == 2:#雙支撐的重力矩
-            # torq[self.sw][4:6] = self.ankle_control()
-            # torq[self.cf][4:6] = self.estimatorcontrol()[self.cf]
-            # torq[self.cf][4:6] = self.estimatorcontrol()
-            # torq[self.sw][4:6] = np.zeros((2,1))
-            # torq[self.cf][4:6] = np.zeros((2,1))
-            torq[self.sw] = np.zeros((6,1))
-        if self.state == 30:
-            torq[self.sw][4:6] = self.ankle_control()[self.sw]
-            torq[self.cf][4:6] = self.estimatorcontrol()[self.cf]
-        
-        
-        write_measure_L(self)
-        writetorq(self,torq)
-        write_jp(self)
-        print(self.jp.flatten())
-        #========================pub出扭矩命令來控制==================================#
-        self.publisher['effort'].publish( Float64MultiArray( data = np.vstack((torq['lf'], torq['rf'])) ))
-        printdict  = {
-            'cf': self.cf,
-            'sw': self.sw,
-            'state':self.state,
-            'contact':self.isContact
-        }
-        print(printdict)
-        self.state_past = deepcopy(self.state)
-        self.cf_past = deepcopy(self.cf)
-        
-        
-
-   
     def trajRef_planning(self):
         
         def ALIP_trajRef_planning():
@@ -725,7 +480,7 @@ class UpperLevelController(Node):
                 """理想ALIP動態矩陣"""
                 if axis == 'x':
                     return np.array([[ cosh(l*t),       sinh(l*t)/(m*H*l) ], 
-                                    [ m*H*l*sinh(l*t),  cosh(l*t) ]])
+                                    [ m*H*l*sinh(l*t), cosh(l*t) ]])
                 elif axis == 'y':
                     return np.array([[ cosh(l*t),       -sinh(l*t)/(m*H*l) ],
                                     [ -m*H*l*sinh(l*t), cosh(l*t) ]])
@@ -748,17 +503,17 @@ class UpperLevelController(Node):
                         
             def get_com_trajpt_in_cf(t:float) -> np.ndarray :
                 '''得出到換腳前的com_in_cf的軌跡點'''
-                ref_xLy_com_in_cf =  ALIP_MAT('x',t) @ self.pt.xLy0_com_in_cf
-                ref_yLx_com_in_cf =  ALIP_MAT('y',t) @ self.pt.yLx0_com_in_cf
+                ref_xLy_com_in_cf = ( ALIP_MAT('x',t) @ self.pt.xLy0_com_in_cf[0:2] )
+                ref_yLx_com_in_cf = ( ALIP_MAT('y',t) @ self.pt.yLx0_com_in_cf[0:2] )
                 ref_p_com_in_cf = np.vstack((ref_xLy_com_in_cf[0,0], ref_yLx_com_in_cf[0,0], H ))
                 return ref_p_com_in_cf, ref_xLy_com_in_cf, ref_yLx_com_in_cf
 
-            def get_com2sw_trajpt_in_cf(t:float, p0_sw2com_in_cf:np.ndarray, ref_xy_sw2com_in_cf_T:np.ndarray) -> np.ndarray:
+            def get_com2sw_trajpt_in_cf(t:float, p0_sw2com_in_cf:np.ndarray, xy_sw2com_in_cf_T:np.ndarray) -> np.ndarray:
                 '''給初始點和下一點, 用弦波連成換腳前的sw_in_cf的軌跡點'''
                 tn = t/T
                 zCL = 0.02 #踏步高度
                 ref_p_sw2com_in_cf = np.vstack((
-                    0.5 * ( (1+cos(pi*tn)) * p0_sw2com_in_cf[0:2] + (1-cos(pi*tn)) * ref_xy_sw2com_in_cf_T ),
+                    0.5*( (1+cos(pi*tn))*p0_sw2com_in_cf[0:2] + (1-cos(pi*tn))*xy_sw2com_in_cf_T ),
                     4*zCL*(tn-0.5)**2 + (H-zCL)
                 ))
                 return - ref_p_sw2com_in_cf #com2sw
@@ -767,7 +522,7 @@ class UpperLevelController(Node):
             p_cf_in_wf = self.pt.__dict__[f"p_{self.cf}_in_wf"]
             p_sw_in_wf = self.pt.__dict__[f"p_{self.sw}_in_wf"]
             
-            r_cf2wf = np.identity(3)
+            r_cf2wf = self.pt.__dict__[f"r_{self.cf}2wf"]
             r_wf2cf = r_cf2wf.T
             #====================拿取初始值,一步還沒走完前不能被改變====================#
             if self.state != self.state_past or self.cf != self.cf_past: #切換的瞬間,時間設成0,拿取初始值
@@ -777,17 +532,15 @@ class UpperLevelController(Node):
                 self.pt.p0_cf_in_wf = deepcopy(self.pt.__dict__[f"p_{self.cf}_in_wf"])
                 self.pt.p0_sw2com_in_cf = r_wf2cf @ (self.pt.p_com_in_wf - p_sw_in_wf) 
                 
-                self.ref_xy_sw2com_in_cf_T = getNextStep_xy_sw2com_in_cf(T) #預測擺動腳下一步
+                self.pt.xy_sw2com_in_cf_T = getNextStep_xy_sw2com_in_cf(T) #預測擺動腳下一步
                 
             #=====================================================================#
             
             ref_p_com_in_cf, ref_xLy_com_in_cf, ref_yLx_com_in_cf = get_com_trajpt_in_cf(self.contact_t) #得到cf下的軌跡點
-            ref_p_com2sw_in_cf = get_com2sw_trajpt_in_cf(self.contact_t, self.pt.p0_sw2com_in_cf, self.ref_xy_sw2com_in_cf_T)
+            ref_p_com2sw_in_cf = get_com2sw_trajpt_in_cf(self.contact_t, self.pt.p0_sw2com_in_cf, self.pt.xy_sw2com_in_cf_T)
+            ref_p_sw_in_wf = r_cf2wf @ ref_p_com2sw_in_cf + self.pt.p_com_in_wf #sw參考軌跡
             
-            ref_p_sw_in_wf = r_cf2wf @ ( ref_p_com_in_cf + ref_p_com2sw_in_cf ) + self.pt.p0_cf_in_wf
-            # ref_p_sw_in_wf = r_cf2wf @ ref_p_com2sw_in_cf + self.pt.p_com_in_wf #sw參考軌跡
-            
-            ref_p_com_in_wf = r_cf2wf @ ref_p_com_in_cf + self.pt.p0_cf_in_wf #com參考軌跡
+            ref_p_com_in_wf = r_cf2wf @ ref_p_com_in_cf + p_cf_in_wf #com參考軌跡
             p_com2pel_in_wf = self.pt.p_pel_in_wf - self.pt.p_com_in_wf #com和pel的相對位置
             ref_p_pel_in_wf = p_com2pel_in_wf + ref_p_com_in_wf #pel參考軌跡
             ref_p_pel_in_wf[2] = 0.55
@@ -799,22 +552,16 @@ class UpperLevelController(Node):
             
             ref_pa_com_in_cf = np.vstack(( ref_p_com_in_cf, 0, 0, 0 ))
             
-            return ( ref_pa_pel_in_wf, ref_pa_cf_in_wf, ref_pa_sw_in_wf,ref_p_com_in_wf, #迴圈控制的三道軌跡
+            return ( ref_pa_pel_in_wf, ref_pa_cf_in_wf, ref_pa_sw_in_wf, #迴圈控制的三道軌跡
                      ref_pa_com_in_cf, ref_xLy_com_in_cf, ref_yLx_com_in_cf ) #補償控制的com參數
 
         if self.state == 0:
             self.ref_pa_pel_in_wf = np.vstack(( 0.0,  0.0, 0.55, 0.0, 0.0, 0.0 ))
             self.ref_pa_lf_in_wf  = np.vstack(( 0.0,  0.1, 0.0,  0.0, 0.0, 0.0 ))
             self.ref_pa_rf_in_wf  = np.vstack(( 0.0, -0.1, 0.0,  0.0, 0.0, 0.0 ))
-            
-        if self.state == 2:
-            # self.ref_pa_pel_in_wf = np.vstack(( 0.0,  0.0, 0.56, 0.0, 0.0, 0.0 ))
-            # self.ref_pa_lf_in_wf  = np.vstack(( 0.0,  0.1, 0.0,  0.0, 0.0, 0.0 ))
-            # self.ref_pa_rf_in_wf  = np.vstack(( 0.0, -0.1, 0.0,  0.0, 0.0, 0.0 ))
-            get_initial_place(self)
-            
     
         elif self.state == 1: #左右腳都放在0.1, state1:骨盆在0.5DDT內移到左邊0.06(左腳)
+            
             targetstate1_y_pel_in_wf = 0.06
 
             if self.DS_time > 0.0 and self.DS_time <= 0.5*DS_timeLength:
@@ -831,7 +578,6 @@ class UpperLevelController(Node):
                 self.ref_pa_pel_in_wf, #迴圈控制的三道軌跡
                 self.__dict__[f"ref_pa_{self.cf}_in_wf"],
                 self.__dict__[f"ref_pa_{self.sw}_in_wf"],
-                self.ref_p_com_in_wf,
             
                 self.__dict__[f"ref_pa_com_in_{self.cf}"], #補償控制的com參數
                 self.__dict__[f"ref_xLy_com_in_{self.cf}"],
@@ -841,110 +587,120 @@ class UpperLevelController(Node):
             
             self.contact_t += timer_period
 
-    def outerloop(self):        
+    def outerloop(self):
+        def zyx_analy_2_gmtry_w(ay:float, az:float) -> np.ndarray:
+            '''我們的歐拉角是以zyx做定義, 這個函式把解析角速度轉成幾何角速度'''
+            return np.array([[cos(ay)*cos(az), -sin(az), 0],
+                             [cos(ay)*sin(az),  cos(az), 0],
+                             [-sin(ay),         0,       1]])
 
-        def endErr_to_endVeocity() -> dict[str, np.ndarray]:
+        def calculateErr_to_endVeocity() -> dict[str, np.ndarray]:
             '''計算對骨盆的支撐腳、擺動腳in wf的error, 並經過Pcontrol再轉成幾何速度輸出'''
-            #p control #todo擺動腳之後要改成PI
+            kp=20 #p control #todo擺動腳之後要改成PI
             #===========================得到參考命令和量測值==================================#
-            r_wf2cf = self.pt.__dict__[f"r_{self.cf}2wf"].T
-            r_sw2pf = self.pt.__dict__[f"r_{self.sw}2pf"]
-            
-            r_pf2cf = self.pt.__dict__[f"r_{self.cf}2pf"].T
-            
-            ref_pa_pel_in_cf = self.ref_pa_pel_in_wf - self.__dict__[f"ref_pa_{self.cf}_in_wf"] #理想狀況下wf和cf是平行的，所以不用旋轉
-            ref_pa_sw_in_pf = self.__dict__[f"ref_pa_{self.sw}_in_wf"]-self.ref_pa_pel_in_wf #同理pf和wf
-            
-            a_pf_in_cf = Rotation.from_matrix(r_pf2cf).as_euler('zyx', degrees=False) [::-1] #把旋轉矩陣換成歐拉角zyx,並轉成ax,ay,az
-            a_sw_in_pf = Rotation.from_matrix(r_sw2pf).as_euler('zyx', degrees=False) [::-1] #把旋轉矩陣換成歐拉角zyx,並轉成ax,ay,az
-            
-            p_pel_in_cf = r_wf2cf @ ( self.pt.p_pel_in_wf - self.pt.__dict__[f"p_{self.cf}_in_wf"] )
-            p_sw_in_pf = self.pt.pa_lf_in_pf[:3]
+            ref_pa_pel2lf_in_wf = self.ref_pa_lf_in_wf - self.ref_pa_pel_in_wf
+            ref_pa_pel2rf_in_wf = self.ref_pa_rf_in_wf - self.ref_pa_pel_in_wf
+            pa_pel2lf_in_wf = self.pt.pa_lf_in_pf - self.pt.pa_pel_in_pf
+            pa_pel2rf_in_wf = self.pt.pa_rf_in_pf - self.pt.pa_pel_in_pf
             
             
             #===========================經過加法器計算error==================================#
-            err_pa_pel_in_cf = ref_pa_pel_in_cf - np.vstack(( p_pel_in_cf, *a_pf_in_cf ))
-            err_pa_sw_in_pel = ref_pa_sw_in_pf - np.vstack(( p_sw_in_pf, *a_sw_in_pf ))
+            err_pa_pel2lf_in_wf = ref_pa_pel2lf_in_wf - pa_pel2lf_in_wf
+            err_pa_pel2rf_in_wf = ref_pa_pel2rf_in_wf - pa_pel2rf_in_wf
 
+            print('err_pa_pel2lf_in_wf\n',err_pa_pel2lf_in_wf.flatten())
+            print('err_pa_pel2rf_in_wf\n',err_pa_pel2rf_in_wf.flatten())
+            
             #===========================經過kp==================================#
-            derr_pa_pel_in_cf = 1 * err_pa_pel_in_cf
-            derr_pa_sw_in_pel = 1 * err_pa_sw_in_pel
+            derr_pa_pel2lf_in_wf = kp*err_pa_pel2lf_in_wf
+            derr_pa_pel2rf_in_wf = kp*err_pa_pel2rf_in_wf
             
             #===========================轉換成geometry端末角速度==================================#
-            
-            w_pel_in_cf = self.pt.zyx_analy_2_gmtry_w(*a_pf_in_cf[-2:]) @ derr_pa_pel_in_cf[-3:] #analytical轉成Geometry
-            w_sw_in_pel = self.pt.zyx_analy_2_gmtry_w(*a_sw_in_pf[-2:]) @ derr_pa_sw_in_pel[-3:]
+            w_pel2lf_in_wf = zyx_analy_2_gmtry_w(*ref_pa_pel2lf_in_wf[-2:,0]) @ derr_pa_pel2lf_in_wf[-3:] #analytical轉成Geometry
+            w_pel2rf_in_wf = zyx_analy_2_gmtry_w(*ref_pa_pel2rf_in_wf[-2:,0]) @ derr_pa_pel2rf_in_wf[-3:]
 
-            vw_pel_in_cf = np.vstack(( derr_pa_pel_in_cf[:3], w_pel_in_cf )) 
-            vw_sw_in_pel = np.vstack(( derr_pa_sw_in_pel[:3], w_sw_in_pel ))
-            
-            writetraj(self,ref_pa_pel_in_cf, p_pel_in_cf, a_pf_in_cf)
-            
+            vw_pel2lf_in_wf = np.vstack(( derr_pa_pel2lf_in_wf[:3], w_pel2lf_in_wf )) 
+            vw_pel2rf_in_wf = np.vstack(( derr_pa_pel2rf_in_wf[:3], w_pel2rf_in_wf ))
+
             return {
-                self.cf : vw_pel_in_cf,
-                self.sw : vw_sw_in_pel
+                'lf' : vw_pel2lf_in_wf,
+                'rf' : vw_pel2rf_in_wf
             }
         
-        def endVel_to_jv(endVel):
+        def Jacobian():
+            '''算出左關節對左腳掌, 右關節對右腳掌的Jacobian'''
+            pt = self.pt
+            #===========================左腳位置和方向的Jacobian==================================#
+            for ft in ['l','r']:
+                J_jnt2ft_in_pf = np.array([ [], [], [], [], [], [] ]) #先設6*1全空的一個向量
+                
+                for i in range(1,6+1): 
+                    u_axis_ftjnti_in_wf = pt.__dict__[f"u_axis_{ft}j{i}_in_wf"] #關節omega的方向
+                    p_ftjnti_in_wf = pt.__dict__[f"pa_{ft}j{i}_in_pf"][:3]
+                    p_ft_in_wf = pt.__dict__[f"pa_{ft}f_in_pf"][:3]
+                    
+                    p_ftjnti_to_ft_in_wf = p_ft_in_wf - p_ftjnti_in_wf #力臂方向
+                    
+                    Jpi = np.cross(u_axis_ftjnti_in_wf, p_ftjnti_to_ft_in_wf, axis=0 ) # omega x r
+                    Jai = np.vstack(u_axis_ftjnti_in_wf)
+                    Ji = np.vstack(( Jpi, Jai ))
+                    J_jnt2ft_in_pf = np.hstack(( J_jnt2ft_in_pf,Ji ))
+                    
+                yield J_jnt2ft_in_pf #先左再右輸出
+        
+        def endVelocity2jointVelocity(vw_pel2ft_in_wf : dict[str, np.ndarray] ) -> dict[str, np.ndarray]:
             '''轉成支撐腳、擺動腳膝上4關節速度命令'''
-            J_cj_in_cf, J_sj_in_pf = self.pt.Jacobian(self.cf)
-            J = {
-                'lf': J_cj_in_cf,
-                'rf': J_sj_in_pf
-                }
-            jv_ankle_of = {'lf':self.jv[4:6], #左右腳踝關節轉速
-                           'rf':self.jv[10:]}
+            J_lj2lf_in_wf, J_rj2rf_in_wf = tuple(Jacobian())
+            J = {'lf': J_lj2lf_in_wf,
+                 'rf': J_rj2rf_in_wf}
+            jv_ankle_of = {'lf':self.jvf[4:6], #左右腳踝關節轉速
+                           'rf':self.jvf[10:]}
             
-            #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
-            vzwxyz_pel_in_cf = endVel[self.cf][2:]
-            J_ankle_to_vzwxyz_in_cf = J[self.cf][2:, 4:]
-            J_knee_to_vzwxyz_in_cf = J[self.cf][2:, :4]
-            
-            vzwxyz_indep_pel_in_cf = vzwxyz_pel_in_cf - J_ankle_to_vzwxyz_in_cf @ jv_ankle_of[self.cf] # 經過加法器扣除掉腳踝關節(i.e.膝下關節)的影響
-            
-            J_vzwxyz_cf_inv = np.linalg.pinv( J_knee_to_vzwxyz_in_cf ) # 經過J^-1
-            cmd_v_j1234_cf = J_vzwxyz_cf_inv @ vzwxyz_indep_pel_in_cf
-            
-            #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
-            vxyzwz_sw_in_pel = np.vstack([ endVel[self.sw][i] for i in (0,1,2,-1) ])
-            J_ankle_to_vxyzwz_in_pel = np.vstack([ J[self.sw][i, 4:] for i in (0,1,2,-1) ])
-            J_knee_to_vxyzwz_in_pel = np.vstack([ J[self.sw][i, :4] for i in (0,1,2,-1) ])
+            if self.state == 30: #ALIP mode
+                
+                #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
+                vzwxyz_pel2cf_in_wf = vw_pel2ft_in_wf[self.cf][2:]
+                J_ankle_to_vzwxyz_cf = J[self.cf][2:, 4:]
+                J_knee_to_vzwxyz_cf = J[self.cf][2:, :4]
+                
+                vzwxyz_indep_pel2cf_in_wf = vzwxyz_pel2cf_in_wf - J_ankle_to_vzwxyz_cf @ jv_ankle_of[self.cf] # 經過加法器扣除掉腳踝關節(i.e.膝下關節)的影響
+                
+                J_vzwxyz_cf_inv = np.linalg.pinv( J_knee_to_vzwxyz_cf ) # 經過J^-1
+                cmd_v_j1234_cf = J_vzwxyz_cf_inv @ vzwxyz_indep_pel2cf_in_wf
+                
+                #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
+                vxyzwz_pel2sw_in_wf = np.vstack([ vw_pel2ft_in_wf[self.sw][i] for i in (0,1,2,-1) ])
+                J_ankle_to_vxyzwz_sw = np.vstack([ J[self.sw][i, 4:] for i in (0,1,2,-1) ])
+                J_knee_to_vxyzwz_sw = np.vstack([ J[self.sw][i, :4] for i in (0,1,2,-1) ])
 
-            # vxyzwz_indep_sw_in_pel = vxyzwz_sw_in_pel - J_ankle_to_vxyzwz_in_pel @ jv_ankle_of[self.sw] # 經過加法器扣除掉腳踝關節(i.e.膝下關節)的影響
-            vxyzwz_indep_sw_in_pel = vxyzwz_sw_in_pel # 經過加法器扣除掉腳踝關節(i.e.膝下關節)的影響
-            
-            J_vxy_wz_inv = np.linalg.pinv(  J_knee_to_vxyzwz_in_pel ) # 經過J^-1
-            cmd_v_j1234_sw = J_vxy_wz_inv @ vxyzwz_indep_sw_in_pel
-            
-            cmd_v_j1234_cf,cmd_v_j1234_sw = np.maximum( (cmd_v_j1234_cf,cmd_v_j1234_sw), -0.75 )
-            cmd_v_j1234_cf,cmd_v_j1234_sw = np.minimum( (cmd_v_j1234_cf,cmd_v_j1234_sw),  0.75 )
-            
-            cmd = - np.linalg.pinv(J[self.cf]) @ endVel[self.cf]
-            cmd = np.maximum( cmd, -0.75 )
-            cmd = np.minimum( cmd,  0.75 )
-            
-            
-            return {
-                # self.cf : np.vstack(( cmd_v_j1234_cf, 0, 0 )),
-                self.cf : cmd ,
-                self.sw : np.vstack(( cmd_v_j1234_sw, 0, 0 ))
-            }
+                vxyzwz_indep_pel2sw_in_wf = vxyzwz_pel2sw_in_wf - J_ankle_to_vxyzwz_sw @ jv_ankle_of[self.sw] # 經過加法器扣除掉腳踝關節(i.e.膝下關節)的影響
+                
+                J_vxy_wz_inv = np.linalg.pinv( J_knee_to_vxyzwz_sw ) # 經過J^-1
+                cmd_v_j1234_sw = J_vxy_wz_inv @ vxyzwz_indep_pel2sw_in_wf
+                
+                return {
+                    self.cf : np.vstack(( cmd_v_j1234_cf, 0, 0 )),
+                    self.sw : np.vstack(( cmd_v_j1234_sw, 0, 0 ))
+                }
+            else:
+                return { #不是ALIP就不用排除腳踝
+                    'lf' : np.linalg.pinv(J['lf']) @ vw_pel2ft_in_wf['lf'],
+                    'rf' : np.linalg.pinv(J['rf']) @ vw_pel2ft_in_wf['rf']
+                }
                 
                 
-        endVel = endErr_to_endVeocity()
-        cmd_jv = endVel_to_jv(endVel)
-        
-        write_jv(self,cmd_jv)
+        vw_pel2ft_in_wf = calculateErr_to_endVeocity()
+        cmd_jv = endVelocity2jointVelocity(vw_pel2ft_in_wf)
         
         return cmd_jv
     
     def innerloop(self, cmd_jv, pa_lf2pel_in_pf, pa_rf2pel_in_pf) -> dict[str, np.ndarray]:
-        def cal_jvErr_to_ja():
+        def calculateErr_to_jointAccerlation():
             '''通過加法器計算誤差再進入kp'''
             #===========================膝上四關節進入加法器算誤差==================================#
             err_jv = {
-                'lf' : cmd_jv['lf'] - self.jv[:6],
-                'rf' : cmd_jv['rf'] - self.jv[6:]
+                'lf' : cmd_jv['lf'] - self.jvf[:6],
+                'rf' : cmd_jv['rf'] - self.jvf[6:]
             }
             #==================經過膝上四關節的kp==================#
             if self.state == 30: #腳踝關節不在這控, 設成0
@@ -955,37 +711,22 @@ class UpperLevelController(Node):
                     self.cf : kcf * err_jv[self.cf],
                     self.sw : ksw * err_jv[self.sw]
                 }                  
-            elif self.state == 1:
+            elif self.state ==1:
                 k = 0.5 * np.ones((6,1))
                 return {
                     'lf' : k * err_jv['lf'],
                     'rf' : k * err_jv['rf']
                 }
-            elif self.state == 2: 
-                # ksw = 60    * np.vstack(( 1, 1, 1, 1, 0, 0))
-                # kcf = 41.67 * np.vstack(( 1, 1, 1, 1, 0, 0))
-                ksw = 5    * np.vstack(( 1, 1, 1, 1, 1, 1))
-                kcf = 5 * np.vstack(( 1, 1, 1, 1, 1, 1))
-                return {
-                    self.cf : kcf * err_jv[self.cf],
-                    self.sw : ksw * err_jv[self.sw]
-                }   
 
         def elasticTorq():
             '''state0 有自己的控制方法, 利用裝彈簧暫時hold住'''
-            # ref_jp = np.vstack(( 0, 0, -0.37, 0.74, -0.37, 0))
-            ref_jp = np.vstack((0,0,0,0,0,0))
-            
-            # kp = np.vstack(( 2, 2, 4, 6, 6, 4 )) # 裝彈簧
-            # kp[4:] = np.vstack([0,0])
-            # kp = np.vstack(( 0, 0, 0, 0, 0, 0 ))
-            kp = np.vstack(( 1, 1, 2, 3, 3, 2 )) # 裝彈簧
+            ref_jp = np.vstack(( 0, 0, -0.37, 0.74, -0.37, 0))
+            kp = np.vstack(( 2, 2, 4, 6, 6, 4 ))/2 # 裝彈簧
             
             err_jp = {
                 'lf' : ref_jp -self.jp[:6],
                 'rf' : ref_jp -self.jp[6:]
             }
-
             return {
                 'lf' : kp * err_jp['lf'],
                 'rf' : kp * err_jp['rf']
@@ -1012,7 +753,6 @@ class UpperLevelController(Node):
 
             #左腳單支撐的重力矩
             jp_LSS = np.vstack(( -jp_l[::-1],jp_r ))
-
             Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS, jv_SS, ja_SS ),(12,1))  
             LSS_gravity = np.vstack(( -Leg_LSS_gravity[5::-1], Leg_LSS_gravity[6:] ))  
 
@@ -1033,15 +773,7 @@ class UpperLevelController(Node):
                 'lf':Leg_gravity[:6],
                 'rf':Leg_gravity[6:]
             }
-            # return {
-            #     'lf':0.5 * LSS_gravity[:6] + 0.5 * RSS_gravity[:6],
-            #     'rf':0.5 * LSS_gravity[6:] + 0.5 * RSS_gravity[6:]
-            # }
-            # return {
-            #     'lf':LSS_gravity[:6],
-            #     'rf':LSS_gravity[6:]
-            # }
-            
+        
         def inertiaTorq(ja):
             '''目前慣性矩設成單位矩陣'''
             inertia_mat = np.identity(6) #慣量矩陣H
@@ -1051,7 +783,7 @@ class UpperLevelController(Node):
             }
         
         #========================內環關節加速度==================================#
-        ja = cal_jvErr_to_ja()
+        ja = calculateErr_to_jointAccerlation()
         
         #========================順向動力學==================================#
         gravity_torq = gravity()
@@ -1063,17 +795,18 @@ class UpperLevelController(Node):
                 'rf' : elastic_torq['rf'] + gravity_torq['rf'] 
             }
 
-        elif self.state in [1, 2, 30]:
+        elif self.state in [1, 30]:
             inertia_torq = inertiaTorq(ja)
             return {
-                'lf' : inertia_torq['lf'] + gravity_torq['lf']*2,
-                # 'lf' : inertia_torq['lf'],
+                'lf' : inertia_torq['lf'] + gravity_torq['lf'],
                 'rf' : inertia_torq['rf'] + gravity_torq['rf']
-                # 'rf' : inertia_torq['rf']
             }  
     
     def ankle_control(self):
-        '''kd寫在xacro裡'''       
+        '''kd寫在STM裡'''
+        kp = 0.1
+        friction_torq = 0.2
+        
         ref_axy_ankle = np.zeros((2,1))
         axy_ft_in_wf = {
             'lf' : self.pt.a_lf_in_wf[:2],
@@ -1084,61 +817,19 @@ class UpperLevelController(Node):
             'lf': ref_axy_ankle - axy_ft_in_wf['lf'],
             'rf': ref_axy_ankle - axy_ft_in_wf['rf']
         }
-        torq56 = np.vstack((
-            PD_sw_y.send( err_axy_ft_in_wf[self.sw][1,0] ),
-            PD_sw_x.send( err_axy_ft_in_wf[self.sw][0,0] )
-        ))
-
+        #===========================經過PD控制力矩==================================#
+        torq56 = {
+            'lf' : kp * err_axy_ft_in_wf['lf'][::-1],
+            'rf' : kp * err_axy_ft_in_wf['rf'][::-1]
+        }
+        #===========================考慮摩擦力==================================#
+        for ft in ['lf','rf']:
+            for i in range(2): #x,y
+                torq56[ft][i,0] = torq56[ft][i,0] + friction_torq if torq56[ft][i,0] > 0 else\
+                                  torq56[ft][i,0] - friction_torq
         return torq56
     
     def estimatorcontrol(self):
-        Kx = np.array([ [150, 15] ])
-        # Kx = np.array([ [778, 23] ])
-        # Kx = np.array([ [ 290.3274, 15.0198 ] ])*0.5
-        # Ky = np.array([[ -177.0596, 9.6014 ]])*0.15
-        # Ky = np.array([[ -1664,37.3 ]])
-        Ky = np.array([[ -150, 15 ]])
-        
-        ux = {
-            'lf' : -Kx @ (self.pt.xLy_com_in_lf - self.ref_xLy_com_in_lf),
-            'rf' : -Kx @ (self.pt.xLy_com_in_rf - self.ref_xLy_com_in_rf)
-        }
-        uy = {
-            'lf' : -Ky @ (self.pt.yLx_com_in_lf - self.ref_yLx_com_in_lf),
-            'rf' : -Ky @ (self.pt.yLx_com_in_rf - self.ref_yLx_com_in_rf)
-        }
-
-        torq56 = {
-            'lf' : - np.vstack(( uy['lf'], ux['lf'] )),
-            'rf' : - np.vstack(( uy['rf'], ux['rf'] ))
-        }
-        
-        for ft in ['lf', 'rf']:
-            for i in [0, 1]:
-                torq56[ft][i,0] = min(20, torq56[ft][i,0])
-                torq56[ft][i,0] = max(-20, torq56[ft][i,0])
-
-        return torq56
-        
-        '''kd寫在xacro裡'''       
-        ref_axy_ankle = np.zeros((2,1))
-        axy_ft_in_wf = {
-            'lf' : self.pt.a_lf_in_wf[:2],
-            'rf' : self.pt.a_rf_in_wf[:2],
-        }
-        #===========================膝下兩關節進入加法器算誤差==================================#
-        err_axy_ft_in_wf = {
-            'lf': ref_axy_ankle - axy_ft_in_wf['lf'],
-            'rf': ref_axy_ankle - axy_ft_in_wf['rf']
-        }
-        torq56 = np.vstack((
-            PD_cf_y.send( err_axy_ft_in_wf[self.cf][1,0] ),
-            PD_cf_x.send( err_axy_ft_in_wf[self.cf][0,0] )
-        ))
-
-        return torq56
-    
-    def estimatorcontrol_oldversion(self):            
         #===========================離散版狀態矩陣==================================#
         #x, Ly
         Ax = np.array([
@@ -1146,7 +837,7 @@ class UpperLevelController(Node):
             [0.8832, 1]
             ])
         Bx = np.vstack(( 0, 0.01 ))
-                
+        
         Kx = np.array([[ 290.3274, 15.0198 ]])*0.5
         Lx = np.array([
             [0.1390, 0.0025],
@@ -1188,12 +879,6 @@ class UpperLevelController(Node):
         }
         
         #===========================現在的輸入==================================#
-        if self.state == 30 and self.cf != self.cf_past: 
-            self.ref_xLy_com_in_lf = ob_xLy_com_in_ft['lf']
-            self.ref_yLx_com_in_lf = ob_xLy_com_in_ft['rf']
-            self.ref_xLy_com_in_rf = ob_yLx_com_in_ft['lf']
-            self.ref_yLx_com_in_rf = ob_yLx_com_in_ft['rf']
-            
         ux = {
             'lf' : -Kx @ (ob_xLy_com_in_ft['lf'] - self.ref_xLy_com_in_lf),
             'rf' : -Kx @ (ob_xLy_com_in_ft['rf'] - self.ref_xLy_com_in_rf)
@@ -1204,8 +889,7 @@ class UpperLevelController(Node):
         }
 
         
-        
-        #===========================若是在切換瞬間, 則強迫支撐腳角動量連續,把扭矩切成0來避免腳沒踩穩==================================#
+        #===========================若是在切換瞬間強迫支撐腳角動量連續,把扭矩切成0來避免腳沒踩穩==================================#
 
         if self.state == 30 and self.cf != self.cf_past: 
             self.pt.__dict__[f"xLy_com_in_{self.cf}"][1,0] = deepcopy(self.pt.__dict__[f"xLy_com_in_{self.sw}_past"][1,0]) #擺動腳的過去是支撐腳
@@ -1235,70 +919,112 @@ class UpperLevelController(Node):
         
         #===========================現在的力矩==================================#
         torq56 = {
-            'lf' : - np.vstack(( uy['lf'], ux['lf'] )),
-            'rf' : - np.vstack(( uy['rf'], ux['rf'] ))
+            'lf' : - np.vstack(( ux['lf'], uy['lf'] )),
+            'rf' : - np.vstack(( ux['rf'], uy['rf'] ))
         }
-        
-        torq56['lf'][0,0] = 20 if torq56['lf'][0,0]> 20 else\
-                           -20 if torq56['lf'][0,0]< -20 else\
-                            torq56['lf'][0,0]
-        torq56['lf'][1,0] = 20 if torq56['lf'][1,0]> 20 else\
-                           -20 if torq56['lf'][1,0]< -20 else\
-                            torq56['lf'][1,0]
-        torq56['rf'][0,0] = 20 if torq56['rf'][0,0]> 20 else\
-                           -20 if torq56['rf'][0,0]< -20 else\
-                            torq56['rf'][0,0]
-        torq56['rf'][1,0] = 20 if torq56['rf'][1,0]> 20 else\
-                           -20 if torq56['rf'][1,0]< -20 else\
-                            torq56['rf'][1,0]                    
             
         return torq56
 
-dirname = '/home/ldsc/Desktop/'    
-def createfile():
-    traj_names = ['traj0.txt', 'traj1.txt', 'traj30.txt']
-    torq_names = ['torq0.txt', 'torq1.txt', 'torq2.txt', 'torq30.txt']
-    meaL_names = ['meaL0.txt', 'meaL1.txt', 'meaL2.txt', 'meaL30.txt']
-    jp_names = ['jp0.txt', 'jp2.txt']
-    jv_names = ['jv0.txt', 'jv2.txt']
-    for name in torq_names + meaL_names + jp_names + jv_names +traj_names:
-        with open( dirname + name ,'w') as fh:
-            pass
-
-def writetraj(self,ref_pa_pel_in_cf,p_pel_in_cf, a_pf_in_cf):
-    traj_name = f'traj{int(self.state)}.txt'
-    L = np.vstack(( ref_pa_pel_in_cf, p_pel_in_cf, *a_pf_in_cf)).flatten()
-    with open( dirname + traj_name ,'a') as fh:
-        fh.write("{} {} {} {} {} {} {} {} {} {} {} {}\n".format(*L))
-
-def writetorq(self,torq):
-    torq_name = f'torq{int(self.state)}.txt'
-    L = np.vstack((torq['lf'], torq['rf'])).flatten()
-    with open( dirname + torq_name ,'a') as fh:
-        fh.write("{} {} {} {} {} {} {} {} {} {} {} {}\n".format(*L))
+    def main_callback(self):
         
-def write_measure_L(self):
-    meaLname = f'meaL{int(self.state)}.txt'
-    L = np.vstack(( self.pt.xLy_com_in_lf,self.pt.yLx_com_in_lf )).flatten()
-    with open( dirname + meaLname ,'a') as fh:
-        fh.write("{} {} {} {}\n".format(*L))
-        
-def write_jp(self):
-    meaLname = f'jp{int(self.state)}.txt'
-    L = self.jp.flatten()
-    with open( dirname + meaLname ,'a') as fh:
-        fh.write("{} {} {} {} {} {} {} {} {} {} {} {}\n".format(*L))
-        
-def write_jv(self,cmd_jv):
-    meaLname = f'jv{int(self.state)}.txt'
-    L = self.jv.flatten()
-    L1 = np.vstack((cmd_jv['lf'],cmd_jv['rf'])).flatten()
-    with open( dirname + meaLname ,'a') as fh:
-        fh.write("{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}\n".format(*L,*L1))
+        def judge_step_firmly():
+            '''當腳掌高度(z)在wf<0.01當作踩穩，之後可能要改'''
+            self.isContact['lf'] = (self.pt.p_lf_in_wf[2,0] <= 0.01)
+            self.isContact['rf'] = (self.pt.p_rf_in_wf[2,0] <= 0.01)
+                
+        def stance_change(pa_lf2pel_in_pf:np.ndarray,  pa_rf2pel_in_pf:np.ndarray ): #todo還是看不太懂,要記得改
+            """決定不同狀態時支撐模式怎麼做切換"""
+            #========================當state0時, 骨盆距離腳的側向(y)在0.06以內, 決定支撐腳==================================#
+            if self.state == 0: #判斷單雙支撐
+                if abs(pa_lf2pel_in_pf[1,0])<=0.06:
+                    self.cf = 'lf'
+                elif abs(pa_rf2pel_in_pf[1,0])<=0.06:
+                    self.cf = 'rf' #單支撐
+                else:
+                    self.cf = '2f' #雙支撐
+                    
+            #========================當state1時, 一開始維持雙支撐, 兩秒後換左腳單支撐==================================#
+            elif self.state == 1:
+                if self.DS_time <= DS_timeLength:
+                    self.cf = '2f' #開始雙支撐
+                    self.DS_time += timer_period #更新時間
+                    print("DS",self.DS_time)
+                else:
+                    self.DS_time = 10.1
+                    self.cf = 'lf'
+            
+            #========================當state30時, #地面踩夠久才換支撐腳==================================#
+            elif self.state == 30:
+                if abs( self.contact_t-0.5 )<=0.005:
+                    self.cf, self.sw = self.sw, self.cf
+            
+            #========================擺動腳==================================#
+            self.sw =   'rf' if self.cf == 'lf' else\
+                        'lf' if self.cf == 'rf' else\
+                        ''
 
-if __name__ == '__main__':
-    createfile()
-    rclpy.init(args = None)
+        #========================建立現在的模型==================================#
+        config = pink.Configuration(self.robot.model, self.robot.data, self.jp) 
+        self.viz.display(config.q)
+
+        #========================得到各個frame座標==================================#
+        self.pt.get_all_frame_needed(config, self.bipedal_floating_model, self.bipedal_floating_data, self.jp)
+        
+        #得到相對姿勢
+        pa_lf2pel_in_pf = self.pt.pa_pel_in_pf - self.pt.pa_lf_in_pf #從pink拿骨盆座標下相對於左右腳掌的骨盆位置
+        pa_rf2pel_in_pf = self.pt.pa_pel_in_pf - self.pt.pa_rf_in_pf
+        # p_lf2com_in_pf, p_rf2com_in_pf = com_foot2position_in_pf(self.jp)
+
+        #===========================================================
+        judge_step_firmly()#判斷是否踩穩
+        stance_change(pa_lf2pel_in_pf, pa_rf2pel_in_pf) #怎麼切支撐狀態要改!!!!!
+        #========================軌跡規劃==================================#
+        self.trajRef_planning()
+        #========================得到內環關節速度命令==================================#
+        cmd_jv= self.outerloop()
+        torq = self.innerloop(cmd_jv, pa_lf2pel_in_pf, pa_rf2pel_in_pf)#相對姿勢只有state 0會用到
+        if self.state == 1:
+            self.estimatorcontrol()
+        if self.state == 30:
+            self.estimatorcontrol()
+            torq[self.sw][4:6] = self.ankle_control()[self.sw]
+            torq[self.cf][4:6] = self.estimatorcontrol()[self.cf]
+        
+        #========================pub出扭矩命令來控制==================================#
+        self.publisher['effort'].publish( Float64MultiArray( data = np.vstack((torq['lf'], torq['rf'])) ))
+        printdict  = {
+            'cf': self.cf,
+            'sw': self.sw,
+            'state':self.state,
+            'contact':self.isContact
+        }
+        print(printdict)
+        self.state_past = deepcopy(self.state)
+        self.cf_past = deepcopy(self.cf)
+        print(self.pt.pa_pel_in_wf.flatten())
+        
+def com_foot2position_in_pf(jp):
+    ''' 回傳(對左腳質點位置,對右腳的,對骨盆的) p.s. 不管是哪個模型,原點都在兩隻腳(相距0.2m)中間'''
+    #get com position   
+    jp_l, jp_r = jp[:6],jp[6:] #分別取出左右腳的由骨盆往下的joint_position
+    
+    #右腳為支撐腳的模型
+    jp_from_rf = np.vstack(( -jp_r[::-1], jp_l )) #從右腳掌到左腳掌的順序,由於jp_r從右腳對骨盆變成骨盆對右腳,所以要負號
+    pin.centerOfMass( self.bipedal_r_model, self.bipedal_r_data, jp_from_rf)
+    p_com_in_pf_from_rf = np.reshape(self.bipedal_r_data.com[0],(3,1))
+    p_rf_in_pf = np.array([[0.0],[-0.1],[0.0]]) #原點在兩隻腳正中間
+    p_rf2com_in_pf = p_com_in_pf_from_rf - p_rf_in_pf
+
+    #左腳為支撐腳的模型
+    jp_from_lf = -jp_from_rf[::-1]
+    pin.centerOfMass(self.bipedal_l_model, self.bipedal_l_data, jp_from_lf)
+    p_com_in_pf_from_lf = np.reshape(self.bipedal_l_data.com[0],(3,1))
+    p_lf_in_pf = np.array([[0.0],[0.1],[0]])
+    p_lf2com_in_pf = p_com_in_pf_from_lf - p_lf_in_pf
+
+    return p_lf2com_in_pf, p_rf2com_in_pf   
+def main(args=None):
+    rclpy.init(args=args)
 
     upper_level_controllers = UpperLevelController()
     rclpy.spin(upper_level_controllers)
@@ -1308,3 +1034,6 @@ if __name__ == '__main__':
     # when the garbage collector destroys the node object)
     upper_level_controllers.destroy_node()
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
