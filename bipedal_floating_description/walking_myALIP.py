@@ -842,7 +842,7 @@ class UpperLevelController(Node):
             self.contact_t += timer_period
 
     def outerloop(self):        
-
+        123
         def endErr_to_endVeocity() -> dict[str, np.ndarray]:
             '''計算對骨盆的支撐腳、擺動腳in wf的error, 並經過Pcontrol再轉成幾何速度輸出'''
             #p control #todo擺動腳之後要改成PI
