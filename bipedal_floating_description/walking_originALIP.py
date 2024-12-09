@@ -1452,7 +1452,7 @@ class UpperLevelController(Node):
         #獲取支撐狀態
         stance = copy.deepcopy(stance_type)
         # print(stance)
-        if state == 30:
+        if state == 1:
             if stance == 0:   
                 print('enter stance0')
                 #(右支撐腳腳踝動態排除)
@@ -1478,7 +1478,7 @@ class UpperLevelController(Node):
 
                 # Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
                 
-            elif stance == 1 :
+            elif stance == 1 or stance == 2 :
                 print('enter stance1')   
                 #(左支撐腳腳踝動態排除)
                 #拿左腳 誤差及腳踝速度
