@@ -1580,7 +1580,7 @@ class UpperLevelController(Node):
             # else:
             #     Leg_gravity = DS_gravity
         
-        elif stance in [ 0, 30]:
+        elif stance == 0:
             if r_contact == 1:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             else:
@@ -1757,8 +1757,8 @@ class UpperLevelController(Node):
     def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
         #balance the robot to initial state by p_control
         jp = copy.deepcopy(joint_position)
-        p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
-        # p = np.zeros((12,1))
+        # p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
+        p = np.zeros((12,1))
         l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
         r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
 
@@ -1878,13 +1878,13 @@ class UpperLevelController(Node):
 
         #PD
         if R_pitch <0:
-            torque[10,0] = 0.1*(0-R_pitch) + 0.2
+            torque[10,0] = 0.1*(0-R_pitch)
         elif R_pitch >=0:
-            torque[10,0] = 0.1*(0-R_pitch) - 0.2
+            torque[10,0] = 0.1*(0-R_pitch)
         if R_roll <0:
-            torque[11,0] = 0.1*(0-R_roll) + 0.2
+            torque[11,0] = 0.1*(0-R_roll)
         elif R_roll >=0:
-            torque[11,0] = 0.1*(0-R_roll) - 0.2
+            torque[11,0] = 0.1*(0-R_roll)
 
         # # 直接不給
         # torque[10,0] = 0
@@ -1972,16 +1972,20 @@ class UpperLevelController(Node):
         self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
        
         #參考值(直接拿從online_planning來的)
-        ref_x_L = copy.deepcopy(self.ref_x_L)
-        ref_y_L = copy.deepcopy(self.ref_y_L)
-
+        # ref_x_L = copy.deepcopy(self.ref_x_L)
+        # ref_y_L = copy.deepcopy(self.ref_y_L)
+        
+        ref_x_L = np.vstack(( 0.0, 0.0 ))
+        ref_y_L = np.vstack((-0.1, 0.0))
+        
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         Ax = np.array([[1,0.00247],[0.8832,1]])
         Bx = np.array([[0],[0.01]])
         Cx = np.array([[1,0],[0,1]])  
         #--LQR
-        Kx = np.array([[290.3274,15.0198]])
-        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
+        # Kx = np.array([[290.3274,15.0198]])
+        Kx = np.array([[150,15.0198]])
+        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]])
         # Kx = np.array([[184.7274,9.9032]])
         # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
         #--compensator
@@ -1996,7 +2000,9 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
         # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_L = -Kx@(self.ob_x_L - ref_x_L)*0.5
+        
+        # self.ap_L = -Kx@(self.ob_x_L - ref_x_L)*0.5
+        self.ap_L = -Kx@(self.mea_x_L - ref_x_L)
 
         # if self.ap_L >= 3:
         #     self.ap_L = 3
@@ -2019,7 +2025,9 @@ class UpperLevelController(Node):
         By = np.array([[0],[0.01]])
         Cy = np.array([[1,0],[0,1]])  
         #--LQR
-        Ky = np.array([[-177.0596,9.6014]])
+        # Ky = np.array([[-177.0596,9.6014]])
+        Ky = np.array([[-150,15]])
+        
         Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
         #--compensator
         self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
@@ -2033,7 +2041,9 @@ class UpperLevelController(Node):
         #----calculate toruqe
         # self.ar_L = -Ky@(self.ob_y_L)
         # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_L = -Ky@(self.ob_y_L - ref_y_L)*0.15
+        
+        # self.ar_L = -Ky@(self.ob_y_L - ref_y_L)*0.15
+        self.ar_L = -Ky@(self.mea_y_L - ref_y_L)
 
         # if self.ar_L >= 3:
         #     self.ar_L =3
@@ -2112,8 +2122,11 @@ class UpperLevelController(Node):
         self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
 
         #參考值(直接拿從online_planning來的)
-        ref_x_R = copy.deepcopy(self.ref_x_R)
-        ref_y_R = copy.deepcopy(self.ref_y_R)
+        ref_x_R = 0
+        ref_y_R = 0.1
+        # self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
+        # self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
+        # self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
 
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         Ax = np.array([[1,0.00247],[0.8832,1]])
@@ -2310,7 +2323,10 @@ class UpperLevelController(Node):
             stance = 0
             
       
-        self.ref_cmd(state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
+        # self.ref_cmd(state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
+        self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
+        self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
+        self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
 
         JLL = self.left_leg_jacobian()
@@ -2324,12 +2340,13 @@ class UpperLevelController(Node):
 
         elif state == 1 or state == 2:
             torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
+            # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,state)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
         elif state == 30:
             # self.to_matlab()

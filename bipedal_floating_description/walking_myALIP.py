@@ -691,11 +691,11 @@ class UpperLevelController(Node):
             # torq[self.cf][4:6] = self.estimatorcontrol()
             # torq[self.sw][4:6] = np.zeros((2,1))
             # torq[self.cf][4:6] = np.zeros((2,1))
-            torq[self.sw] = np.zeros((6,1))
+            # torq[self.sw] = np.zeros((6,1))
+            pass
         if self.state == 30:
             torq[self.sw][4:6] = self.ankle_control()[self.sw]
             torq[self.cf][4:6] = self.estimatorcontrol()[self.cf]
-        
         
         write_measure_L(self)
         writetorq(self,torq)
@@ -842,7 +842,6 @@ class UpperLevelController(Node):
             self.contact_t += timer_period
 
     def outerloop(self):        
-        123
         def endErr_to_endVeocity() -> dict[str, np.ndarray]:
             '''計算對骨盆的支撐腳、擺動腳in wf的error, 並經過Pcontrol再轉成幾何速度輸出'''
             #p control #todo擺動腳之後要改成PI
@@ -856,24 +855,22 @@ class UpperLevelController(Node):
             ref_pa_sw_in_pf = self.__dict__[f"ref_pa_{self.sw}_in_wf"]-self.ref_pa_pel_in_wf #同理pf和wf
             
             a_pf_in_cf = Rotation.from_matrix(r_pf2cf).as_euler('zyx', degrees=False) [::-1] #把旋轉矩陣換成歐拉角zyx,並轉成ax,ay,az
-            a_sw_in_pf = Rotation.from_matrix(r_sw2pf).as_euler('zyx', degrees=False) [::-1] #把旋轉矩陣換成歐拉角zyx,並轉成ax,ay,az
             
             p_pel_in_cf = r_wf2cf @ ( self.pt.p_pel_in_wf - self.pt.__dict__[f"p_{self.cf}_in_wf"] )
-            p_sw_in_pf = self.pt.pa_lf_in_pf[:3]
-            
+            pa_sw_in_pf = self.pt.__dict__[f"pa_{self.sw}_in_pf"]
             
             #===========================經過加法器計算error==================================#
             err_pa_pel_in_cf = ref_pa_pel_in_cf - np.vstack(( p_pel_in_cf, *a_pf_in_cf ))
-            err_pa_sw_in_pel = ref_pa_sw_in_pf - np.vstack(( p_sw_in_pf, *a_sw_in_pf ))
+            err_pa_sw_in_pel = ref_pa_sw_in_pf - pa_sw_in_pf
 
             #===========================經過kp==================================#
-            derr_pa_pel_in_cf = 1 * err_pa_pel_in_cf
-            derr_pa_sw_in_pel = 1 * err_pa_sw_in_pel
+            derr_pa_pel_in_cf = 5 * err_pa_pel_in_cf
+            derr_pa_sw_in_pel = 5 * err_pa_sw_in_pel
             
             #===========================轉換成geometry端末角速度==================================#
             
             w_pel_in_cf = self.pt.zyx_analy_2_gmtry_w(*a_pf_in_cf[-2:]) @ derr_pa_pel_in_cf[-3:] #analytical轉成Geometry
-            w_sw_in_pel = self.pt.zyx_analy_2_gmtry_w(*a_sw_in_pf[-2:]) @ derr_pa_sw_in_pel[-3:]
+            w_sw_in_pel = self.pt.zyx_analy_2_gmtry_w(*pa_sw_in_pf[-2:]) @ derr_pa_sw_in_pel[-3:]
 
             vw_pel_in_cf = np.vstack(( derr_pa_pel_in_cf[:3], w_pel_in_cf )) 
             vw_sw_in_pel = np.vstack(( derr_pa_sw_in_pel[:3], w_sw_in_pel ))
@@ -923,11 +920,15 @@ class UpperLevelController(Node):
             cmd = np.maximum( cmd, -0.75 )
             cmd = np.minimum( cmd,  0.75 )
             
+            cmd1 =  np.linalg.pinv(J[self.sw]) @ endVel[self.sw]
+            cmd1 = np.maximum( cmd1, -0.75 )
+            cmd1 = np.minimum( cmd1,  0.75 )
             
             return {
                 # self.cf : np.vstack(( cmd_v_j1234_cf, 0, 0 )),
                 self.cf : cmd ,
-                self.sw : np.vstack(( cmd_v_j1234_sw, 0, 0 ))
+                # self.sw : np.vstack(( cmd_v_j1234_sw, 0, 0 ))
+                self.sw : cmd1 ,
             }
                 
                 
@@ -964,8 +965,8 @@ class UpperLevelController(Node):
             elif self.state == 2: 
                 # ksw = 60    * np.vstack(( 1, 1, 1, 1, 0, 0))
                 # kcf = 41.67 * np.vstack(( 1, 1, 1, 1, 0, 0))
-                ksw = 5    * np.vstack(( 1, 1, 1, 1, 1, 1))
-                kcf = 5 * np.vstack(( 1, 1, 1, 1, 1, 1))
+                ksw = 10 * np.vstack(( 1, 1, 1, 1, 1, 1))
+                kcf = 10 * np.vstack(( 1, 1, 1, 1, 1, 1))
                 return {
                     self.cf : kcf * err_jv[self.cf],
                     self.sw : ksw * err_jv[self.sw]
@@ -1066,7 +1067,7 @@ class UpperLevelController(Node):
         elif self.state in [1, 2, 30]:
             inertia_torq = inertiaTorq(ja)
             return {
-                'lf' : inertia_torq['lf'] + gravity_torq['lf']*2,
+                'lf' : inertia_torq['lf'] + gravity_torq['lf'],
                 # 'lf' : inertia_torq['lf'],
                 'rf' : inertia_torq['rf'] + gravity_torq['rf']
                 # 'rf' : inertia_torq['rf']
@@ -1117,24 +1118,6 @@ class UpperLevelController(Node):
             for i in [0, 1]:
                 torq56[ft][i,0] = min(20, torq56[ft][i,0])
                 torq56[ft][i,0] = max(-20, torq56[ft][i,0])
-
-        return torq56
-        
-        '''kd寫在xacro裡'''       
-        ref_axy_ankle = np.zeros((2,1))
-        axy_ft_in_wf = {
-            'lf' : self.pt.a_lf_in_wf[:2],
-            'rf' : self.pt.a_rf_in_wf[:2],
-        }
-        #===========================膝下兩關節進入加法器算誤差==================================#
-        err_axy_ft_in_wf = {
-            'lf': ref_axy_ankle - axy_ft_in_wf['lf'],
-            'rf': ref_axy_ankle - axy_ft_in_wf['rf']
-        }
-        torq56 = np.vstack((
-            PD_cf_y.send( err_axy_ft_in_wf[self.cf][1,0] ),
-            PD_cf_x.send( err_axy_ft_in_wf[self.cf][0,0] )
-        ))
 
         return torq56
     
