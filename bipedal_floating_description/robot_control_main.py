@@ -26,6 +26,8 @@ import csv
 #================ import other code =====================#
 from utils.robot_control_init import ULC_init
 from utils.robot_control_sensor import ULC_sensor
+from utils.robot_control_traj import ULC_traj
+from utils.robot_control_knee_control import Outterloop, Innerloop
 #========================================================#
         
 
@@ -507,172 +509,7 @@ class UpperLevelController(Node):
         
         return Com_ref_wf,L_ref_wf,R_ref_wf
     
-    def ref_cmd(self,state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf):
-    
-        if state in [0, 30]:
-            self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-            self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-            self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
-        else:
-            # Lth = 0.16
-            # hLth = 0.06
-            # hhLth = 0.03
-            # pyLth = 0.06
-            # hight  = 0.03
-            hLth = 0.0
-            hhLth = 0.0
-            pyLth = -0.06
-            hight  = 0.0
-            if state == 1:
-                R_X_ref = 0.0
-                R_Z_ref = 0.0
-                if self.DS_time > 0.0 and self.DS_time <= self.DDT:
-                    if self.DS_time > (0.5*self.DDT) and self.DS_time <= self.DDT:
-                        P_X_ref = 0.0
-                        P_Y_ref = -pyLth
-                        if self.DS_time <= (0.75*self.DDT):
-                            L_X_ref = -hhLth*((self.DS_time-(0.5*self.DDT))/(0.25*self.DDT))
-                            L_Z_ref = hight*((self.DS_time-(0.5*self.DDT))/(0.25*self.DDT))
-                        else:
-                            L_X_ref = -hhLth-hhLth*((self.DS_time-(0.75*self.DDT))/(0.25*self.DDT))
-                            L_Z_ref = hight-hight*((self.DS_time-(0.75*self.DDT))/(0.25*self.DDT))                            
-                    else:
-                        P_X_ref = 0.0
-                        P_Y_ref = -pyLth*(self.DS_time/(0.5*self.DDT))
-                        L_X_ref = 0.0
-                        L_Z_ref = 0.0
-                else:
-                    P_X_ref = 0.0
-                    P_Y_ref = -pyLth
-                    L_X_ref = -hLth
-                    L_Z_ref = 0.0
 
-            if state == 2:
-                if stance == 2:
-                    L_Z_ref = 0.0
-                    R_Z_ref = 0.0
-                    if self.DS_time > 0.0 and self.DS_time <= self.DDT:
-                        if self.RSS_count == 0:
-                            P_X_ref = hhLth+hhLth*(self.DS_time/self.DDT)
-                            P_Y_ref = -pyLth*(self.DS_time/self.DDT)
-                            L_X_ref = 0.0
-                            R_X_ref = hLth
-                        else:
-                            P_X_ref = hhLth+hhLth*(self.DS_time/self.DDT)
-                            P_Y_ref = pyLth*(self.DS_time/self.DDT)
-                            L_X_ref = hLth
-                            R_X_ref = 0.0
-                    else:
-                        if abs(px_in_rf[1,0])<=0.08:
-                            P_X_ref = hLth
-                            P_Y_ref = -pyLth
-                            L_X_ref = 0.0
-                            R_X_ref = hLth
-                        elif abs(px_in_lf[1,0])<=0.08:
-                            P_X_ref = hLth
-                            P_Y_ref = pyLth
-                            L_X_ref = hLth
-                            R_X_ref = 0.0
-                        else:
-                            P_Y_ref = 0.0
-
-                elif stance == 0:
-                    R_X_ref = 0.0
-                    R_Z_ref = 0.0
-                    fq_RDT = 0.25*self.RDT
-                    h_RDT = 0.5*self.RDT
-                    rq_RDT = 0.75*self.RDT
-                    if self.RSS_time > 0.0 and self.RSS_time<=self.RDT:
-                        if self.RSS_time > fq_RDT and self.RSS_time <= h_RDT:
-                            P_X_ref = 0.0
-                            P_Y_ref = -pyLth
-                            L_X_ref = -hLth+hLth*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
-                            L_Z_ref = hight*((self.RSS_time-fq_RDT)/(h_RDT-fq_RDT)) #lift l leg
-                        elif self.RSS_time > h_RDT and self.RSS_time <= rq_RDT:
-                            P_X_ref = 0.0
-                            P_Y_ref = -pyLth
-                            # P_X_ref = hhLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            # P_Y_ref = -pyLth+pyLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            L_X_ref = hLth*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                            L_Z_ref = hight-hight*((self.RSS_time-h_RDT)/(rq_RDT-h_RDT)) #lay down l leg
-                        elif self.RSS_time > rq_RDT:
-                            P_X_ref = hhLth*((self.RSS_time-rq_RDT)/(self.RDT-rq_RDT)) #lay down l leg
-                            P_Y_ref = -pyLth+pyLth*((self.RSS_time-rq_RDT)/(self.RDT-rq_RDT)) #lay down l leg
-                            # P_X_ref = hhLth
-                            # P_Y_ref = 0.0
-                            L_X_ref = hLth
-                            L_Z_ref = 0.0
-                        else:
-                            P_X_ref = 0.0
-                            P_Y_ref = -pyLth
-                            L_X_ref = -hLth
-                            L_Z_ref = 0.0
-                    else:
-                        P_X_ref = hhLth
-                        P_Y_ref = 0.0
-                        L_X_ref = hLth
-                        L_Z_ref = 0.0
-                
-                else: #stance = 1
-                    L_X_ref = 0.0
-                    L_Z_ref = 0.0
-                    fq_LDT = 0.25*self.LDT
-                    h_LDT = 0.5*self.LDT
-                    rq_LDT = 0.75*self.LDT
-                    if self.LSS_time > 0.0 and self.LSS_time <= self.LDT:
-                        if self.LSS_time > fq_LDT and self.LSS_time <= h_LDT:
-                            P_X_ref = 0.0
-                            P_Y_ref = pyLth
-                            R_X_ref = -hLth+hLth*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
-                            R_Z_ref = hight*((self.LSS_time-fq_LDT)/(h_LDT-fq_LDT)) #lift r leg
-                        elif self.LSS_time > h_LDT and self.LSS_time <= rq_LDT:
-                            P_X_ref = 0.0
-                            P_Y_ref = pyLth
-                            # P_X_ref = hhLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                            # P_Y_ref = pyLth-pyLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                            R_X_ref = hLth*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                            R_Z_ref = hight-hight*((self.LSS_time-h_LDT)/(rq_LDT-h_LDT)) #lay down r leg
-                        elif self.LSS_time > rq_LDT:
-                            P_X_ref = hhLth*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT)) #lay down r leg
-                            P_Y_ref = pyLth-pyLth*((self.LSS_time-rq_LDT)/(self.LDT-rq_LDT)) #lay down r leg
-                            # P_X_ref = hhLth
-                            # P_Y_ref = 0.0
-                            R_X_ref = hLth
-                            R_Z_ref = 0.0
-                        else:
-                            P_X_ref = 0.0
-                            P_Y_ref = pyLth #
-                            R_X_ref = -hLth
-                            R_Z_ref = 0.0
-                    else:
-                        P_X_ref = hhLth
-                        P_Y_ref = 0.0
-                        R_X_ref = hLth
-                        R_Z_ref = 0.0
-            
-            #pelvis
-            P_Z_ref = 0.55
-            P_Roll_ref = 0.0
-            P_Pitch_ref = 0.0
-            P_Yaw_ref = 0.0
-
-            #left_foot
-            L_Y_ref = 0.1
-            L_Roll_ref = 0.0
-            L_Pitch_ref = 0.0
-            L_Yaw_ref = 0.0
-            
-            #right_foot
-            R_Y_ref = -0.1           
-            R_Roll_ref = 0.0
-            R_Pitch_ref = 0.0
-            R_Yaw_ref = 0.0
-
-            self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
-            self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
-            self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])  
-        
-        return 
     
     def ref_alip(self,stance,px_in_lf,px_in_rf,com_in_lf,com_in_rf,Com_ref_wf,L_ref_wf,R_ref_wf):
         #ALIP
@@ -724,92 +561,8 @@ class UpperLevelController(Node):
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
         self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]]) 
 
-    def calculate_err(self,state):
-        PX_ref = copy.deepcopy(self.PX_ref) #wf
-        LX_ref = copy.deepcopy(self.LX_ref) #wf
-        RX_ref = copy.deepcopy(self.RX_ref) #wf
-        PX = copy.deepcopy(self.PX) #pf
-        LX = copy.deepcopy(self.LX) #pf
-        RX = copy.deepcopy(self.RX) #pf
-        state = copy.deepcopy(state)
-        
-        #foot_trajectory(by myself)
-        L_ref = LX_ref - PX_ref 
-        R_ref = RX_ref - PX_ref
-
-        L = LX - PX
-        R = RX - PX 
-        Le = L_ref - L
-        Re = R_ref - R
-        # --P
-        Le_dot = 20*Le
-        Re_dot = 20*Re
-
-        # #--PI
-        # Le_dot = self.Le_dot_past + 20*Le - 19.99*self.Le_past 
-        # self.Le_dot_past = Le_dot
-        # self.Le_past = Le
-
-        # Re_dot = self.Re_dot_past + 20*Re - 19.99*self.Re_past 
-        # self.Re_dot_past = Re_dot
-        # self.Re_past = Re
-
-
-        Lroll_error_dot = Le_dot[3,0]
-        Lpitch_error_dot = Le_dot[4,0]
-        Lyaw_error_dot = Le_dot[5,0]
-        WL_x = self.L_Body_transfer[0,0]*Lroll_error_dot + self.L_Body_transfer[0,1]*Lpitch_error_dot
-        WL_y = self.L_Body_transfer[1,0]*Lroll_error_dot + self.L_Body_transfer[1,1]*Lpitch_error_dot
-        WL_z = self.L_Body_transfer[2,0]*Lroll_error_dot + self.L_Body_transfer[2,2]*Lyaw_error_dot
-
-        Le_2 = np.array([[Le_dot[0,0]],[Le_dot[1,0]],[Le_dot[2,0]],[WL_x],[WL_y],[WL_z]])
-
-        Rroll_error_dot = Re_dot[3,0]
-        Rpitch_error_dot = Re_dot[4,0]
-        Ryaw_error_dot = Re_dot[5,0]
-        WR_x = self.R_Body_transfer[0,0]*Rroll_error_dot + self.R_Body_transfer[0,1]*Rpitch_error_dot
-        WR_y = self.R_Body_transfer[1,0]*Rroll_error_dot + self.R_Body_transfer[1,1]*Rpitch_error_dot
-        WR_z = self.R_Body_transfer[2,0]*Rroll_error_dot + self.R_Body_transfer[2,2]*Ryaw_error_dot
-
-        Re_2 = np.array([[Re_dot[0,0]],[Re_dot[1,0]],[Re_dot[2,0]],[WR_x],[WR_y],[WR_z]])
-
-        return Le_2,Re_2
     
-    def left_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        l_hip_roll = copy.deepcopy(self.P_Lhr_pf)
-        l_hip_yaw = copy.deepcopy(self.P_Lhy_pf)
-        l_hip_pitch = copy.deepcopy(self.P_Lhp_pf)
-        l_knee_pitch = copy.deepcopy(self.P_Lkp_pf)
-        l_ankle_pitch = copy.deepcopy(self.P_Lap_pf)
-        l_ankle_roll = copy.deepcopy(self.P_Lar_pf)
-        l_foot = copy.deepcopy(self.P_L_pf)
-
-        JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
-        JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
-        JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
-        JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
-        JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
-        JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
-
-        JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
-        JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
-        self.JLL = np.vstack((JLL_upper,JLL_lower))  
-        # print(self.JLL)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JL_sp44 = np.reshape(self.JLL[2:,0:4],(4,4))  
-        self.JL_sp42 = np.reshape(self.JLL[2:,4:],(4,2))
-        #排除擺動.腳踝對末端速度的影響
-        JL_sw34 = np.reshape(self.JLL[0:3,0:4],(3,4)) 
-        JL_sw14 = np.reshape(self.JLL[5,0:4],(1,4)) 
-        self.JL_sw44 = np.vstack((JL_sw34,JL_sw14))
-
-        JL_sw32 = np.reshape(self.JLL[0:3,4:],(3,2)) 
-        JL_sw12 = np.reshape(self.JLL[5,4:],(1,2)) 
-        self.JL_sw42 = np.vstack((JL_sw32,JL_sw12))
-
-        return self.JLL
+    
 
     def left_leg_jacobian_wf(self):
         pelvis = copy.deepcopy(self.P_PV_wf)
@@ -839,41 +592,7 @@ class UpperLevelController(Node):
 
         return self.JLL
 
-    def right_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        r_hip_roll = copy.deepcopy(self.P_Rhr_pf)
-        r_hip_yaw = copy.deepcopy(self.P_Rhy_pf)
-        r_hip_pitch = copy.deepcopy(self.P_Rhp_pf)
-        r_knee_pitch = copy.deepcopy(self.P_Rkp_pf)
-        r_ankle_pitch = copy.deepcopy(self.P_Rap_pf)
-        r_ankle_roll = copy.deepcopy(self.P_Rar_pf)
-        r_foot = copy.deepcopy(self.P_R_pf)
 
-        JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
-        JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
-        JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
-        JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
-        JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
-        JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
-
-        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
-        JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
-        self.JRR = np.vstack((JRR_upper,JRR_lower))  
-        # print(self.JRR)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JR_sp44 = np.reshape(self.JRR[2:,0:4],(4,4))  
-        self.JR_sp42 = np.reshape(self.JRR[2:,4:],(4,2))
-        #排除擺動.腳踝對末端速度的影響
-        JR_sw34 = np.reshape(self.JRR[0:3,0:4],(3,4)) 
-        JR_sw14 = np.reshape(self.JRR[5,0:4],(1,4)) 
-        self.JR_sw44 = np.vstack((JR_sw34,JR_sw14))
-
-        JR_sw32 = np.reshape(self.JRR[0:3,4:],(3,2)) 
-        JR_sw12 = np.reshape(self.JRR[5,4:],(1,2)) 
-        self.JR_sw42 = np.vstack((JR_sw32,JR_sw12))
-
-        return self.JRR
 
     def right_leg_jacobian_wf(self):
         pelvis = copy.deepcopy(self.P_PV_wf)
@@ -902,217 +621,7 @@ class UpperLevelController(Node):
         self.JR_sp42 = np.reshape(self.JRR[2:,4:],(4,2))
         return self.JRR
 
-    def velocity_cmd(self,Le_2,Re_2,jv_f,stance_type,state):
 
-        L2 = copy.deepcopy(Le_2)
-        R2 = copy.deepcopy(Re_2)
-        v =  copy.deepcopy(jv_f) #joint_velocity
-        state = copy.deepcopy(state)
-       
-        #獲取支撐狀態
-        stance = copy.deepcopy(stance_type)
-        # print(stance)
-        if state == 1:
-            if stance == 0:   
-                print('enter stance0')
-                #(右支撐腳腳踝動態排除)
-                R2_41 = np.reshape(R2[2:,0],(4,1)) #R2 z to wz
-                VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
-                #計算右膝關節以上速度
-                R2_41_cal = R2_41 - self.JR_sp42@VR56
-                #彙整右腳速度
-                rw_41_d = np.dot(np.linalg.pinv(self.JR_sp44),R2_41_cal)
-                rw_21_d = np.zeros((2,1))
-                Rw_d = np.vstack((rw_41_d,rw_21_d))
-
-                #(左擺動腳腳踝動態排除)
-                #拿左腳 誤差及腳踝速度
-                L2_41 = np.array([[L2[0,0]],[L2[1,0]],[L2[2,0]],[L2[5,0]]]) #x y z yaw
-                VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
-                #計算左膝關節以上速度
-                L2_41_cal = L2_41 - self.JL_sw42@VL56
-                #彙整左腳速度
-                lw_41_d = np.dot(np.linalg.pinv(self.JL_sw44),L2_41_cal)
-                lw_21_d = np.zeros((2,1))
-                Lw_d = np.vstack((lw_41_d,lw_21_d))
-
-                # Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
-                
-            elif stance == 1 or stance == 2 :
-                print('enter stance1')   
-                #(左支撐腳腳踝動態排除)
-                #拿左腳 誤差及腳踝速度
-                L2_41 = np.reshape(L2[2:,0],(4,1)) #L2 z to wz
-                VL56 =  np.reshape(v[4:6,0],(2,1)) #左腳腳踝速度
-                #計算左膝關節以上速度
-                L2_41_cal = L2_41 - self.JL_sp42@VL56
-                #彙整左腳速度
-                lw_41_d = np.dot(np.linalg.pinv(self.JL_sp44),L2_41_cal)
-                lw_21_d = np.zeros((2,1))
-                Lw_d = np.vstack((lw_41_d,lw_21_d))
-
-                #(右擺動腳腳踝動態排除)
-                #拿右腳 誤差及腳踝速度
-                R2_41 = np.array([[R2[0,0]],[R2[1,0]],[R2[2,0]],[R2[5,0]]]) #x y z yaw
-                VR56 =  np.reshape(v[10:,0],(2,1)) #右腳腳踝速度
-                #計算右膝關節以上速度
-                R2_41_cal = R2_41 - self.JR_sw42@VR56
-                #彙整右腳速度
-                rw_41_d = np.dot(np.linalg.pinv(self.JR_sw44),R2_41_cal)
-                rw_21_d = np.zeros((2,1))
-                Rw_d = np.vstack((rw_41_d,rw_21_d))
-                # Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
-        else:
-            Lw_d = np.dot(np.linalg.pinv(self.JLL),L2) 
-            Rw_d = np.dot(np.linalg.pinv(self.JRR),R2) 
-
-        return Lw_d,Rw_d
-    
-    def gravity_compemsate(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,state):
-
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        stance = copy.deepcopy((stance_type))
-        
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l,axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-
-        jp_R_DS = np.flip(-jp_r,axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
-
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r,axis=0)
-        jp_RSS = np.vstack((jp_R_RSS,jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l,axis=0)
-        jp_LSS = np.vstack((jp_L_LSS,jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        if stance == 2:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-
-            # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-            #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
-            
-            # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-            #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
-            
-            # else:
-            #     Leg_gravity = DS_gravity
-        
-        elif stance == 0:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-            # if r_contact == 1:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-                
-            # # if l_contact ==1:
-            # #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            # # else:
-            # #     Leg_gravity = RSS_gravity
-
-        
-        elif stance == 1:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-
-            # if l_contact == 1:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-                
-            # # if r_contact ==1:
-            # #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            # # else:
-            # #     Leg_gravity = LSS_gravity
-
-
-        if state == 1:
-            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
-        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
-        
-        return l_leg_gravity,r_leg_gravity,kl,kr
     
     def gravity_ALIP(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
@@ -1772,16 +1281,14 @@ class UpperLevelController(Node):
             stance = 0
             
       
-        # self.ref_cmd(state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
-        self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-        self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-        self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
-        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
+        ULC_traj.ref_cmd(self, state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
 
-        JLL = self.left_leg_jacobian()
-        JRR = self.right_leg_jacobian()
-        Le_2,Re_2 = self.calculate_err(state)
-        VL,VR = self.velocity_cmd(Le_2,Re_2,jv_f,stance,state)
+        l_leg_gravity,r_leg_gravity,kl,kr = Innerloop.gravity_compemsate(self, joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
+
+        JLL = Outterloop.left_leg_jacobian(self)
+        JRR = Outterloop.right_leg_jacobian(self)
+        Le_2,Re_2 = Outterloop.calculate_err(self,state)
+        VL,VR = Innerloop.velocity_cmd(self,Le_2,Re_2,jv_f,stance,state)
         
         #control
         if state == 0:   
