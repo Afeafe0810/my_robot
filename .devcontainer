@@ -1,0 +1,14 @@
+{
+  "name": "ROS 2 Development Environment",
+  "image": "osrf/ros:humble",
+  "extensions": [
+    "ms-vscode.cpptools",
+    "ms-iot.vscode-ros",
+    "ms-python.python",
+    "github.codespaces",
+    "ms-vscode.pylance"
+  ],
+  "postCreateCommand": [
+    "pip install rclpy pinocchio pink numpy scipy"
+  ]
+}
