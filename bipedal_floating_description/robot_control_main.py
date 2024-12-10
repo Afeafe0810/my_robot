@@ -338,8 +338,8 @@ class UpperLevelController(Node):
     def main_controller_callback(self):
         
         joint_position,joint_velocity = self.collect_joint_data()
-        joint_velocity_cal = ULC_sensor.joint_velocity_cal(joint_position)
-        jv_f = ULC_sensor.joint_velocity_filter(joint_velocity_cal)
+        joint_velocity_cal = ULC_sensor.joint_velocity_cal(self, joint_position)
+        jv_f = ULC_sensor.joint_velocity_filter(self, joint_velocity_cal)
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.viz.display(configuration.q)
