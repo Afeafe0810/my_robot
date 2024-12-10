@@ -295,8 +295,8 @@ class ULC_sensor:
 
         return 
     
-    @staticmethod
-    def rotation_matrix(node:Node,joint_position):
+    @classmethod
+    def rotation_matrix(cls, node:Node,joint_position):
         jp = copy.deepcopy(joint_position)
         
         # 各關節角度
@@ -315,19 +315,19 @@ class ULC_sensor:
         Theta12 = jp[11,0] #R_Ankle_Roll
 
         #calculate rotation matrix
-        node.L_R01 = node.xyz_rotation('x',Theta1) #L_Hip_roll
-        node.L_R12 = node.xyz_rotation('z',Theta2)
-        node.L_R23 = node.xyz_rotation('y',Theta3)
-        node.L_R34 = node.xyz_rotation('y',Theta4)
-        node.L_R45 = node.xyz_rotation('y',Theta5)
-        node.L_R56 = node.xyz_rotation('x',Theta6) #L_Ankle_roll
+        node.L_R01 = cls.xyz_rotation('x',Theta1) #L_Hip_roll
+        node.L_R12 = cls.xyz_rotation('z',Theta2)
+        node.L_R23 = cls.xyz_rotation('y',Theta3)
+        node.L_R34 = cls.xyz_rotation('y',Theta4)
+        node.L_R45 = cls.xyz_rotation('y',Theta5)
+        node.L_R56 = cls.xyz_rotation('x',Theta6) #L_Ankle_roll
 
-        node.R_R01 = node.xyz_rotation('x',Theta7) #R_Hip_roll
-        node.R_R12 = node.xyz_rotation('z',Theta8)
-        node.R_R23 = node.xyz_rotation('y',Theta9)
-        node.R_R34 = node.xyz_rotation('y',Theta10)
-        node.R_R45 = node.xyz_rotation('y',Theta11)
-        node.R_R56 = node.xyz_rotation('x',Theta12) #R_Ankle_roll
+        node.R_R01 = cls.xyz_rotation('x',Theta7) #R_Hip_roll
+        node.R_R12 = cls.xyz_rotation('z',Theta8)
+        node.R_R23 = cls.xyz_rotation('y',Theta9)
+        node.R_R34 = cls.xyz_rotation('y',Theta10)
+        node.R_R45 = cls.xyz_rotation('y',Theta11)
+        node.R_R56 = cls.xyz_rotation('x',Theta12) #R_Ankle_roll
 
     @staticmethod
     def relative_axis(node):
@@ -351,3 +351,55 @@ class ULC_sensor:
         node.AR4 = node.RP@node.R_R01@node.R_R12@node.R_R23@(np.array([[0],[1],[0]]))
         node.AR5 = node.RP@node.R_R01@node.R_R12@node.R_R23@node.R_R34@(np.array([[0],[1],[0]])) 
         node.AR6 = node.RP@node.R_R01@node.R_R12@node.R_R23@node.R_R34@node.R_R45@(np.array([[1],[0],[0]])) #R_Ankle_Roll
+
+    @staticmethod
+    def joint_velocity_filter(node,joint_velocity):
+        '''
+        把差分得到的速度做5個點差分，但pp是什麼意思？？是怎麼濾的
+        '''
+        jv_sub = copy.deepcopy(joint_velocity)
+
+        # node.jv = 1.1580*node.jv_p - 0.4112*node.jv_pp + 0.1453*node.jv_sub_p + 0.1078*node.jv_sub_pp #10Hz
+        # node.jv = 0.5186*node.jv_p - 0.1691*node.jv_pp + 0.4215*node.jv_sub_p + 0.229*node.jv_sub_pp #20Hz
+        node.jv = 0.0063*node.jv_p - 0.0001383*node.jv_pp + 1.014*node.jv_sub_p -0.008067*node.jv_sub_pp #100Hz
+
+        node.jv_pp = copy.deepcopy(node.jv_p)
+        node.jv_p = copy.deepcopy(node.jv)
+        node.jv_sub_pp = copy.deepcopy(node.jv_sub_p)
+        node.jv_sub_p = copy.deepcopy(jv_sub)
+
+        return node.jv
+    
+    @staticmethod
+    def joint_velocity_cal(node,joint_position):
+        '''
+        用差分計算速度，並且加上飽和條件[-0.75, 0.75]、更新joint_position_past(感覺沒意義)
+        '''
+        joint_position_now = copy.deepcopy(joint_position)
+        joint_velocity_cal = (joint_position_now - node.joint_position_past)/node.timer_period
+        node.joint_position_past = joint_position_now     
+        
+        joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
+
+        for i in range(len(joint_velocity_cal)):
+            if joint_velocity_cal[i,0]>= 0.75:
+                joint_velocity_cal[i,0] = 0.75
+            elif joint_velocity_cal[i,0]<= -0.75:
+                joint_velocity_cal[i,0] = -0.75
+
+        return joint_velocity_cal
+
+
+
+    @staticmethod
+    def xyz_rotation(axis,theta):
+        cos = math.cos
+        sin = math.sin
+        R = np.array((3,3))
+        if axis == 'x':
+            R = np.array([[1,0,0],[0,cos(theta),-sin(theta)],[0,sin(theta),cos(theta)]])
+        elif axis == 'y':
+            R = np.array([[cos(theta),0,sin(theta)],[0,1,0],[-sin(theta),0,cos(theta)]])
+        elif axis == 'z':
+            R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
+        return R 
