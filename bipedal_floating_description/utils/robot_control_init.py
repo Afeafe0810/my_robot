@@ -71,7 +71,6 @@ class ULC_init:
             lambda msg: cls.base_in_wf(node, msg),
             10)
 
-
         #l_foot_contact_state_subscribe
         node.l_foot_contact_subscriber = node.create_subscription(
             ContactsState,
@@ -159,7 +158,65 @@ class ULC_init:
             node.call = 0
     
     @staticmethod
-    def state_callback(node,msg):
+    def state_callback(node,msg:Float64MultiArray):
         
         node.pub_state = msg.data[0]
         node.state_collect()
+    
+    @staticmethod
+    def load_URDF(node, urdf_path):
+        robot = pin.RobotWrapper.BuildFromURDF(
+            filename=urdf_path,
+            package_dirs=["."],
+            # root_joint=pin.JointModelFreeFlyer(),
+            root_joint=None,
+        )
+        
+        print(f"URDF description successfully loaded in {robot}")
+
+        #從骨盆建下來的模擬模型
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_floating.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        node.bipedal_floating_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + node.bipedal_floating_model.name)
+        # Create data required by the algorithms
+        node.bipedal_floating_data = node.bipedal_floating_model.createData()
+
+        #左單支撐腳
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_l.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        node.stance_l_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + node.stance_l_model.name)
+        # Create data required by the algorithms
+        node.stance_l_data = node.stance_l_model.createData()
+
+        #右單支撐腳
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_r_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        node.stance_r_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + node.stance_r_model.name)
+        # Create data required by the algorithms
+        node.stance_r_data = node.stance_r_model.createData()
+
+        #雙足模型_以左腳建起
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_l_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        node.bipedal_l_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + node.bipedal_l_model.name)
+        # Create data required by the algorithms
+        node.bipedal_l_data = node.bipedal_l_model.createData()
+
+        #雙足模型_以右腳建起
+        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
+        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_r_gravity.xacro' if len(argv)<2 else argv[1]
+        # Load the urdf model
+        node.bipedal_r_model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + node.bipedal_r_model.name)
+        # Create data required by the algorithms
+        node.bipedal_r_data = node.bipedal_r_model.createData()
+
+        return robot
