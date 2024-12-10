@@ -33,6 +33,7 @@ setup(
             '2 = bipedal_floating_description.2:main',
             'walking_myALIP = bipedal_floating_description.walking_myALIP:main',
             'walking_originALIP = bipedal_floating_description.walking_originALIP:main',            
+            'robot_control_main = bipedal_floating_description.robot_control_main:main',
         ],
     },
 )
