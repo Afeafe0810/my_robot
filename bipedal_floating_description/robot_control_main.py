@@ -1,27 +1,12 @@
 #================ import library ========================#
 import rclpy
 from rclpy.node import Node
-
 from std_msgs.msg import Float64MultiArray 
-
-
-
-
 import pinocchio as pin
-
 import pink
-
-
 import numpy as np
 np.set_printoptions(precision=2)
-
-from sys import argv
-from os.path import dirname, join, abspath
 import copy
-import math
-from scipy.spatial.transform import Rotation as R
-
-import csv
 
 #================ import other code =====================#
 from utils.robot_control_init import ULC_init
@@ -37,7 +22,7 @@ class UpperLevelController(Node):
     def __init__(self):
         
         super().__init__('upper_level_controllers')
-        ULC_init.create_publishers(self)
+        self.publisher = ULC_init.create_publishers(self)
         ULC_init.create_subscribers(self)
         self.robot = ULC_init.load_URDF(self,"/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         self.call = 0
@@ -399,7 +384,7 @@ class UpperLevelController(Node):
             torque_ALIP = Innerloop.walking_by_ALIP(self,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             torque_L =  Innerloop.alip_L(self,stance,px_in_lf,torque_ALIP,com_in_lf,state)
             torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            self.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
         elif state == 30:
             # self.to_matlab()
@@ -408,10 +393,10 @@ class UpperLevelController(Node):
             torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
             # print(stance)
             if stance == 1:
-                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+                self.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
             elif stance == 0:
-                self.effort_publisher.publish(Float64MultiArray(data=torque_R))
+                self.publisher['effort'].publish(Float64MultiArray(data=torque_R))
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
         
         self.state_past = copy.deepcopy(state)

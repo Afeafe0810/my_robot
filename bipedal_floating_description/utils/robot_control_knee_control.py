@@ -294,6 +294,7 @@ class Innerloop:
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
 
         node.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
+        node.lpublisher['l_gravity'].publish(Float64MultiArray(data=l_leg_gravity))
         node.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
         
         return l_leg_gravity,r_leg_gravity,kl,kr

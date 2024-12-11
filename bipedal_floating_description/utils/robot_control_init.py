@@ -42,25 +42,28 @@ class ULC_init:
     
     @staticmethod  
     def create_publishers(node: Node):
-        node.position_publisher =  node.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
-        node.velocity_publisher =  node.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
-        node.effort_publisher =  node.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10)
-        node.vcmd_publisher =  node.create_publisher(Float64MultiArray , '/velocity_command/commands', 10)
-        node.l_gravity_publisher =  node.create_publisher(Float64MultiArray , '/l_gravity', 10)
-        node.r_gravity_publisher =  node.create_publisher(Float64MultiArray , '/r_gravity', 10)
-        node.alip_x_publisher =  node.create_publisher(Float64MultiArray , '/alip_x_data', 10)
-        node.alip_y_publisher =  node.create_publisher(Float64MultiArray , '/alip_y_data', 10)
-        node.torque_L_publisher =  node.create_publisher(Float64MultiArray , '/torqueL_data', 10)
-        node.torque_R_publisher =  node.create_publisher(Float64MultiArray , '/torqueR_data', 10)
+        return {
+            "position" : node.create_publisher(Float64MultiArray , '/position_controller/commands', 10),
+            "velocity" : node.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10),
+            "effort" : node.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10),
+            "vcmd" :  node.create_publisher(Float64MultiArray , '/velocity_command/commands', 10),
+            "gravity_l" :  node.create_publisher(Float64MultiArray , '/l_gravity', 10),
+            "gravity_r" : node.create_publisher(Float64MultiArray , '/r_gravity', 10),
+            "alip_x" : node.create_publisher(Float64MultiArray , '/alip_x_data', 10),
+            "alip_y" : node.create_publisher(Float64MultiArray , '/alip_y_data', 10),
+            "torque_l" : node.create_publisher(Float64MultiArray , '/torqueL_data', 10),
+            "torque_r" : node.create_publisher(Float64MultiArray , '/torqueR_data', 10),
 
-        node.ref_publisher =  node.create_publisher(Float64MultiArray , '/ref_data', 10)
+            "ref" : node.create_publisher(Float64MultiArray , '/ref_data', 10),
 
-        node.joint_trajectory_controller =  node.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
+            "joint_trajectory_controller" : node.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10),
 
-        node.PX_publisher =  node.create_publisher(Float64MultiArray , '/px_data', 10)
-        node.COM_publisher =  node.create_publisher(Float64MultiArray , '/com_data', 10)
-        node.LX_publisher =  node.create_publisher(Float64MultiArray , '/lx_data', 10)
-        node.RX_publisher =  node.create_publisher(Float64MultiArray , '/rx_data', 10)
+            "pel" : node.create_publisher(Float64MultiArray , '/px_data', 10),
+            "com" : node.create_publisher(Float64MultiArray , '/com_data', 10),
+            "lf" : node.create_publisher(Float64MultiArray , '/lx_data', 10),
+            "rf" : node.create_publisher(Float64MultiArray , '/rx_data', 10),
+        }
+        
     
     @classmethod
     def create_subscribers(cls, node: Node):
