@@ -21,7 +21,7 @@ import csv
 
 #========================================================#
 
-class ULC_sensor:
+class ULC_frame:
     
     @staticmethod
     def get_position_pf(node:Node,configuration:pink.Configuration):

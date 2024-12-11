@@ -10,7 +10,7 @@ import copy
 
 #================ import other code =====================#
 from utils.robot_control_init import ULC_init
-from utils.robot_control_sensor import ULC_sensor
+from utils.robot_control_framesensor import ULC_frame
 from utils.robot_control_traj import ULC_traj
 from utils.robot_control_knee_control import Outterloop, Innerloop
 #========================================================#
@@ -22,9 +22,32 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
         self.publisher = ULC_init.create_publishers(self)
         self.subscriber = ULC_init.create_subscribers(self)
-        self.robot = ULC_init.loadMeshcatModel("/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         
-        self.robot = ULC_init.load_URDF(self,"/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
+        #================ load模型 =====================#
+        self.robot = ULC_init.loadMeshcatModel("/bipedal_floating.pin.urdf") #動力學高級模型，從骨盆建下來的
+        
+        self.bipedal_floating_model, self.bipedal_floating_data = ULC_init.loadSimpleModel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
+        self.stance_l_model,         self.stance_l_data         = ULC_init.loadSimpleModel("/stance_l.xacro") #從左腳掌往上建的左單腳
+        self.stance_r_model,         self.stance_r_data         = ULC_init.loadSimpleModel("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
+        self.bipedal_l_model,        self.bipedal_l_data        = ULC_init.loadSimpleModel("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
+        self.bipedal_r_model,        self.bipedal_r_data        = ULC_init.loadSimpleModel("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
+        
+        print(self.robot.model)
+        print(self.robot.q0)
+
+        #================ 可視化模型meshcat================#
+        self.viz = pin.visualize.MeshcatVisualizer(
+            self.robot.model, self.robot.collision_model, self.robot.visual_model
+        )
+        self.robot.setVisualizer(self.viz, init=False)
+        self.viz.initViewer(open=True)
+        self.viz.loadViewerModel()
+
+        # Set initial robot configuration
+        self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
+        self.viz.display(self.init_configuration.q)
+
+        #================================================#
         self.call = 0
 
         #joint_state(subscribe data)
@@ -60,22 +83,9 @@ class UpperLevelController(Node):
         self.l_contact = 1
         self.r_contact = 1
       
-        # Initialize meschcat visualizer
-        self.viz = pin.visualize.MeshcatVisualizer(
-            self.robot.model, self.robot.collision_model, self.robot.visual_model
-        )
-        self.robot.setVisualizer(self.viz, init=False)
-        self.viz.initViewer(open=True)
-        self.viz.loadViewerModel()
+        
+        
 
-        #
-
-
-        # Set initial robot configuration
-        print(self.robot.model)
-        print(self.robot.q0)
-        self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
-        self.viz.display(self.init_configuration.q)
 
         self.timer_period = 0.01 # seconds 跟joint state update rate&取樣次數有關
         # self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
@@ -133,7 +143,7 @@ class UpperLevelController(Node):
         self.Vx_L = 0.0
         self.Vx_past_L = 0.0
         self.CX_dot_past_L = 0.0
-        self.Vy_L = 0.0
+        self.Vy_L = 0.0# Set initial robot configuration
         self.Vy_past_L = 0.0
         self.CY_dot_past_L = 0.0
         self.Vx_R = 0.0
@@ -175,11 +185,6 @@ class UpperLevelController(Node):
         self.ref_y_L = np.zeros((2,1))
         self.ref_x_R = np.zeros((2,1))
         self.ref_y_R = np.zeros((2,1))
-
-        #touch for am tracking check
-        self.touch = 0
- 
-        # Initialize the service client
 
     def contact_collect(self):
         '''
