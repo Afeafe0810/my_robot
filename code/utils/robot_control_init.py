@@ -32,6 +32,9 @@ import copy
 import math
 from scipy.spatial.transform import Rotation as R
 
+#================ import other code =====================#
+from utils.robot_control_framesensor import ULC_frame
+#========================================================#
 
 class ULC_init:
     
@@ -62,36 +65,36 @@ class ULC_init:
         }
         
     @classmethod
-    def create_subscribers(cls, node: Node):
+    def create_subscribers(cls, ulc: Node):
         '''主要是為了訂閱base, joint_states, state'''
         return{
-            "base": node.create_subscription(
+            "base": ulc.create_subscription(
                 Odometry, '/odom', 
-                lambda msg: cls.__base_in_wf(node, msg), 
+                lambda msg: cls.__base_in_wf(ulc.pt, msg), 
                 10
             ),
             
-            "joint_states": node.create_subscription(
+            "joint_states": ulc.create_subscription(
                 JointState, '/joint_states',
-                lambda msg : cls.__joint_states_callback(node, msg),
+                lambda msg : cls.__joint_states_callback(ulc, msg),
                 10
             ),
             
-            "state": node.create_subscription(
+            "state": ulc.create_subscription(
                 Float64MultiArray, 'state_topic',
-                lambda msg : cls.__state_callback(node, msg),
+                lambda msg : cls.__state_callback(ulc, msg),
                 10
             ),
         
-            "lf_contact": node.create_subscription(
+            "lf_contact": ulc.create_subscription(
                 ContactsState, '/l_foot/bumper_demo',
-                lambda msg: cls.__contact_callback(node, msg),
+                lambda msg: cls.__contact_callback(ulc, msg),
                 10
             ),
         
-            "rf_contact": node.create_subscription(
+            "rf_contact": ulc.create_subscription(
                 ContactsState, '/r_foot/bumper_demo',
-                lambda msg: cls.__contact_callback(node, msg),
+                lambda msg: cls.__contact_callback(ulc, msg),
                 10
             ),
         }
@@ -120,18 +123,18 @@ class ULC_init:
         return model, model_data
       
     @staticmethod
-    def __base_in_wf(node, msg:Odometry):
+    def __base_in_wf(frame:ULC_frame, msg:Odometry):
         P_base_x = msg.pose.pose.position.x
         P_base_y = msg.pose.pose.position.y
         P_base_z = msg.pose.pose.position.z
-        node.P_B_wf = np.array([[P_base_x],[P_base_y],[P_base_z]])
+        frame.P_B_wf = np.array([[P_base_x],[P_base_y],[P_base_z]])
 
         O_base_x = msg.pose.pose.orientation.x
         O_base_y = msg.pose.pose.orientation.y
         O_base_z = msg.pose.pose.orientation.z
         O_base_w = msg.pose.pose.orientation.w
         base_quaternions = R.from_quat([O_base_x, O_base_y, O_base_z, O_base_w])
-        node.O_wfB = base_quaternions.as_matrix()  #注意
+        frame.O_wfB = base_quaternions.as_matrix()  #注意
 
     @staticmethod
     def __joint_states_callback(node, msg:JointState ):

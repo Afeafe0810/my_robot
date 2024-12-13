@@ -22,15 +22,17 @@ import math
 from scipy.spatial.transform import Rotation as R
 
 import csv
+#================ import other code =====================#
+from utils.robot_control_framesensor import ULC_frame
 #========================================================#
 
 class ULC_traj:
     
     @staticmethod
-    def ref_cmd(node,state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf):
-        node.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-        node.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-        node.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
+    def ref_cmd(ulc, state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf):
+        ulc.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
+        ulc.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
+        ulc.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         
         # if state in [0, 30]:
         #     self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])

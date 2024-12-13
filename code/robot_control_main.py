@@ -20,6 +20,8 @@ class UpperLevelController(Node):
     def __init__(self):
         
         super().__init__('upper_level_controllers')
+        self.pt = ULC_frame()
+        
         self.publisher = ULC_init.create_publishers(self)
         self.subscriber = ULC_init.create_subscribers(self)
         
@@ -104,17 +106,7 @@ class UpperLevelController(Node):
         self.RDT = 1
         self.LDT = 1
 
-        #data in wf_initial_data
-        self.P_B_wf = np.zeros((3,1))
-        self.P_PV_wf = np.array([[0.0],[0.0],[0.6]])
-        self.P_COM_wf = np.array([[0.0],[0.0],[0.6]])
-        self.P_L_wf= np.array([[0.0],[0.1],[0.0]])
-        self.P_R_wf = np.array([[0.0],[-0.1],[0.0]])
         
-        self.O_wfB = np.zeros((3,3))
-        self.O_wfPV = np.zeros((3,3))
-        self.O_wfL = np.zeros((3,3))
-        self.O_wfR = np.zeros((3,3))
 
         self.delay = 0
 
@@ -130,37 +122,7 @@ class UpperLevelController(Node):
         self.X0 = np.zeros((2,1))
         self.Y0 = np.zeros((2,1))
         self.Psw2com_0 = np.zeros((2,1))
-        #--velocity
-        self.CX_past_L = 0.0
-        self.CX_dot_L = 0.0
-        self.CY_past_L = 0.0
-        self.CY_dot_L = 0.0
-        self.CX_past_R = 0.0
-        self.CX_dot_R = 0.0
-        self.CY_past_R = 0.0
-        self.CY_dot_R = 0.0
-        #--velocity filter
-        self.Vx_L = 0.0
-        self.Vx_past_L = 0.0
-        self.CX_dot_past_L = 0.0
-        self.Vy_L = 0.0# Set initial robot configuration
-        self.Vy_past_L = 0.0
-        self.CY_dot_past_L = 0.0
-        self.Vx_R = 0.0
-        self.Vx_past_R = 0.0
-        self.CX_dot_past_R = 0.0
-        self.Vy_R = 0.0
-        self.Vy_past_R = 0.0
-        self.CY_dot_past_R = 0.0
-        #--measurement
-        self.mea_x_L = np.zeros((2,1))
-        self.mea_x_past_L = np.zeros((2,1))
-        self.mea_y_L = np.zeros((2,1))
-        self.mea_y_past_L = np.zeros((2,1))
-        self.mea_x_R = np.zeros((2,1))
-        self.mea_x_past_R = np.zeros((2,1))
-        self.mea_y_R = np.zeros((2,1))
-        self.mea_y_past_R = np.zeros((2,1))
+        
         #--compensator
         self.ob_x_L = np.zeros((2,1))
         self.ob_x_past_L = np.zeros((2,1))
@@ -295,39 +257,39 @@ class UpperLevelController(Node):
     def main_controller_callback(self):
         
         joint_position,joint_velocity = self.collect_joint_data()
-        joint_velocity_cal = ULC_sensor.joint_velocity_cal(self, joint_position)
-        jv_f = ULC_sensor.joint_velocity_filter(self, joint_velocity_cal)
+        joint_velocity_cal = ULC_frame.joint_velocity_cal(self, joint_position)
+        jv_f = ULC_frame.joint_velocity_filter(self, joint_velocity_cal)
 
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
         self.viz.display(configuration.q)
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        ULC_sensor.get_position_pf(self,configuration)
-        px_in_lf,px_in_rf = ULC_sensor.get_posture(self)
-        com_in_lf,com_in_rf,com_in_pink = ULC_sensor.com_position(self,joint_position)
+        self.pt.get_position_pf(configuration)
+        px_in_lf,px_in_rf = self.pt.get_posture()
+        com_in_lf,com_in_rf,com_in_pink = ULC_frame.com_position(self,joint_position)
         #算wf下的位置及姿態
-        ULC_sensor.pelvis_in_wf(self)
-        ULC_sensor.data_in_wf(self, com_in_pink)
+        self.pt.pelvis_in_wf()
+        self.pt.data_in_wf(com_in_pink)
         #這邊算相對的矩陣
-        ULC_sensor.rotation_matrix(self, joint_position)
+        self.pt.rotation_matrix(joint_position)
         #這邊算wf下各軸姿態
-        ULC_sensor.relative_axis(self)
+        self.pt.relative_axis()
 
         state = self.state_collect()
 
         l_contact,r_contact = self.contact_collect()
 
-        if self.P_L_wf[2,0] <= 0.01:##\\\\接觸的判斷是z方向在不在0.01以內
+        if self.pt.P_L_wf[2,0] <= 0.01:##\\\\接觸的判斷是z方向在不在0.01以內
             l_contact == 1
         else:
             l_contact == 0
-        if self.P_R_wf[2,0] <= 0.01:
+        if self.pt.P_R_wf[2,0] <= 0.01:
             r_contact == 1
         else:
             r_contact == 0
 
         #怎麼切支撐狀態要改!!!!!
-        stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.contact_t)
+        stance = self.stance_change(state, px_in_lf, px_in_rf, self.stance, self.contact_t)
         if state == 30:
             stance = 0
         else:
@@ -335,37 +297,37 @@ class UpperLevelController(Node):
             l_leg_gravity,r_leg_gravity,kl,kr = Innerloop.gravity_compemsate(self, joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
         
  
-        JLL = Outterloop.left_leg_jacobian(self)
-        JRR = Outterloop.right_leg_jacobian(self)
-        Le_2,Re_2 = Outterloop.calculate_err(self,state)
-        VL,VR = Innerloop.velocity_cmd(self,Le_2,Re_2,jv_f,stance,state)
+        JLL = Outterloop.left_leg_jacobian(self.pt)
+        JRR = Outterloop.right_leg_jacobian(self.pt)
+        Le_2,Re_2 = Outterloop.calculate_err(self, self.pt,state)
+        VL,VR = Innerloop.velocity_cmd(self.pt,Le_2,Re_2,jv_f,stance,state)
         
-        #control
-        if state == 0:   
-            Innerloop.balance(self, joint_position,l_leg_gravity,r_leg_gravity)
+        # #control
+        # if state == 0:   
+        #     Innerloop.balance(self, joint_position,l_leg_gravity,r_leg_gravity)
 
-        elif state == 1 or state == 2:
+        if state == 1 or state == 2:
             torque_kine = Innerloop.swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
             torque_ALIP = Innerloop.walking_by_ALIP(self,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             torque_L =  Innerloop.alip_L(self,stance,px_in_lf,torque_ALIP,com_in_lf,state)
-            torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            # torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
-        elif state == 30:
-            # self.to_matlab()
-            torque_ALIP = Innerloop.walking_by_ALIP(self,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            torque_L =  Innerloop.alip_L(self,stance,px_in_lf,torque_ALIP,com_in_lf,state)
-            torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            # print(stance)
-            if stance == 1:
-                self.publisher['effort'].publish(Float64MultiArray(data=torque_L))
+        # elif state == 30:
+        #     # self.to_matlab()
+        #     torque_ALIP = Innerloop.walking_by_ALIP(self,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+        #     torque_L =  Innerloop.alip_L(self,stance,px_in_lf,torque_ALIP,com_in_lf,state)
+        #     torque_R =  Innerloop.alip_R(self,stance,px_in_lf,torque_ALIP,com_in_rf,state)
+        #     # print(stance)
+        #     if stance == 1:
+        #         self.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
-            elif stance == 0:
-                self.publisher['effort'].publish(Float64MultiArray(data=torque_R))
-            # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+        #     elif stance == 0:
+        #         self.publisher['effort'].publish(Float64MultiArray(data=torque_R))
+        #     # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
         
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)
