@@ -2323,10 +2323,10 @@ class UpperLevelController(Node):
             stance = 0
             
       
-        # self.ref_cmd(state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
-        self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-        self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-        self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
+        self.ref_cmd(state,px_in_lf,px_in_rf,stance,com_in_lf,com_in_rf)
+        # self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
+        # self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
+        # self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
 
         JLL = self.left_leg_jacobian()
@@ -2346,7 +2346,7 @@ class UpperLevelController(Node):
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,state)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
 
         elif state == 30:
             # self.to_matlab()

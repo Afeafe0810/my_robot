@@ -47,23 +47,24 @@ def endVel_to_jv(Le_2,Re_2,jv_f,stance_type,state, JLL, JRR):
     state = copy.deepcopy(state)
     stance = copy.deepcopy(stance_type)
     
-    cf, sf = ('lf','rf') if stance == 0 else \
-             ('rf','lf') # if stance ==1, 2
+    cf, sf = ('lf','rf') if stance == 1 else \
+             ('rf','lf') # if stance == 0, 2
     
     endVel = {'lf': Le_2, 'rf': Re_2}
-    jv = {'lf' : jv_f[:6], 'rf':jv_f[6:]}
+    jv = {'lf': jv_f[:6], 'rf': jv_f[6:]}
     jv_ankle = {'lf': jv['lf'][-2:], 'rf': jv['rf'][-2:]}
     J = {
         'lf': JLL,
         'rf': JRR
     }
-    if state == 0:
+    
+    if state == 0 or state == 2 :
         cmd_jv = {
             'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
             'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
         }
         
-    if state == 1:#真雙支撐
+    elif state == 1: #or state == 2 :#真雙支撐
         #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
         #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
         ctrlVel = {
@@ -90,3 +91,45 @@ def endVel_to_jv(Le_2,Re_2,jv_f,stance_type,state, JLL, JRR):
         }
     
     return cmd_jv['lf'], cmd_jv['rf']
+
+def innerloop():
+    pass
+
+def balance(joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
+    #balance the robot to initial state by p_control
+    jp = copy.deepcopy(joint_position)
+    ref_jp = np.zeros((12,1))
+    
+    
+    kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
+    
+    l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+    r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+    gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
+    
+    torque = kp * (ref_jp-jp) + gravity
+    
+    return torque
+
+def swing_leg(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
+    print("swing_mode")
+    self.tt += 0.0157
+    jv = copy.deepcopy(joint_velocity)
+    vl_cmd = copy.deepcopy(l_leg_vcmd)
+    vr_cmd = copy.deepcopy(r_leg_vcmd)
+    cmd_v = np.vstack(( vl_cmd, vr_cmd ))
+    l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
+    r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
+    gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
+    kp = np.vstack(( kl,kr ))
+
+
+    torque = np.zeros((12,1))
+    torque = kp * cmd_v + gravity
+    
+    vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
+    self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
+    jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
+    self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
+
+    return torque

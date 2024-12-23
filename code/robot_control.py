@@ -1483,69 +1483,7 @@ class UpperLevelController(Node):
         
         return l_leg_gravity,r_leg_gravity,kl,kr
 
-    def balance(self,joint_position,l_leg_gravity_compensate,r_leg_gravity_compensate):
-        #balance the robot to initial state by p_control
-        jp = copy.deepcopy(joint_position)
-        # p = np.array([[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0],[0.0],[0.0],[-0.37],[0.74],[-0.37],[0.0]])
-        p = np.zeros((12,1))
-        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
-        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
-
-        torque = np.zeros((12,1))
-        torque[0,0] = 2*(p[0,0]-jp[0,0]) + l_leg_gravity[0,0]
-        torque[1,0] = 2*(p[1,0]-jp[1,0]) + l_leg_gravity[1,0]
-        torque[2,0] = 4*(p[2,0]-jp[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = 6*(p[3,0]-jp[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = 6*(p[4,0]-jp[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = 4*(p[5,0]-jp[5,0]) + l_leg_gravity[5,0]
-
-        torque[6,0] = 2*(p[6,0]-jp[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = 2*(p[7,0]-jp[7,0]) + r_leg_gravity[1,0]
-        torque[8,0] = 4*(p[8,0]-jp[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = 6*(p[9,0]-jp[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = 6*(p[10,0]-jp[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = 4*(p[11,0]-jp[11,0]) + r_leg_gravity[5,0]
-
-        self.effort_publisher.publish(Float64MultiArray(data=torque))
-
-    def swing_leg(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
-        print("swing_mode")
-        self.tt += 0.0157
-        jv = copy.deepcopy(joint_velocity)
-        vl_cmd = copy.deepcopy(l_leg_vcmd)
-        vr_cmd = copy.deepcopy(r_leg_vcmd)
-        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
-        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
-
-        # print("com_lf:",com_in_lf)
-        # print("com_rf:",com_in_rf)
-        # #L_leg_velocity
-        # vl = np.reshape(copy.deepcopy(joint_velocity[:6,0]),(6,1))
-
-        torque = np.zeros((12,1))
-
-        torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
-        torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
-        torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-        torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-
-        torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
-        torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-        torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-
-        # self.effort_publisher.publish(Float64MultiArray(data=torque))
-        
-        vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
-        self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
-        jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
-
-        return torque
+    
    
     def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
         # print("ALIP_mode")
@@ -2057,21 +1995,21 @@ class UpperLevelController(Node):
         #================#
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
         #========膝上雙環控制========#
+        #--------膝上外環控制--------#
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
         Le_2,Re_2 = endErr_to_endVel(self)
         VL, VR = endVel_to_jv(Le_2,Re_2,jv_f,stance,state,JLL,JRR)
         
+        #--------膝上內環控制--------#
+        
         #========腳踝ALIP、PD控制========#
-        
-        
-        
-        #control
-        if state == 0:   
-            self.balance(joint_position,l_leg_gravity,r_leg_gravity)
+        if state == 0:
+            torque = balance(joint_position,l_leg_gravity,r_leg_gravity)
+            self.effort_publisher.publish(Float64MultiArray(data=torque))
 
         elif state == 1 or state == 2:
-            torque_kine = self.swing_leg(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
