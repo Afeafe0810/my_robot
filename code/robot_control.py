@@ -678,61 +678,18 @@ class UpperLevelController(Node):
         return com_in_lf,com_in_rf,com_floating_in_pink
 
     def stance_change(self,state,px_in_lf,px_in_rf,stance,contact_t):
-        '''
-        state0利用雙腳左右距離來判斷是哪隻腳支撐/雙支撐(骨盆距某腳0.06內為支撐腳，其他狀態是雙支撐)
-        state1...剩下的都看不太懂
-        '''
         if state == 0:
-            #用骨盆相對左右腳掌位置來切換   
-            if abs(px_in_lf[1,0])<=0.06:
-                stance = 1 #左單支撐
-            elif abs(px_in_rf[1,0])<=0.06:
-                stance = 1 #右單支撐
-            else:
-                stance = 2 #雙支撐
+            stance = 1
+            
+        elif state == 1:
+            stance = 1
 
-        if state == 1:
-            if self.DS_time <= self.DDT:## \\\\DS_time和DDT是什麼？？？
+        elif state == 2:
+            stance = 1
+            if self.DS_time <= self.DDT:
                 self.DS_time += self.timer_period
-                stance = 2
                 print("DS",self.DS_time)
-            else:
-                self.DS_time = 10.1
-                stance = 1
-                self.RSS_time = 0.01
 
-        if state == 2:
-            if stance == 2:
-                if self.DS_time <= self.DDT:
-                    stance = 2
-                    self.DS_time += self.timer_period
-                else:
-                    self.DS_time = 0.0
-                    if abs(px_in_lf[1,0])<=0.08:
-                        stance = 1 #左單支撐
-                        self.LSS_time = 0.01
-                    elif abs(px_in_rf[1,0])<=0.08:
-                        stance = 0 #右單支撐
-                        self.RSS_time = 0.01
-            if stance == 0:
-                if self.RSS_time <= self.RDT:
-                    stance = 0
-                    self.RSS_time += self.timer_period
-                else:
-                    stance = 2 #雙支撐
-                    self.DS_time = 0.01
-                    self.RSS_time = 0
-                    self.RSS_count = 1
-            if stance == 1:
-                if self.LSS_time <= self.LDT:
-                    stance = 1
-                    self.LSS_time += self.timer_period
-                else:
-                    stance = 2 #雙支撐
-                    self.DS_time = 0.01
-                    self.LSS_time = 0
-                    self.RSS_count = 0
-        
         if state == 30:
 
             #踩到地面才切換支撐腳
@@ -1338,8 +1295,7 @@ class UpperLevelController(Node):
             # #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
             # # else:
             # #     Leg_gravity = RSS_gravity
-
-        
+     
         elif stance == 1:
             if r_contact == 1:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
@@ -1372,6 +1328,10 @@ class UpperLevelController(Node):
 
 
         if state == 1:
+            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
+            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
+        
+        if state == 2:
             kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
 
@@ -1482,87 +1442,6 @@ class UpperLevelController(Node):
         self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
         
         return l_leg_gravity,r_leg_gravity,kl,kr
-
-    
-   
-    def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
-        # print("ALIP_mode")
-        self.tt += 0.0157
-        jv = copy.deepcopy(joint_velocity)
-        vl_cmd = copy.deepcopy(l_leg_vcmd)
-        vr_cmd = copy.deepcopy(r_leg_vcmd)
-        l_leg_gravity = copy.deepcopy(l_leg_gravity_compensate)
-        r_leg_gravity = copy.deepcopy(r_leg_gravity_compensate)
-
-        L_matrix = R.from_matrix(self.O_wfL)
-        L_euler = L_matrix.as_euler('zyx', degrees=False)
-        L_yaw = L_euler[0]
-        L_pitch = L_euler[1]
-        L_roll = L_euler[2]
-
-        R_matrix = R.from_matrix(self.O_wfR)
-        R_euler = R_matrix.as_euler('zyx', degrees=False)
-        R_yaw = R_euler[0]
-        R_pitch = R_euler[1]
-        R_roll = R_euler[2]
-
-        # print(L_pitch)
-
-        torque = np.zeros((12,1))
-
-        torque[0,0] = kl[0,0]*(vl_cmd[0,0]-jv[0,0]) + l_leg_gravity[0,0]
-        torque[1,0] = kl[1,0]*(vl_cmd[1,0]-jv[1,0]) + l_leg_gravity[1,0]
-        torque[2,0] = kl[2,0]*(vl_cmd[2,0]-jv[2,0]) + l_leg_gravity[2,0]
-        torque[3,0] = kl[3,0]*(vl_cmd[3,0]-jv[3,0]) + l_leg_gravity[3,0]
-
-        #運動學
-        # torque[4,0] = kl[4,0]*(vl_cmd[4,0]-jv[4,0]) + l_leg_gravity[4,0]
-        # torque[5,0] = kl[5,0]*(vl_cmd[5,0]-jv[5,0]) + l_leg_gravity[5,0]
-        
-        #PD
-        if L_pitch <0:
-            torque[4,0] = 0.1*(0-L_pitch) + 0.2
-        elif L_pitch >=0:
-            torque[4,0] = 0.1*(0-L_pitch) - 0.2
-        if L_roll <0:
-            torque[5,0] = 0.1*(0-L_roll) + 0.2
-        elif L_roll >=0:
-            torque[5,0] = 0.1*(0-L_roll) - 0.2
-        
-        # # 直接不給
-        # torque[4,0] = 0
-        # torque[5,0] = 0
-
-
-        torque[6,0] = kr[0,0]*(vr_cmd[0,0]-jv[6,0]) + r_leg_gravity[0,0]
-        torque[7,0] = kr[1,0]*(vr_cmd[1,0]-jv[7,0])+ r_leg_gravity[1,0]
-        torque[8,0] = kr[2,0]*(vr_cmd[2,0]-jv[8,0]) + r_leg_gravity[2,0]
-        torque[9,0] = kr[3,0]*(vr_cmd[3,0]-jv[9,0]) + r_leg_gravity[3,0]
-
-        #運動學
-        # torque[10,0] = kr[4,0]*(vr_cmd[4,0]-jv[10,0]) + r_leg_gravity[4,0]
-        # torque[11,0] = kr[5,0]*(vr_cmd[5,0]-jv[11,0]) + r_leg_gravity[5,0]
-
-        #PD
-        if R_pitch <0:
-            torque[10,0] = 0.1*(0-R_pitch)
-        elif R_pitch >=0:
-            torque[10,0] = 0.1*(0-R_pitch)
-        if R_roll <0:
-            torque[11,0] = 0.1*(0-R_roll)
-        elif R_roll >=0:
-            torque[11,0] = 0.1*(0-R_roll)
-
-        # # 直接不給
-        # torque[10,0] = 0
-        # torque[11,0] = 0
-       
-        vcmd_data = np.array([[vl_cmd[0,0]],[vl_cmd[1,0]],[vl_cmd[2,0]],[vl_cmd[3,0]],[vl_cmd[4,0]],[vl_cmd[5,0]]])
-        self.vcmd_publisher.publish(Float64MultiArray(data=vcmd_data))
-        jv_collect = np.array([[jv[0,0]],[jv[1,0]],[jv[2,0]],[jv[3,0]],[jv[4,0]],[jv[5,0]]])
-        self.velocity_publisher.publish(Float64MultiArray(data=jv_collect))#檢查收到的速度(超髒)
-
-        return torque
     
     def alip_test(self,joint_position,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr,px_in_lf):
         print("alip_test")
@@ -1602,298 +1481,6 @@ class UpperLevelController(Node):
 
         return torque
 
-    def alip_L(self,stance_type,px_in_lf,torque_ALIP,com_in_lf,state):
-        # print("ALIP_L")
-        stance = copy.deepcopy(stance_type) 
-        #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
-        torque = copy.deepcopy(torque_ALIP) 
-        com_in_wf = copy.deepcopy(self.P_COM_wf)
-        lx_in_wf = copy.deepcopy(self.P_L_wf)
-
-        #質心相對L frame的位置
-        PX_l = com_in_wf - lx_in_wf
-        PX_l[0,0] = PX_l[0,0] #xc
-        PX_l[1,0] = PX_l[1,0] #yc
-
-        #計算質心速度(v從世界座標下求出)
-        self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
-        self.CX_past_L = com_in_wf[0,0]
-        self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
-        self.CY_past_L = com_in_wf[1,0]
-
-        #velocity filter
-        self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
-        self.Vx_past_L = self.Vx_L
-        self.CX_dot_past_L =  self.CX_dot_L
-
-        self.Vy_L = 0.7408*self.Vy_past_L + 0.2592*self.CY_dot_past_L  #濾過後的速度(5Hz)
-        self.Vy_past_L = self.Vy_L
-        self.CY_dot_past_L =  self.CY_dot_L
-
-        #量測值
-        Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.45
-        Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.Vy_L*0.45 #(記得加負號)
-        self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
-        self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
-       
-        #參考值(直接拿從online_planning來的)
-        # ref_x_L = copy.deepcopy(self.ref_x_L)
-        # ref_y_L = copy.deepcopy(self.ref_y_L)
-        
-        ref_x_L = np.vstack(( 0.0, 0.0 ))
-        ref_y_L = np.vstack((-0.1, 0.0))
-        
-        #xc & ly model(m=9 H=0.45 Ts=0.01)
-        Ax = np.array([[1,0.00247],[0.8832,1]])
-        Bx = np.array([[0],[0.01]])
-        Cx = np.array([[1,0],[0,1]])  
-        #--LQR
-        # Kx = np.array([[290.3274,15.0198]])
-        Kx = np.array([[150,15.0198]])
-        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]])
-        # Kx = np.array([[184.7274,9.9032]])
-        # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
-        #--compensator
-        self.ob_x_L = Ax@self.ob_x_past_L + self.ap_past_L*Bx + Lx@(self.mea_x_past_L - Cx@self.ob_x_past_L)
-
-        #由於程式邏輯 使得左腳在擺動過程也會估測 然而並不會拿來使用
-        #為了確保支撐腳切換過程 角動量估測連續性
-        if self.stance_past == 0 and self.stance == 1:
-            self.mea_x_L[1,0] = copy.deepcopy(self.mea_x_past_R[1,0])
-            self.ob_x_L[1,0] = copy.deepcopy(self.ob_x_past_R[1,0])
-
-        #----calculate toruqe
-        # self.ap_L = -Kx@(self.ob_x_L)  #(地面給機器人 所以使用時要加負號)
-        # self.ap_L = -torque[4,0] #torque[4,0]為左腳pitch對地,所以要加負號才會變成地對機器人
-        
-        # self.ap_L = -Kx@(self.ob_x_L - ref_x_L)*0.5
-        self.ap_L = -Kx@(self.mea_x_L - ref_x_L)
-
-        # if self.ap_L >= 3:
-        #     self.ap_L = 3
-        # elif self.ap_L <= -3:
-        #     self.ap_L =-3
-
-        #切換瞬間 扭矩切成0 避免腳沒踩穩
-        if self.stance_past == 0 and self.stance == 1:
-            self.ap_L = 0
-
-        #--torque assign
-        torque[4,0] = -self.ap_L
-        #----update
-        self.mea_x_past_L = self.mea_x_L
-        self.ob_x_past_L = self.ob_x_L
-        self.ap_past_L = self.ap_L
-
-        #yc & lx model
-        Ay = np.array([[1,-0.00247],[-0.8832,1]])
-        By = np.array([[0],[0.01]])
-        Cy = np.array([[1,0],[0,1]])  
-        #--LQR
-        # Ky = np.array([[-177.0596,9.6014]])
-        Ky = np.array([[-150,15]])
-        
-        Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
-        #--compensator
-        self.ob_y_L = Ay@self.ob_y_past_L + self.ar_past_L*By + Ly@(self.mea_y_past_L - Cy@self.ob_y_past_L)
-
-        #由於程式邏輯 使得左腳在擺動過程也會估測 然而並不會拿來使用，因此踩踏瞬間角動量來自上一時刻
-        #為了確保支撐腳切換過程 角動量估測連續性
-        if self.stance_past == 0 and self.stance == 1:
-            self.mea_y_L[1,0] = copy.deepcopy(self.mea_y_past_R[1,0])
-            self.ob_y_L[1,0] = copy.deepcopy(self.ob_y_past_R[1,0])
-
-        #----calculate toruqe
-        # self.ar_L = -Ky@(self.ob_y_L)
-        # self.ar_L = -torque[5,0]#torque[5,0]為左腳roll對地,所以要加負號才會變成地對機器人
-        
-        # self.ar_L = -Ky@(self.ob_y_L - ref_y_L)*0.15
-        self.ar_L = -Ky@(self.mea_y_L - ref_y_L)
-
-        # if self.ar_L >= 3:
-        #     self.ar_L =3
-        # elif self.ar_L <= -3:
-        #     self.ar_L =-3
-
-        #切換瞬間 扭矩切成0 避免腳沒踩穩
-        if self.stance_past == 0 and self.stance == 1:
-            self.ar_L = 0
-
-        #--torque assign
-        torque[5,0] = -self.ar_L
-        # torque[5,0] = 0
-        #----update
-        self.mea_y_past_L = self.mea_y_L
-        self.ob_y_past_L = self.ob_y_L
-        self.ar_past_L = self.ar_L
-
-        # self.effort_publisher.publish(Float64MultiArray(data=torque))
-        tl_data= np.array([[torque[4,0]],[torque[5,0]]])
-        self.torque_L_publisher.publish(Float64MultiArray(data=tl_data))
-
-
-        if stance == 1:
-            alip_x_data = np.array([[ref_x_L[0,0]],[ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-            alip_y_data = np.array([[ref_y_L[0,0]],[ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-            # alip_x_data = np.array([[self.ref_x_L[0,0]],[self.ref_x_L[1,0]],[self.mea_x_L[0,0]],[self.mea_x_L[1,0]]])
-            # alip_y_data = np.array([[self.ref_y_L[0,0]],[self.ref_y_L[1,0]],[self.mea_y_L[0,0]],[self.mea_y_L[1,0]]])
-            self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
-            self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
-            
-            # if state == 30:
-            #     collect_data = [str(ref_x_L[0,0]),str(ref_x_L[1,0]),str(self.ob_x_L[0,0]),str(self.ob_x_L[1,0]),
-            #                     str(ref_y_L[0,0]),str(ref_y_L[1,0]),str(self.ob_y_L[0,0]),str(self.ob_y_L[1,0])]
-            #     csv_file_name = '/home/ldsc/collect/alip_data.csv'
-            #     with open(csv_file_name, 'a', newline='') as csvfile:
-            #         # Create a CSV writer object
-            #         csv_writer = csv.writer(csvfile)
-            #         # Write the data
-            #         csv_writer.writerow(collect_data)
-
-        return torque
-
-    def alip_R(self,stance_type,px_in_rf,torque_ALIP,com_in_rf,state):
-        # print("ALIP_R")
-
-        torque = copy.deepcopy(torque_ALIP) 
-        stance = copy.deepcopy(stance_type) 
-        #獲取量測值(相對於右腳腳底)
-        # PX_r = copy.deepcopy(com_in_rf)
-        com_in_wf = copy.deepcopy(self.P_COM_wf)
-        rx_in_wf = copy.deepcopy(self.P_R_wf)
-        PX_r = com_in_wf - rx_in_wf
-       
-        #計算質心速度
-        self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
-        self.CX_past_R = com_in_wf[0,0]
-        self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
-        self.CY_past_R = com_in_wf[1,0]
-
-        #velocity filter
-        self.Vx_R = 0.7408*self.Vx_past_R + 0.2592*self.CX_dot_past_R  #濾過後的速度(5Hz)
-        self.Vx_past_R = self.Vx_R
-        self.CX_dot_past_R =  self.CX_dot_R
-
-        self.Vy_R = 0.7408*self.Vy_past_R + 0.2592*self.CY_dot_past_R  #濾過後的速度(5Hz)
-        self.Vy_past_R = self.Vy_R
-        self.CY_dot_past_R =  self.CY_dot_R
-
-        #量測值
-        Xc_mea = PX_r[0,0]
-        Ly_mea = 9*self.Vx_R*0.45
-        Yc_mea = PX_r[1,0]
-        Lx_mea = -9*self.Vy_R*0.45 #(記得加負號)
-        self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
-        self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
-
-        #參考值(直接拿從online_planning來的)
-        ref_x_R = 0
-        ref_y_R = 0.1
-        # self.PX_ref = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-        # self.LX_ref = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-        # self.RX_ref = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
-
-        #xc & ly model(m=9 H=0.45 Ts=0.01)
-        Ax = np.array([[1,0.00247],[0.8832,1]])
-        Bx = np.array([[0],[0.01]])
-        Cx = np.array([[1,0],[0,1]])  
-        #--LQR
-        Kx = np.array([[290.3274,15.0198]])
-        Lx = np.array([[0.1390,0.0025],[0.8832,0.2803]]) 
-        # Kx = np.array([[184.7274,9.9032]])
-        # Lx = np.array([[0.1427,-0.0131],[0.8989,0.1427]]) 
-       
-        #--compensator
-        self.ob_x_R = Ax@self.ob_x_past_R + self.ap_past_R*Bx + Lx@(self.mea_x_past_R - Cx@self.ob_x_past_R)
-
-        #由於程式邏輯 使得右腳在擺動過程也會估測 然而並不會拿來使用
-        #為了確保支撐腳切換過程 角動量估測連續性
-        if self.stance_past == 1 and self.stance == 0:
-            self.mea_x_R[1,0] = copy.deepcopy(self.mea_x_past_L[1,0])
-            self.ob_x_R[1,0] = copy.deepcopy(self.ob_x_past_L[1,0])
-        
-        #----calculate toruqe
-        # self.ap_R = -Kx@(self.ob_x_R)  #(地面給機器人 所以使用時要加負號)
-        # self.ap_R = -torque[10,0] #torque[10,0]為右腳pitch對地,所以要加負號才會變成地對機器人
-        self.ap_R = -Kx@(self.ob_x_R - ref_x_R)*0.5
-
-        # if self.ap_R >= 3:
-        #     self.ap_R =3
-        # elif self.ap_R <= -3:
-        #     self.ap_R =-3
-
-        #切換瞬間 扭矩切成0 避免腳沒踩穩
-        if self.stance_past == 1 and self.stance == 0:
-            self.ap_R = 0
-       
-        #--torque assign
-        torque[10,0] = -self.ap_R
-        #----update
-        self.mea_x_past_R = self.mea_x_R
-        self.ob_x_past_R = self.ob_x_R
-        self.ap_past_R = self.ap_R
-
-        #yc & lx model
-        Ay = np.array([[1,-0.00247],[-0.8832,1]])
-        By = np.array([[0],[0.01]])
-        Cy = np.array([[1,0],[0,1]])  
-        #--LQR
-        # Ky = np.array([[-290.3274,15.0198]])
-        # Ly = np.array([[0.1390,-0.0025],[-0.8832,0.2803]])
-        Ky = np.array([[-177.0596,9.6014]])
-        Ly = np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
-        #--compensator
-        self.ob_y_R = Ay@self.ob_y_past_R + self.ar_past_R*By + Ly@(self.mea_y_past_R - Cy@self.ob_y_past_R)
-
-        #由於程式邏輯 使得右腳在擺動過程也會估測 然而並不會拿來使用
-        #為了確保支撐腳切換過程 角動量估測連續性
-        if self.stance_past == 1 and self.stance == 0:
-            self.mea_y_R[1,0] = copy.deepcopy(self.mea_y_past_L[1,0])
-            self.ob_y_R[1,0] = copy.deepcopy(self.ob_y_past_L[1,0])
-
-        #----calculate toruqe
-        # self.ar_R = -Ky@(self.ob_y_R)
-        # self.ar_R = -torque[11,0]#torque[11,0]為右腳roll對地,所以要加負號才會變成地對機器人
-        self.ar_R = -Ky@(self.ob_y_R - ref_y_R)*0.15
-
-        #切換瞬間 扭矩切成0 避免腳沒踩穩
-        if self.stance_past == 1 and self.stance == 0:
-            self.ar_R = 0
-
-        # if self.ar_R >= 3:
-        #     self.ar_R =3
-        # elif self.ar_R <= -3:
-        #     self.ar_R =-3
-
-        #--torque assign
-        torque[11,0] = -self.ar_R
-        #----update
-        self.mea_y_past_R = self.mea_y_R
-        self.ob_y_past_R = self.ob_y_R
-        self.ar_past_R = self.ar_R
-
-
-        # if stance == 0:
-        #     alip_x_data = np.array([[ref_x_R[0,0]],[ref_x_R[1,0]],[self.ob_x_R[0,0]],[self.ob_x_R[1,0]]])
-        #     alip_y_data = np.array([[ref_y_R[0,0]],[ref_y_R[1,0]],[self.ob_y_R[0,0]],[self.ob_y_R[1,0]]])
-        #     # alip_x_data = np.array([[self.ref_x_R[0,0]],[self.ref_x_R[1,0]],[self.mea_x_R[0,0]],[self.mea_x_R[1,0]]])
-        #     # alip_y_data = np.array([[self.ref_y_R[0,0]],[self.ref_y_R[1,0]],[self.mea_y_R[0,0]],[self.mea_y_R[1,0]]])
-        #     self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
-        #     self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
-        #     # if state == 30:
-        #     #     collect_data = [str(ref_x_R[0,0]),str(ref_x_R[1,0]),str(self.ob_x_R[0,0]),str(self.ob_x_R[1,0]),
-        #     #                     str(ref_y_R[0,0]),str(ref_y_R[1,0]),str(self.ob_y_R[0,0]),str(self.ob_y_R[1,0])]
-        #     #     csv_file_name = '/home/ldsc/collect/alip_data.csv'
-        #     #     with open(csv_file_name, 'a', newline='') as csvfile:
-        #     #         # Create a CSV writer object
-        #     #         csv_writer = csv.writer(csvfile)
-        #     #         # Write the data
-        #     #         csv_writer.writerow(collect_data)
-    
-        return torque
-    
     def foot_data(self,px_in_lf,px_in_rf,L,torque_L,com_in_lf):
         l_foot_in_wf = np.array([[0.0],[0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
         r_foot_in_wf = np.array([[0.007],[-0.1],[0],[0],[0],[0]]) #平踏於地面時的位置
@@ -1986,8 +1573,6 @@ class UpperLevelController(Node):
 
         #========怎麼切支撐狀態要改========!!!!!#
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.contact_t)
-        if state == 30:
-            stance = 0
         
         #========軌跡規劃========#
         self.PX_ref, self.LX_ref, self.RX_ref = trajRef_planning(state, self.DS_time, self.DDT)
@@ -2008,22 +1593,33 @@ class UpperLevelController(Node):
             torque = balance(joint_position,l_leg_gravity,r_leg_gravity)
             self.effort_publisher.publish(Float64MultiArray(data=torque))
 
-        elif state == 1 or state == 2:
+        elif state == 1:
             torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
-            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,state)
-            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
+            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
+            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            
+        elif state == 2:
+            torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
+            
+            #更新量測值
+            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
+            torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
+            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
         elif state == 30:
             # self.to_matlab()
-            torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,state)
-            torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
+            torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
+            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             # print(stance)
+            
             if stance == 1:
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 

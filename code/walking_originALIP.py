@@ -2346,7 +2346,7 @@ class UpperLevelController(Node):
             torque_ALIP = self.walking_by_ALIP(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             torque_L =  self.alip_L(stance,px_in_lf,torque_ALIP,com_in_lf,state)
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
+            self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
 
         elif state == 30:
             # self.to_matlab()
