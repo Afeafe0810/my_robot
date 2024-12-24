@@ -686,7 +686,7 @@ class UpperLevelController(Node):
 
         elif state == 2:
             stance = 1
-            if self.DS_time <= self.DDT:
+            if self.DS_time <= 10 * self.DDT:
                 self.DS_time += self.timer_period
                 print("DS",self.DS_time)
 
@@ -1595,7 +1595,6 @@ class UpperLevelController(Node):
 
         elif state == 1:
             torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
             torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
@@ -1605,13 +1604,14 @@ class UpperLevelController(Node):
             
         elif state == 2:
             torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
-            # self.effort_publisher.publish(Float64MultiArray(data=torque_kine))
             
             #更新量測值
             torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
             torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
             torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            print('rf',torque_L[10:12,0])
+            print('lf',torque_L[4:6,0])
 
         elif state == 30:
             # self.to_matlab()
