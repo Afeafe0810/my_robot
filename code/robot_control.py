@@ -1550,29 +1550,34 @@ class UpperLevelController(Node):
         #--------膝上內環控制--------#
         
         #========腳踝ALIP、PD控制========#
+        self.checkpub(VL,jv_f)
+        
+        cf, sf = ('lf','rf') if stance == 1 else \
+             ('rf','lf') # if stance == 0, 2
+             
         if state == 0:
             torque = balance(joint_position,l_leg_gravity,r_leg_gravity)
             self.effort_publisher.publish(Float64MultiArray(data=torque))
 
         elif state == 1:
-            torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
-            #更新量測值
-            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
-            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref,self.frame)
+            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
+            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
+            if stance == 1:
+                self.torque_L_publisher.publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+            self.effort_publisher.publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
             
         elif state == 2:
-            torque_kine = swing_leg(self, jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
-            #更新量測值
-            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
-            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref,self.frame)
+            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
+            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
+            if stance == 1:
+                self.torque_L_publisher.publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data=torque_L))
-            print('rf',torque_L[10:12,0])
-            print('lf',torque_L[4:6,0])
+            self.effort_publisher.publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
 
         elif state == 30:
             # self.to_matlab()
@@ -1591,7 +1596,9 @@ class UpperLevelController(Node):
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)
  
-
+    def checkpub(self,VL,jv_f):
+        self.vcmd_publisher.publish( Float64MultiArray(data = VL) )
+        self.velocity_publisher.publish( Float64MultiArray(data = jv_f[:6]) )#檢查收到的速度(超髒)
 
 def main(args=None):
     rclpy.init(args=args)
