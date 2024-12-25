@@ -1110,8 +1110,8 @@ class UpperLevelController(Node):
         }
 
         torq56 = {
-            'lf' : - np.vstack(( uy['lf'], ux['lf'] )),
-            'rf' : - np.vstack(( uy['rf'], ux['rf'] ))
+            'lf' : - np.vstack(( ux['lf'], uy['lf'] )),
+            'rf' : - np.vstack(( ux['rf'], uy['rf'] ))
         }
         
         for ft in ['lf', 'rf']:

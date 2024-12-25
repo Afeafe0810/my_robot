@@ -22,8 +22,7 @@ from pink.tasks import FrameTask, JointCouplingTask, PostureTask
 import meshcat_shapes
 import qpsolvers
 
-import numpy as np
-np.set_printoptions(precision=2)
+import numpy as np; np.set_printoptions(precision=2)
 
 from sys import argv
 from os.path import dirname, join, abspath
@@ -41,6 +40,7 @@ from linkattacher_msgs.srv import DetachLink
 #================ import other code =====================#
 # from utils_old.robot_control_init import ULC_init
 # from utils_old.robot_control_framesensor import ULC_frame
+from utils.rc_frame_kinermatic import RobotFrame
 from utils.robot_control_traj import *
 from utils.robot_control_knee_control import *
 #========================================================#
@@ -48,6 +48,7 @@ from utils.robot_control_knee_control import *
 class UpperLevelController(Node):
 
     def __init__(self):
+        #==============================================================node==============================================================#
         super().__init__('upper_level_controllers')
 
         self.position_publisher = self.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
@@ -103,6 +104,8 @@ class UpperLevelController(Node):
             10)
         self.joint_states_subscriber  # prevent unused variable warning
 
+        #==============================================================sub data==============================================================#
+        
         #joint_state(subscribe data)
         self.jp_sub = np.zeros(12)
         self.jv_sub = np.zeros(12)
@@ -124,11 +127,6 @@ class UpperLevelController(Node):
         self.jv_sub_p = np.zeros((12,1))
         self.jv_sub_pp = np.zeros((12,1))
 
-        #position PI
-        self.Le_dot_past = 0.0
-        self.Le_past = 0.0
-        self.Re_dot_past = 0.0
-        self.Re_past = 0.0
         
         #state by user
         self.pub_state = 0
@@ -145,6 +143,9 @@ class UpperLevelController(Node):
         self.state_subscriber  # prevent unused variable warning
 
 
+        #==============================================================robot interface==============================================================#
+        
+        
         self.robot = self.load_URDF("/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         
         # Initialize meschcat visualizer
@@ -155,25 +156,21 @@ class UpperLevelController(Node):
         self.viz.initViewer(open=True)
         self.viz.loadViewerModel()
 
-        #
-        self.call = 0
-
         # Set initial robot configuration
         print(self.robot.model)
         print(self.robot.q0)
         self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
         self.viz.display(self.init_configuration.q)
-
+        
         # Tasks initialization for IK
         self.tasks = self.tasks_init()
-
+        
+        
+        #==============================================================robot constant==============================================================#     
+        self.call = 0
         self.timer_period = 0.01 # seconds 跟joint state update rate&取樣次數有關
         # self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
 
-        self.tt = 0
-        self.P_Y_ref = 0.0
-
-        self.count = 0
         self.stance = 2
         self.stance_past = 2
         self.DS_time = 0.0
@@ -184,6 +181,7 @@ class UpperLevelController(Node):
         self.RDT = 1
         self.LDT = 1
 
+        #==============================================================robot frame==============================================================#     
         #data in wf_initial_data
         self.P_B_wf = np.zeros((3,1))
         self.P_PV_wf = np.array([[0.0],[0.0],[0.6]])
@@ -195,8 +193,6 @@ class UpperLevelController(Node):
         self.O_wfPV = np.zeros((3,3))
         self.O_wfL = np.zeros((3,3))
         self.O_wfR = np.zeros((3,3))
-
-        self.delay = 0
 
         self.state_past = 0
         #data_in_pf 
@@ -210,46 +206,7 @@ class UpperLevelController(Node):
         self.X0 = np.zeros((2,1))
         self.Y0 = np.zeros((2,1))
         self.Psw2com_0 = np.zeros((2,1))
-        #--velocity
-        self.CX_past_L = 0.0
-        self.CX_dot_L = 0.0
-        self.CY_past_L = 0.0
-        self.CY_dot_L = 0.0
-        self.CX_past_R = 0.0
-        self.CX_dot_R = 0.0
-        self.CY_past_R = 0.0
-        self.CY_dot_R = 0.0
-        #--velocity filter
-        self.Vx_L = 0.0
-        self.Vx_past_L = 0.0
-        self.CX_dot_past_L = 0.0
-        self.Vy_L = 0.0
-        self.Vy_past_L = 0.0
-        self.CY_dot_past_L = 0.0
-        self.Vx_R = 0.0
-        self.Vx_past_R = 0.0
-        self.CX_dot_past_R = 0.0
-        self.Vy_R = 0.0
-        self.Vy_past_R = 0.0
-        self.CY_dot_past_R = 0.0
-        #--measurement
-        self.mea_x_L = np.zeros((2,1))
-        self.mea_x_past_L = np.zeros((2,1))
-        self.mea_y_L = np.zeros((2,1))
-        self.mea_y_past_L = np.zeros((2,1))
-        self.mea_x_R = np.zeros((2,1))
-        self.mea_x_past_R = np.zeros((2,1))
-        self.mea_y_R = np.zeros((2,1))
-        self.mea_y_past_R = np.zeros((2,1))
-        #--compensator
-        self.ob_x_L = np.zeros((2,1))
-        self.ob_x_past_L = np.zeros((2,1))
-        self.ob_y_L = np.zeros((2,1))
-        self.ob_y_past_L = np.zeros((2,1))
-        self.ob_x_R = np.zeros((2,1))
-        self.ob_x_past_R = np.zeros((2,1))
-        self.ob_y_R = np.zeros((2,1))
-        self.ob_y_past_R = np.zeros((2,1))
+        
         #--torque
         self.ap_L = 0.0
         self.ap_past_L = 0.0
@@ -260,7 +217,7 @@ class UpperLevelController(Node):
         self.ar_R = 0.0
         self.ar_past_R = 0.0
 
-        #--ref    
+        #==============================================================ref==============================================================#     
         self.ref_x_L = np.zeros((2,1))
         self.ref_y_L = np.zeros((2,1))
         self.ref_x_R = np.zeros((2,1))
@@ -272,6 +229,10 @@ class UpperLevelController(Node):
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
+        
+        #==============================================================逐步修改==============================================================#
+        self.frame = RobotFrame() # 各部位的位置與姿態
+        
     
     def attach_links(self, model1_name, link1_name, model2_name, link2_name):
         req = AttachLink.Request()
@@ -1598,8 +1559,8 @@ class UpperLevelController(Node):
             
             #更新量測值
             torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
-            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
-            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref,self.frame)
+            # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.effort_publisher.publish(Float64MultiArray(data=torque_L))
             
         elif state == 2:
@@ -1607,8 +1568,8 @@ class UpperLevelController(Node):
             
             #更新量測值
             torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
-            torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
-            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            torque_L = alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref,self.frame)
+            # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.effort_publisher.publish(Float64MultiArray(data=torque_L))
             print('rf',torque_L[10:12,0])
             print('lf',torque_L[4:6,0])
@@ -1629,8 +1590,9 @@ class UpperLevelController(Node):
         
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)
-            
-                
+ 
+
+
 def main(args=None):
     rclpy.init(args=args)
 
