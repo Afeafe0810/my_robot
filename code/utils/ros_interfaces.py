@@ -40,7 +40,7 @@ class ROSInterfaces:
         self.subscriber = self.__createSubscribers(node)
         
         #=========建立機器人模型===========#
-        self.meshrobot = self.__loadMeshcatModel("bipedal_floating.pin.urdf")
+        self.meshrobot = self.__loadMeshcatModel("/bipedal_floating.pin.urdf")
         self.bipedal_floating_model, self.bipedal_floating_data = self.__loadSimpleModel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
         self.stance_l_model,         self.stance_l_data         = self.__loadSimpleModel("/stance_l.xacro") #從左腳掌往上建的左單腳
         self.stance_r_model,         self.stance_r_data         = self.__loadSimpleModel("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
