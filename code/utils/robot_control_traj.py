@@ -31,7 +31,7 @@ def __comMoveTolf(DS_time, DDT):
     # ref_pa_pel_in_wf = np.vstack(( 0, 0.06*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
     #                   np.vstack(( 0, 0.06,                     0.55, 0, 0, 0 ))
     
-    ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.2*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.2*DDT else \
+    ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
                       np.vstack(( 0, 0.09,                     0.55, 0, 0, 0 ))
                       
     return ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf
