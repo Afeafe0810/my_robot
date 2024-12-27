@@ -50,6 +50,7 @@ class UpperLevelController(Node):
         #==============================================================node==============================================================#
         super().__init__('upper_level_controllers')
         self.ros = ROSInterfaces(self, self.main_controller_callback)
+        self.frame = RobotFrame() # 各部位的位置與姿態
         #==============================================================robot interface==============================================================#
         #joint_velocity_cal
         self.joint_position_past = np.zeros((12,1))
@@ -150,11 +151,7 @@ class UpperLevelController(Node):
  
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
-        self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
-        
-        #==============================================================逐步修改==============================================================#
-        self.frame = RobotFrame() # 各部位的位置與姿態
-        
+        self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK') 
     
     def attach_links(self, model1_name, link1_name, model2_name, link2_name):
         req = AttachLink.Request()
@@ -269,29 +266,12 @@ class UpperLevelController(Node):
 
         return l_contact,r_contact
 
-    def contact_callback(self,msg):
-        if msg.header.frame_id == 'l_foot_1':
-            if len(msg.states)>=1:
-                self.l_contact = 1
-            else:
-                self.l_contact = 0
-        elif msg.header.frame_id == 'r_foot_1':
-            if len(msg.states)>=1:
-                self.r_contact = 1
-            else:
-                self.r_contact = 0
-        self.contact_collect()
 
     def state_collect(self):
         self.state_current = copy.deepcopy(self.pub_state)
 
         return self.state_current
     
-    def state_callback(self,msg):
-        
-        self.pub_state = msg.data[0]
-        self.state_collect()
-        
     def collect_joint_data(self):
         '''
         就只是收集而已
@@ -351,38 +331,6 @@ class UpperLevelController(Node):
         self.jv_sub_p = copy.deepcopy(jv_sub)
 
         return self.jv
-
-    def joint_states_callback(self, msg):
-        
-        # Original ndarray order
-        original_order = [
-            'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 'L_Ankle_Pitch', 
-            'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 'R_Knee_Pitch', 
-            'R_Hip_Pitch', 'R_Ankle_Pitch', 'L_Hip_Roll', 'R_Ankle_Roll'
-        ]
-
-        # Desired order
-        desired_order = [
-            'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 
-            'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll', 'R_Hip_Yaw', 
-            'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
-        ]
-
-        if len(msg.velocity) == 12:
-            velocity_order_dict = {joint: value for joint, value in zip(original_order, np.array(msg.velocity))}
-
-            self.jv_sub = np.array([velocity_order_dict[joint] for joint in desired_order])
-
-        if len(msg.position) == 12:
-            position_order_dict = {joint: value for joint, value in zip(original_order, np.array(msg.position))}
-            self.jp_sub = np.array([position_order_dict[joint] for joint in desired_order])
-
-        self.collect_joint_data()
-
-        self.call += 1
-        if self.call == 5:
-            self.main_controller_callback()
-            self.call = 0
 
     def xyz_rotation(self,axis,theta):
         cos = math.cos
@@ -609,19 +557,6 @@ class UpperLevelController(Node):
         # self.PX_publisher.publish(Float64MultiArray(data=self.P_PV_wf))
 
         return 
-
-    def base_in_wf(self,msg):
-        P_base_x = msg.pose.pose.position.x
-        P_base_y = msg.pose.pose.position.y
-        P_base_z = msg.pose.pose.position.z
-        self.P_B_wf = np.array([[P_base_x],[P_base_y],[P_base_z]])
-
-        O_base_x = msg.pose.pose.orientation.x
-        O_base_y = msg.pose.pose.orientation.y
-        O_base_z = msg.pose.pose.orientation.z
-        O_base_w = msg.pose.pose.orientation.w
-        base_quaternions = R.from_quat([O_base_x, O_base_y, O_base_z, O_base_w])
-        self.O_wfB = base_quaternions.as_matrix()  #注意
 
     def data_in_wf(self,com_in_pink):
         '''
