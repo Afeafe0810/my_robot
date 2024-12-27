@@ -1,33 +1,20 @@
-import rclpy
+import rclpy; from rclpy.node import Node
 from typing import Callable
-from rclpy.node import Node
+
 
 from std_msgs.msg import Float64MultiArray 
-
 from sensor_msgs.msg import JointState
 from gazebo_msgs.msg import ContactsState
-
 from nav_msgs.msg import Odometry
-
 from trajectory_msgs.msg import JointTrajectory
 
 import pinocchio as pin
-import qpsolvers
 
 import pink
-from pink import solve_ik
-from pink.tasks import FrameTask, JointCouplingTask, PostureTask
 import meshcat_shapes
-import qpsolvers
 
-import numpy as np
-np.set_printoptions(precision=2)
-
-from sys import argv
-from os.path import dirname, join, abspath
-import os
+import numpy as np; np.set_printoptions(precision=2)
 from copy import deepcopy
-import math
 from scipy.spatial.transform import Rotation as R
 
 #================ import other code =====================#
