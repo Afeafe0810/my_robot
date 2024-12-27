@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from trajectory_msgs.msg import JointTrajectory
 
 import pinocchio as pin
+from sys import argv
 
 import pink
 import meshcat_shapes
@@ -24,16 +25,29 @@ from utils.config import Config
 
 class ROSInterfaces:
     def __init__(self, node: Node, main_callback: Callable ):
+        
+        #=========初始化===========#
         self.__p_base_in_wf = self.__r_base_to_wf = self.__jp = None
         self.__state = 0
         self.__contact_l = self.__contact_r = True
         
-        self.__callback_time = 0
+        self.__callback_time = 0 #每5次會呼叫一次maincallback
+        self.__main_callback = main_callback #引入main_callback來持續呼叫
         
-        #====================#
-        self.main_callback = main_callback #引入main_callback來持續呼叫
+        #=========ROS的訂閱與發布===========#
+        
         self.publisher = self.__createPublishers(node)
         self.subscriber = self.__createSubscribers(node)
+        
+        #=========建立機器人模型===========#
+        self.meshrobot = self.__loadMeshcatModel("bipedal_floating.pin.urdf")
+        self.bipedal_floating_model, self.bipedal_floating_data = self.__loadSimpleModel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
+        self.stance_l_model,         self.stance_l_data         = self.__loadSimpleModel("/stance_l.xacro") #從左腳掌往上建的左單腳
+        self.stance_r_model,         self.stance_r_data         = self.__loadSimpleModel("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
+        self.bipedal_l_model,        self.bipedal_l_data        = self.__loadSimpleModel("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
+        self.bipedal_r_model,        self.bipedal_r_data        = self.__loadSimpleModel("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
+        
+        
     
     def getSubDate(self):
         return [
@@ -41,7 +55,7 @@ class ROSInterfaces:
                 self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_l, self.__contact_r, self.__jp
             ]
         ]
-    
+   
     @staticmethod
     def __createPublishers(node: Node):
         '''effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩->我們程式的目的就是為了pub他'''
@@ -102,6 +116,25 @@ class ROSInterfaces:
         self.__callback_time += 1
         if self.__callback_time == 5:
             self.__callback_time = 0
-            self.main_callback()
+            self.__main_callback()
             
+    @staticmethod
+    def __loadMeshcatModel(urdf_path):
+        robot = pin.RobotWrapper.BuildFromURDF(
+            filename = Config.PINOCCHIO_MODEL_DIR + urdf_path,
+            package_dirs = ["."],
+            root_joint=None,
+        )
+        print(f"URDF description successfully loaded in {robot}")
+        return robot
+    
+    @staticmethod
+    def __loadSimpleModel(urdf_path):
         
+        urdf_filename = Config.PINOCCHIO_MODEL_DIR + urdf_path if len(argv)<2 else argv[1]
+        model  = pin.buildModelFromUrdf(urdf_filename)
+        print('model name: ' + model.name)
+        model_data = model.createData()
+        
+        return model, model_data
+    

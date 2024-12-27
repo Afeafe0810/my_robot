@@ -38,6 +38,7 @@ from linkattacher_msgs.srv import AttachLink
 from linkattacher_msgs.srv import DetachLink
 
 #================ import other code =====================#
+from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
 from utils.rc_frame_kinermatic import RobotFrame
 from utils.robot_control_traj import *
@@ -51,6 +52,12 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
         self.ros = ROSInterfaces(self, self.main_controller_callback)
         self.frame = RobotFrame() # 各部位的位置與姿態
+        self.robot = self.ros.meshrobot
+        self.bipedal_floating_model, self.bipedal_floating_data = self.ros.bipedal_floating_model, self.ros.bipedal_floating_data
+        self.stance_l_model, self.stance_l_data = self.ros.stance_l_model, self.ros.stance_l_data
+        self.stance_r_model, self.stance_r_data = self.ros.stance_r_model, self.ros.stance_r_data
+        self.bipedal_l_model, self.bipedal_l_data = self.ros.bipedal_l_model, self.ros.bipedal_l_data
+        self.bipedal_r_model, self.bipedal_r_data = self.ros.bipedal_r_model, self.ros.bipedal_r_data
         #==============================================================robot interface==============================================================#
         #joint_velocity_cal
         self.joint_position_past = np.zeros((12,1))
@@ -70,7 +77,6 @@ class UpperLevelController(Node):
         self.jv_sub_pp = np.zeros((12,1))
         #==============================================================robot interface==============================================================#
         
-        self.robot = self.load_URDF("/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         
         # Initialize meschcat visualizer
         self.viz = pin.visualize.MeshcatVisualizer(
@@ -90,19 +96,9 @@ class UpperLevelController(Node):
         self.tasks = self.tasks_init()
         
         #==============================================================robot constant==============================================================#     
-        self.call = 0
-        self.timer_period = 0.01 # seconds 跟joint state update rate&取樣次數有關
-        # self.timer = self.create_timer(self.timer_period, self.main_controller_callback)
-
         self.stance = 2
         self.stance_past = 2
         self.DS_time = 0.0
-        self.RSS_time = 0.0
-        self.LSS_time = 0.0
-        self.RSS_count = 0
-        self.DDT = 2
-        self.RDT = 1
-        self.LDT = 1
 
         #==============================================================robot frame==============================================================#     
         #data in wf_initial_data
@@ -225,7 +221,7 @@ class UpperLevelController(Node):
         print('model name: ' + self.bipedal_r_model.name)
         # Create data required by the algorithms
         self.bipedal_r_data = self.bipedal_r_model.createData()
-
+        
         return robot
         
     def tasks_init(self):
@@ -302,7 +298,7 @@ class UpperLevelController(Node):
         用差分計算速度，並且加上飽和條件[-0.75, 0.75]、更新joint_position_past(感覺沒意義)
         '''
         joint_position_now = copy.deepcopy(joint_position)
-        joint_velocity_cal = (joint_position_now - self.joint_position_past)/self.timer_period
+        joint_velocity_cal = (joint_position_now - self.joint_position_past)/Config.TIMER_PERIOD
         self.joint_position_past = joint_position_now     
         
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
@@ -517,8 +513,8 @@ class UpperLevelController(Node):
 
         elif state == 2:
             stance = 1
-            if self.DS_time <= 10 * self.DDT:
-                self.DS_time += self.timer_period
+            if self.DS_time <= 10 * Config.DDT:
+                self.DS_time += Config.TIMER_PERIOD
                 print("DS",self.DS_time)
 
         if state == 30:
@@ -1393,7 +1389,7 @@ class UpperLevelController(Node):
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.contact_t)
         
         #========軌跡規劃========#
-        self.PX_ref, self.LX_ref, self.RX_ref = trajRef_planning(state, self.DS_time, self.DDT)
+        self.PX_ref, self.LX_ref, self.RX_ref = trajRef_planning(state, self.DS_time, Config.DDT)
 
         #================#
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)

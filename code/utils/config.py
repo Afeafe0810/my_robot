@@ -13,3 +13,6 @@ class Config:
         'L_Ankle_Y', 'L_Ankle_X', 'R_Hip_X', 'R_Hip_Z', 
         'R_Hip_Y', 'R_Knee_Y', 'R_Ankle_Y', 'R_Ankle_X'
     ]
+    
+    PINOCCHIO_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
+    DDT = 2
