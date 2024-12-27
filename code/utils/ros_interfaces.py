@@ -1,4 +1,5 @@
 import rclpy
+from typing import Callable
 from rclpy.node import Node
 
 from std_msgs.msg import Float64MultiArray 
@@ -35,7 +36,7 @@ from utils.config import Config
 
 
 class ROSInterfaces:
-    def __init__(self, node: Node, main_callback: function ):
+    def __init__(self, node: Node, main_callback: Callable ):
         self.__p_base_in_wf = self.__r_base_to_wf = self.__jp = None
         self.__state = 0
         self.__contact_l = self.__contact_r = True

@@ -51,7 +51,23 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
         self.ros = ROSInterfaces(self, self.main_controller_callback)
         #==============================================================robot interface==============================================================#
-        
+        #joint_velocity_cal
+        self.joint_position_past = np.zeros((12,1))
+
+        #joint_velocity_filter (jp = after filter)
+        self.jp = np.zeros((12,1))
+        self.jp_p = np.zeros((12,1))
+        self.jp_pp = np.zeros((12,1))
+        self.jp_sub_p = np.zeros((12,1))
+        self.jp_sub_pp = np.zeros((12,1))
+
+        #joint_velocity_filter (jv = after filter)
+        self.jv = np.zeros((12,1))
+        self.jv_p = np.zeros((12,1))
+        self.jv_pp = np.zeros((12,1))
+        self.jv_sub_p = np.zeros((12,1))
+        self.jv_sub_pp = np.zeros((12,1))
+        #==============================================================robot interface==============================================================#
         
         self.robot = self.load_URDF("/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.pin.urdf")
         
@@ -1205,8 +1221,8 @@ class UpperLevelController(Node):
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
 
-        self.l_gravity_publisher.publish(Float64MultiArray(data=l_leg_gravity))
-        self.r_gravity_publisher.publish(Float64MultiArray(data=r_leg_gravity))
+        self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
+        self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
         
         return l_leg_gravity,r_leg_gravity,kl,kr
     
@@ -1406,8 +1422,7 @@ class UpperLevelController(Node):
 
     def main_controller_callback(self):
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, joint_position = self.ros.getSubDate()
-        
-        joint_position,joint_velocity = self.collect_joint_data()
+        self.jp_sub = joint_position
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
