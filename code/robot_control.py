@@ -38,8 +38,7 @@ from linkattacher_msgs.srv import AttachLink
 from linkattacher_msgs.srv import DetachLink
 
 #================ import other code =====================#
-# from utils_old.robot_control_init import ULC_init
-# from utils_old.robot_control_framesensor import ULC_frame
+from utils.ros_interfaces import ROSInterfaces
 from utils.rc_frame_kinermatic import RobotFrame
 from utils.robot_control_traj import *
 from utils.robot_control_knee_control import *
@@ -50,99 +49,7 @@ class UpperLevelController(Node):
     def __init__(self):
         #==============================================================node==============================================================#
         super().__init__('upper_level_controllers')
-
-        self.position_publisher = self.create_publisher(Float64MultiArray , '/position_controller/commands', 10)
-        self.velocity_publisher = self.create_publisher(Float64MultiArray , '/velocity_controller/commands', 10)
-        self.effort_publisher = self.create_publisher(Float64MultiArray , '/effort_controllers/commands', 10)
-        self.vcmd_publisher = self.create_publisher(Float64MultiArray , '/velocity_command/commands', 10)
-        self.l_gravity_publisher = self.create_publisher(Float64MultiArray , '/l_gravity', 10)
-        self.r_gravity_publisher = self.create_publisher(Float64MultiArray , '/r_gravity', 10)
-        self.alip_x_publisher = self.create_publisher(Float64MultiArray , '/alip_x_data', 10)
-        self.alip_y_publisher = self.create_publisher(Float64MultiArray , '/alip_y_data', 10)
-        self.torque_L_publisher = self.create_publisher(Float64MultiArray , '/torqueL_data', 10)
-        self.torque_R_publisher = self.create_publisher(Float64MultiArray , '/torqueR_data', 10)
-
-        self.ref_publisher = self.create_publisher(Float64MultiArray , '/ref_data', 10)
-
-        self.joint_trajectory_controller = self.create_publisher(JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10)
-
-        self.PX_publisher = self.create_publisher(Float64MultiArray , '/px_data', 10)
-        self.COM_publisher = self.create_publisher(Float64MultiArray , '/com_data', 10)
-        self.LX_publisher = self.create_publisher(Float64MultiArray , '/lx_data', 10)
-        self.RX_publisher = self.create_publisher(Float64MultiArray , '/rx_data', 10)
-
-        #base_state_subscribe
-        self.base_subscriber = self.create_subscription(
-            Odometry,
-            '/odom',
-            self.base_in_wf,
-            10)
-        self.base_subscriber  # prevent unused variable warning
-
-
-        #l_foot_contact_state_subscribe
-        self.l_foot_contact_subscriber = self.create_subscription(
-            ContactsState,
-            '/l_foot/bumper_demo',
-            self.contact_callback,
-            10)
-        self.l_foot_contact_subscriber  # prevent unused variable warning
-       
-        #r_foot_contact_state_subscribe
-        self.r_foot_contact_subscriber = self.create_subscription(
-            ContactsState,
-            '/r_foot/bumper_demo',
-            self.contact_callback,
-            10)
-        self.r_foot_contact_subscriber  # prevent unused variable warning
-        
-        #joint_state_subscribe
-        self.joint_states_subscriber = self.create_subscription(
-            JointState,
-            '/joint_states',
-            self.joint_states_callback,
-            10)
-        self.joint_states_subscriber  # prevent unused variable warning
-
-        #==============================================================sub data==============================================================#
-        
-        #joint_state(subscribe data)
-        self.jp_sub = np.zeros(12)
-        self.jv_sub = np.zeros(12)
-
-        #joint_velocity_cal
-        self.joint_position_past = np.zeros((12,1))
-
-        #joint_velocity_filter (jp = after filter)
-        self.jp = np.zeros((12,1))
-        self.jp_p = np.zeros((12,1))
-        self.jp_pp = np.zeros((12,1))
-        self.jp_sub_p = np.zeros((12,1))
-        self.jp_sub_pp = np.zeros((12,1))
-
-        #joint_velocity_filter (jv = after filter)
-        self.jv = np.zeros((12,1))
-        self.jv_p = np.zeros((12,1))
-        self.jv_pp = np.zeros((12,1))
-        self.jv_sub_p = np.zeros((12,1))
-        self.jv_sub_pp = np.zeros((12,1))
-
-        
-        #state by user
-        self.pub_state = 0
-        #contact by bumper
-        self.l_contact = 1
-        self.r_contact = 1
-
-        self.state_subscriber = self.create_subscription(
-            Float64MultiArray,
-            'state_topic',
-            self.state_callback,
-            10
-        )
-        self.state_subscriber  # prevent unused variable warning
-
-
+        self.ros = ROSInterfaces(self, self.main_controller_callback)
         #==============================================================robot interface==============================================================#
         
         
@@ -164,7 +71,6 @@ class UpperLevelController(Node):
         
         # Tasks initialization for IK
         self.tasks = self.tasks_init()
-        
         
         #==============================================================robot constant==============================================================#     
         self.call = 0
@@ -1499,6 +1405,7 @@ class UpperLevelController(Node):
         self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
     def main_controller_callback(self):
+        self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, joint_position = self.ros.getSubDate()
         
         joint_position,joint_velocity = self.collect_joint_data()
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
@@ -1557,7 +1464,7 @@ class UpperLevelController(Node):
              
         if state == 0:
             torque = balance(joint_position,l_leg_gravity,r_leg_gravity)
-            self.effort_publisher.publish(Float64MultiArray(data=torque))
+            self.ros.publisher['effort'].publish(Float64MultiArray(data=torque))
 
         elif state == 1:
             torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
@@ -1565,9 +1472,9 @@ class UpperLevelController(Node):
             torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
             torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
             if stance == 1:
-                self.torque_L_publisher.publish( Float64MultiArray(data = torque['lf'][4:6] ))
+                self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
+            self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
             
         elif state == 2:
             torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
@@ -1575,9 +1482,9 @@ class UpperLevelController(Node):
             torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
             torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
             if stance == 1:
-                self.torque_L_publisher.publish( Float64MultiArray(data = torque['lf'][4:6] ))
+                self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            self.effort_publisher.publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
+            self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
 
         elif state == 30:
             # self.to_matlab()
@@ -1587,18 +1494,19 @@ class UpperLevelController(Node):
             # print(stance)
             
             if stance == 1:
-                self.effort_publisher.publish(Float64MultiArray(data=torque_L))
+                self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
             elif stance == 0:
-                self.effort_publisher.publish(Float64MultiArray(data=torque_R))
-            # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
+                self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_R))
+            # self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_ALIP))
         
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)
  
     def checkpub(self,VL,jv_f):
-        self.vcmd_publisher.publish( Float64MultiArray(data = VL) )
-        self.velocity_publisher.publish( Float64MultiArray(data = jv_f[:6]) )#檢查收到的速度(超髒)
+        
+        self.ros.publisher["vcmd"].publish( Float64MultiArray(data = VL) )
+        self.ros.publisher["velocity"].publish( Float64MultiArray(data = jv_f[:6]) )#檢查收到的速度(超髒)
 
 def main(args=None):
     rclpy.init(args=args)
