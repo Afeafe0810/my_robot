@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as R
 
 #================ import library ========================#
 from utils.rc_frame_kinermatic import RobotFrame
+from utils.config import Config
 
 def outterloop():
     pass
@@ -132,7 +133,6 @@ def swingAnkle_PDcontrol(stance, r_lf_to_wf, r_rf_to_wf):
     torque_ankle_sf = 0.1 * ( ref_jp - ayx_sf_in_wf )
     
     return torque_ankle_sf
-    
 
 def alip_control(frame:RobotFrame, stance, stance_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
 
@@ -152,10 +152,9 @@ def alip_control(frame:RobotFrame, stance, stance_past, p_com_in_wf, p_lf_in_wf,
     ref_x_cfTOcom_in_wf, ref_y_cfTOcom_in_wf = ( ref_pa_com_in_wf - ref_pa_ft_in_wf[cf] ) [0:2,0]
 
     #計算質心速度(v從世界座標下求出)
-    vx_com_in_wf, vy_com_in_wf = frame.filter_v_com_in_wf.filt(
-        frame.diffter_p_com_in_wf.diff(p_com_in_wf) 
+    vx_com_in_wf, vy_com_in_wf = Config.FILTER["v_com_in_wf"].filt(
+        Config.DIFFTER["p_com_in_wf"].diff(p_com_in_wf) 
     ) [0:2,0]
-    
     
     Ly_com_in_wf =  9 * vx_com_in_wf * 0.45
     Lx_com_in_wf = -9 * vy_com_in_wf * 0.45

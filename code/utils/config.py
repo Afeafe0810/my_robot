@@ -1,3 +1,7 @@
+#================ import library ========================#
+from utils.signal_process import *
+#========================================================#
+
 class Config:
     TIMER_PERIOD = 0.01 #取樣頻率
     JNT_ORDER_SUB = (
@@ -14,5 +18,16 @@ class Config:
         'R_Hip_Y', 'R_Knee_Y', 'R_Ankle_Y', 'R_Ankle_X'
     ]
     
-    PINOCCHIO_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
+    ROBOT_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
     DDT = 2
+    
+    #====================微分器====================#
+    DIFFTER = {
+        "p_com_in_wf" : Diffter(),
+    }
+    
+    #====================濾波器====================#
+    FILTER = {
+        "v_com_in_wf" : Filter(),
+    }
+    

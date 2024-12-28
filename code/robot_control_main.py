@@ -191,7 +191,6 @@ class UpperLevelController(Node):
 
         return l_contact,r_contact
 
-
     def state_collect(self):
         self.state_current = copy.deepcopy(self.pub_state)
 
@@ -1281,22 +1280,23 @@ class UpperLevelController(Node):
         self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
     def main_controller_callback(self):
-        self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, joint_position = self.ros.getSubDate()
-        self.jp_sub = joint_position
-        joint_velocity_cal = self.joint_velocity_cal(joint_position)
+        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp = self.ros.getSubData()
+        
+        self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
+        joint_velocity_cal = self.joint_velocity_cal(jp)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
-        configuration = self.ros.update_VizAndMesh(joint_position)
+        config = self.ros.update_VizAndMesh(jp)
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        self.get_position_pf(configuration)
+        self.get_position_pf(config)
         px_in_lf,px_in_rf = self.get_posture()
-        com_in_lf,com_in_rf,com_in_pink = self.com_position(joint_position)
+        com_in_lf,com_in_rf,com_in_pink = self.com_position(jp)
         #算wf下的位置及姿態
         self.pelvis_in_wf()
         self.data_in_wf(com_in_pink)
         #這邊算相對的矩陣
-        self.rotation_matrix(joint_position)
+        self.rotation_matrix(jp)
         #這邊算wf下各軸姿態
         self.relative_axis()
 
@@ -1320,7 +1320,7 @@ class UpperLevelController(Node):
         self.PX_ref, self.LX_ref, self.RX_ref = trajRef_planning(state, self.DS_time, Config.DDT)
 
         #================#
-        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
+        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(jp,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
         #========膝上雙環控制========#
         #--------膝上外環控制--------#
         JLL = self.left_leg_jacobian()
@@ -1337,7 +1337,7 @@ class UpperLevelController(Node):
              ('rf','lf') # if stance == 0, 2
              
         if state == 0:
-            torque = balance(joint_position,l_leg_gravity,r_leg_gravity)
+            torque = balance(jp,l_leg_gravity,r_leg_gravity)
             self.ros.publisher['effort'].publish(Float64MultiArray(data=torque))
 
         elif state == 1:
