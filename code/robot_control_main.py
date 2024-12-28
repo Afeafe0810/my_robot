@@ -79,7 +79,7 @@ class UpperLevelController(Node):
         #==============================================================robot interface==============================================================#
      
         # Tasks initialization for IK
-        self.tasks = self.tasks_init()
+        # self.tasks = self.tasks_init()
         
         #==============================================================robot constant==============================================================#     
         self.stance = 2
