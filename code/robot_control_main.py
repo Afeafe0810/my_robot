@@ -230,7 +230,7 @@ class UpperLevelController(Node):
         self.joint_position_past = joint_position_now     
         
         joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
-
+        
         for i in range(len(joint_velocity_cal)):
             if joint_velocity_cal[i,0]>= 0.75:
                 joint_velocity_cal[i,0] = 0.75
@@ -1283,6 +1283,8 @@ class UpperLevelController(Node):
         p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp = self.ros.getSubData()
         
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
+        __jv = np.clip( Dsp.DIFFTER["jp"].diff(jp), -0.75, 0.75)
+        
         joint_velocity_cal = self.joint_velocity_cal(jp)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
