@@ -1284,9 +1284,10 @@ class UpperLevelController(Node):
         
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         __jv = np.clip( Dsp.DIFFTER["jp"].diff(jp), -0.75, 0.75)
-        
-        joint_velocity_cal = self.joint_velocity_cal(jp)
-        jv_f = self.joint_velocity_filter(joint_velocity_cal)
+        jv = Dsp.FILTER["jv"].filt(__jv)
+        jv_f = jv
+        # joint_velocity_cal = self.joint_velocity_cal(jp)
+        # jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
         config = self.ros.update_VizAndMesh(jp)
 
