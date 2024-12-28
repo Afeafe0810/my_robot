@@ -52,6 +52,7 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
         self.ros = ROSInterfaces(self, self.main_controller_callback)
         self.frame = RobotFrame() # 各部位的位置與姿態
+        
         self.robot = self.ros.meshrobot
         self.bipedal_floating_model, self.bipedal_floating_data = self.ros.bipedal_floating_model, self.ros.bipedal_floating_data
         self.stance_l_model, self.stance_l_data = self.ros.stance_l_model, self.ros.stance_l_data
@@ -76,22 +77,7 @@ class UpperLevelController(Node):
         self.jv_sub_p = np.zeros((12,1))
         self.jv_sub_pp = np.zeros((12,1))
         #==============================================================robot interface==============================================================#
-        
-        
-        # Initialize meschcat visualizer
-        self.viz = pin.visualize.MeshcatVisualizer(
-            self.robot.model, self.robot.collision_model, self.robot.visual_model
-        )
-        self.robot.setVisualizer(self.viz, init=False)
-        self.viz.initViewer(open=True)
-        self.viz.loadViewerModel()
-
-        # Set initial robot configuration
-        print(self.robot.model)
-        print(self.robot.q0)
-        self.init_configuration = pink.Configuration(self.robot.model, self.robot.data, self.robot.q0)
-        self.viz.display(self.init_configuration.q)
-        
+     
         # Tasks initialization for IK
         self.tasks = self.tasks_init()
         
@@ -166,64 +152,7 @@ class UpperLevelController(Node):
         req.link2_name = link2_name
 
         self.future = self.detach_link_client.call_async(req)
-
-    def load_URDF(self, urdf_path):
-        robot = pin.RobotWrapper.BuildFromURDF(
-                        filename=urdf_path,
-                        package_dirs=["."],
-                        # root_joint=pin.JointModelFreeFlyer(),
-                        root_joint=None,
-                        )
-        
-        print(f"URDF description successfully loaded in {robot}")
-
-        #從骨盆建下來的模擬模型
-        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
-        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_floating.xacro' if len(argv)<2 else argv[1]
-        # Load the urdf model
-        self.bipedal_floating_model  = pin.buildModelFromUrdf(urdf_filename)
-        print('model name: ' + self.bipedal_floating_model.name)
-        # Create data required by the algorithms
-        self.bipedal_floating_data = self.bipedal_floating_model.createData()
-
-        #左單支撐腳
-        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
-        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_l.xacro' if len(argv)<2 else argv[1]
-        # Load the urdf model
-        self.stance_l_model  = pin.buildModelFromUrdf(urdf_filename)
-        print('model name: ' + self.stance_l_model.name)
-        # Create data required by the algorithms
-        self.stance_l_data = self.stance_l_model.createData()
-
-        #右單支撐腳
-        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
-        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/stance_r_gravity.xacro' if len(argv)<2 else argv[1]
-        # Load the urdf model
-        self.stance_r_model  = pin.buildModelFromUrdf(urdf_filename)
-        print('model name: ' + self.stance_r_model.name)
-        # Create data required by the algorithms
-        self.stance_r_data = self.stance_r_model.createData()
-
-        #雙足模型_以左腳建起
-        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
-        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_l_gravity.xacro' if len(argv)<2 else argv[1]
-        # Load the urdf model
-        self.bipedal_l_model  = pin.buildModelFromUrdf(urdf_filename)
-        print('model name: ' + self.bipedal_l_model.name)
-        # Create data required by the algorithms
-        self.bipedal_l_data = self.bipedal_l_model.createData()
-
-        #雙足模型_以右腳建起
-        pinocchio_model_dir = "/home/ldsc/ros2_ws/src"
-        urdf_filename = pinocchio_model_dir + '/bipedal_floating_description/urdf/bipedal_r_gravity.xacro' if len(argv)<2 else argv[1]
-        # Load the urdf model
-        self.bipedal_r_model  = pin.buildModelFromUrdf(urdf_filename)
-        print('model name: ' + self.bipedal_r_model.name)
-        # Create data required by the algorithms
-        self.bipedal_r_data = self.bipedal_r_model.createData()
-        
-        return robot
-        
+      
     def tasks_init(self):
         # Tasks initialization for IK
         left_foot_task = FrameTask(
@@ -1357,8 +1286,7 @@ class UpperLevelController(Node):
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
         jv_f = self.joint_velocity_filter(joint_velocity_cal)
 
-        configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
-        self.viz.display(configuration.q)
+        configuration = self.ros.update_VizAndMesh(joint_position)
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
         self.get_position_pf(configuration)

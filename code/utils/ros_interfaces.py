@@ -40,22 +40,35 @@ class ROSInterfaces:
         self.subscriber = self.__createSubscribers(node)
         
         #=========建立機器人模型===========#
-        self.meshrobot = self.__loadMeshcatModel("/bipedal_floating.pin.urdf")
+        self.__meshrobot = self.__loadMeshcatModel("/bipedal_floating.pin.urdf")
         self.bipedal_floating_model, self.bipedal_floating_data = self.__loadSimpleModel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
         self.stance_l_model,         self.stance_l_data         = self.__loadSimpleModel("/stance_l.xacro") #從左腳掌往上建的左單腳
         self.stance_r_model,         self.stance_r_data         = self.__loadSimpleModel("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
         self.bipedal_l_model,        self.bipedal_l_data        = self.__loadSimpleModel("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
         self.bipedal_r_model,        self.bipedal_r_data        = self.__loadSimpleModel("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
         
+        #=========可視化msehcat===========#
+        self.__viz = self.__meshcatVisualize(self.__meshrobot)
+        self.update_VizAndMesh(self.__meshrobot.q0) #可視化模型的初始關節角度
+        # Set initial robot configuration
         
-    
+        
+        
+        # Tasks initialization for IK
+        self.tasks = self.tasks_init()
+       
     def getSubDate(self):
         return [
             deepcopy(data) for data in [
                 self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_l, self.__contact_r, self.__jp
             ]
         ]
-   
+    
+    def update_VizAndMesh(self, jp):
+        config = pink.Configuration(self.__meshrobot.model, self.__meshrobot.data, jp)
+        self.__viz.display(config.q)
+        return config
+ 
     @staticmethod
     def __createPublishers(node: Node):
         '''effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩->我們程式的目的就是為了pub他'''
@@ -126,6 +139,8 @@ class ROSInterfaces:
             root_joint=None,
         )
         print(f"URDF description successfully loaded in {robot}")
+        print(robot.model)
+        print(robot.q0)
         return robot
     
     @staticmethod
@@ -137,4 +152,12 @@ class ROSInterfaces:
         model_data = model.createData()
         
         return model, model_data
-    
+     
+    @staticmethod
+    def  __meshcatVisualize(meshrobot):
+        viz = pin.visualize.MeshcatVisualizer( meshrobot.model, meshrobot.collision_model, meshrobot.visual_model )
+        meshrobot.setVisualizer(viz, init=False)
+        viz.initViewer(open=True)
+        viz.loadViewerModel()
+
+        return viz
