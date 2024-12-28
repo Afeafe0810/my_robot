@@ -1,7 +1,7 @@
 #================ import library ========================#
 from utils.config import Config
 #========================================================#
-
+    
 class Filter:
     def __init__(self):
         self.__isStarted = True
@@ -36,3 +36,14 @@ class Diffter:
         y = ( u - self.__u_p ) / Config.TIMER_PERIOD
         self.__u_p = u
         return  y
+    
+class Dsp:
+    #====================微分器====================#
+    DIFFTER = {
+        "p_com_in_wf" : Diffter(),
+    }
+    
+    #====================濾波器====================#
+    FILTER = {
+        "v_com_in_wf" : Filter(),
+    }

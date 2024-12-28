@@ -1,5 +1,5 @@
 #================ import library ========================#
-from utils.signal_process import *
+
 #========================================================#
 
 class Config:
@@ -21,13 +21,6 @@ class Config:
     ROBOT_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
     DDT = 2
     
-    #====================微分器====================#
-    DIFFTER = {
-        "p_com_in_wf" : Diffter(),
-    }
     
-    #====================濾波器====================#
-    FILTER = {
-        "v_com_in_wf" : Filter(),
-    }
+    
     
