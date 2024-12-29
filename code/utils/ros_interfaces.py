@@ -15,6 +15,7 @@ from trajectory_msgs.msg import JointTrajectory
 
 #================ import other code =====================#
 from utils.config import Config
+from utils.signal_process import Dsp
 #========================================================#
 
 
@@ -22,7 +23,7 @@ class ROSInterfaces:
     """
     負責處理所有模擬相關的設置，包含
     1. ROS節點的訂閱與發佈: publisher、subscriber
-    2. 訂閱的data: 利用 getSubData 的method獲取
+    2. 訂閱的data: 利用 updateSubData 的method獲取
         \t- 包含base的位置與旋轉矩陣
         \t- 機器人控制模式state
         \t- 左右腳是否有接觸地面 (未必有踩穩)
@@ -60,11 +61,15 @@ class ROSInterfaces:
         self.update_VizAndMesh(self.__meshrobot.q0) #可視化模型的初始關節角度
         # Set initial robot configuration
        
-    def getSubData(self):
+    def updateSubData(self):
         '''回傳訂閱器的data'''
+        #==========微分得到速度(飽和)，並濾波==========#
+        __jv = np.clip( Dsp.DIFFTER["jp"].diff(self.__jp), -0.75, 0.75) #微分後設定飽和
+        jv = Dsp.FILTER["jv"].filt(__jv)
+        
         return [
             deepcopy(data) for data in [
-                self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_lf, self.__contact_rf, self.__jp
+                self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_lf, self.__contact_rf, self.__jp, jv
             ]
         ]
     

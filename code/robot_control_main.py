@@ -65,21 +65,7 @@ class UpperLevelController(Node):
 
         #joint_velocity_filter (jp = after filter)
         self.jp = np.zeros((12,1))
-        self.jp_p = np.zeros((12,1))
-        self.jp_pp = np.zeros((12,1))
-        self.jp_sub_p = np.zeros((12,1))
-        self.jp_sub_pp = np.zeros((12,1))
-
-        #joint_velocity_filter (jv = after filter)
         self.jv = np.zeros((12,1))
-        self.jv_p = np.zeros((12,1))
-        self.jv_pp = np.zeros((12,1))
-        self.jv_sub_p = np.zeros((12,1))
-        self.jv_sub_pp = np.zeros((12,1))
-        #==============================================================robot interface==============================================================#
-     
-        # Tasks initialization for IK
-        # self.tasks = self.tasks_init()
         
         #==============================================================robot constant==============================================================#     
         self.stance = 2
@@ -134,127 +120,6 @@ class UpperLevelController(Node):
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK') 
-    
-    def attach_links(self, model1_name, link1_name, model2_name, link2_name):
-        req = AttachLink.Request()
-        req.model1_name = model1_name
-        req.link1_name = link1_name
-        req.model2_name = model2_name
-        req.link2_name = link2_name
-
-        self.future = self.attach_link_client.call_async(req)
-
-    def detach_links(self, model1_name, link1_name, model2_name, link2_name):
-        req = DetachLink.Request()
-        req.model1_name = model1_name
-        req.link1_name = link1_name
-        req.model2_name = model2_name
-        req.link2_name = link2_name
-
-        self.future = self.detach_link_client.call_async(req)
-      
-    def tasks_init(self):
-        # Tasks initialization for IK
-        left_foot_task = FrameTask(
-            "l_foot",
-            position_cost=1.0,
-            orientation_cost=1.0,
-        )
-        pelvis_task = FrameTask(
-            "base_link",
-            position_cost=1.0,
-            orientation_cost=0.0,
-        )
-        right_foot_task = FrameTask(
-            "r_foot_1",
-            position_cost=1.0,
-            orientation_cost=1.0,
-        )
-        posture_task = PostureTask(
-            cost=1e-1,  # [cost] / [rad]
-        )
-        tasks = {
-            # 'left_foot_task': left_foot_task,
-            'pelvis_task': pelvis_task,
-            # 'right_foot_task': right_foot_task,
-            'posture_task': posture_task,
-        }
-        return tasks
-
-    def contact_collect(self):
-        '''
-            只複製並回傳(l_contact,r_contact)
-        '''
-        l_contact = copy.deepcopy(self.l_contact)
-        r_contact = copy.deepcopy(self.r_contact)
-        # print("L:",l_contact,"R:",r_contact)
-
-        return l_contact,r_contact
-
-    def state_collect(self):
-        self.state_current = copy.deepcopy(self.pub_state)
-
-        return self.state_current
-    
-    def collect_joint_data(self):
-        '''
-        就只是收集而已
-        '''
-        joint_position = copy.deepcopy(self.jp_sub)
-        joint_velocity = copy.deepcopy(self.jv_sub)
-
-        joint_position = np.reshape(joint_position,(12,1))
-        joint_velocity = np.reshape(joint_velocity,(12,1))
-
-        return joint_position,joint_velocity
-
-    def joint_position_filter(self,joint_position):
-        
-        jp_sub = copy.deepcopy(joint_position)
-
-        self.jp = 1.1580*self.jp_p - 0.4112*self.jp_pp + 0.1453*self.jp_sub_p + 0.1078*self.jp_sub_pp #10Hz
-
-        self.jp_pp = copy.deepcopy(self.jp_p)
-        self.jp_p = copy.deepcopy(self.jp)
-        self.jp_sub_pp = copy.deepcopy(self.jp_sub_p)
-        self.jp_sub_p = copy.deepcopy(jp_sub)
-
-        return self.jp
-
-    def joint_velocity_cal(self,joint_position):
-        '''
-        用差分計算速度，並且加上飽和條件[-0.75, 0.75]、更新joint_position_past(感覺沒意義)
-        '''
-        joint_position_now = copy.deepcopy(joint_position)
-        joint_velocity_cal = (joint_position_now - self.joint_position_past)/Config.TIMER_PERIOD
-        self.joint_position_past = joint_position_now     
-        
-        joint_velocity_cal = np.reshape(joint_velocity_cal,(12,1))
-        
-        for i in range(len(joint_velocity_cal)):
-            if joint_velocity_cal[i,0]>= 0.75:
-                joint_velocity_cal[i,0] = 0.75
-            elif joint_velocity_cal[i,0]<= -0.75:
-                joint_velocity_cal[i,0] = -0.75
-
-        return joint_velocity_cal
-
-    def joint_velocity_filter(self,joint_velocity):
-        '''
-        把差分得到的速度做5個點差分，但pp是什麼意思？？是怎麼濾的
-        '''
-        jv_sub = copy.deepcopy(joint_velocity)
-
-        # self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
-        # self.jv = 0.5186*self.jv_p - 0.1691*self.jv_pp + 0.4215*self.jv_sub_p + 0.229*self.jv_sub_pp #20Hz
-        self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
-
-        self.jv_pp = copy.deepcopy(self.jv_p)
-        self.jv_p = copy.deepcopy(self.jv)
-        self.jv_sub_pp = copy.deepcopy(self.jv_sub_p)
-        self.jv_sub_p = copy.deepcopy(jv_sub)
-
-        return self.jv
 
     def xyz_rotation(self,axis,theta):
         cos = math.cos
@@ -1280,16 +1145,21 @@ class UpperLevelController(Node):
         self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
 
     def main_controller_callback(self):
-        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp = self.ros.getSubData()
+        #==========拿取訂閱值==========#
+        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp, jv = self.ros.updateSubData()
+        
+        #==========更新可視化的機器人==========#
+        config = self.ros.update_VizAndMesh(jp)
+        
+        #==========更新frame==========#
+        
         
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
-        __jv = np.clip( Dsp.DIFFTER["jp"].diff(jp), -0.75, 0.75)
-        jv = Dsp.FILTER["jv"].filt(__jv)
-        jv_f = jv
-        # joint_velocity_cal = self.joint_velocity_cal(jp)
-        # jv_f = self.joint_velocity_filter(joint_velocity_cal)
+        l_contact,r_contact = self.l_contact, self.r_contact
+        
+        
 
-        config = self.ros.update_VizAndMesh(jp)
+        
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
         self.get_position_pf(config)
@@ -1303,9 +1173,7 @@ class UpperLevelController(Node):
         #這邊算wf下各軸姿態
         self.relative_axis()
 
-        state = self.state_collect()
-
-        l_contact,r_contact = self.contact_collect()
+        
 
         if self.P_L_wf[2,0] <= 0.01:##\\\\接觸的判斷是z方向在不在0.01以內
             l_contact == 1
@@ -1329,12 +1197,12 @@ class UpperLevelController(Node):
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
         Le_2,Re_2 = endErr_to_endVel(self)
-        VL, VR = endVel_to_jv(Le_2,Re_2,jv_f,stance,state,JLL,JRR)
+        VL, VR = endVel_to_jv(Le_2,Re_2,jv,stance,state,JLL,JRR)
         
         #--------膝上內環控制--------#
         
         #========腳踝ALIP、PD控制========#
-        self.checkpub(VL,jv_f)
+        self.checkpub(VL,jv)
         
         cf, sf = ('lf','rf') if stance == 1 else \
              ('rf','lf') # if stance == 0, 2
@@ -1344,7 +1212,7 @@ class UpperLevelController(Node):
             self.ros.publisher['effort'].publish(Float64MultiArray(data=torque))
 
         elif state == 1:
-            torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
             torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
             torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
@@ -1354,7 +1222,7 @@ class UpperLevelController(Node):
             self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
             
         elif state == 2:
-            torque = innerloopDynamics(jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
             torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
             torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
@@ -1365,7 +1233,7 @@ class UpperLevelController(Node):
 
         elif state == 30:
             # self.to_matlab()
-            torque_ALIP = walking_by_ALIP(self, jv_f, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
+            torque_ALIP = walking_by_ALIP(self, jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
             torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
             torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             # print(stance)
@@ -1380,10 +1248,10 @@ class UpperLevelController(Node):
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)
  
-    def checkpub(self,VL,jv_f):
+    def checkpub(self,VL,jv):
         
         self.ros.publisher["vcmd"].publish( Float64MultiArray(data = VL) )
-        self.ros.publisher["velocity"].publish( Float64MultiArray(data = jv_f[:6]) )#檢查收到的速度(超髒)
+        self.ros.publisher["velocity"].publish( Float64MultiArray(data = jv[:6]) )#檢查收到的速度(超髒)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -7,5 +7,8 @@ from utils.config import Config
 
 class RobotFrame:
     def __init__(self):
+        self.p_base_in_wf: np.ndarray = None
+        self.r_base_to_wf: np.ndarray = None
+        
         pass
 
