@@ -132,44 +132,6 @@ class UpperLevelController(Node):
         elif axis == 'z':
             R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
         return R    
- 
-    def com_position(self,joint_position):
-        '''
-        回傳(對左腳質點位置，對右腳的，對骨盆的)
-        p.s. 不管是哪個模型，原點都在兩隻腳(相距0.2m)中間
-        '''
-        #get com position
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        
-        #右腳為支撐腳
-        R_jp_r = np.flip(-jp_r,axis=0)
-        R_jp_l = jp_l
-        R_joint_angle = np.vstack((R_jp_r,R_jp_l))
-        pin.centerOfMass(self.bipedal_r_model,self.bipedal_r_data,R_joint_angle)
-        com_r_in_pink = np.reshape(self.bipedal_r_data.com[0],(3,1))
-        r_foot_in_wf = np.array([[0.0],[-0.1],[0.0]]) ##////其實是pink，原點在兩隻腳正中間
-        com_in_rf = com_r_in_pink - r_foot_in_wf
-
-        #左腳為支撐腳
-        L_jp_l = np.flip(-jp_l,axis=0)
-        L_jp_r = jp_r
-        L_joint_angle = np.vstack((L_jp_l,L_jp_r))
-        pin.centerOfMass(self.bipedal_l_model,self.bipedal_l_data,L_joint_angle)
-        com_l_in_pink = np.reshape(self.bipedal_l_data.com[0],(3,1))
-        l_foot_in_wf = np.array([[0.0],[0.1],[0]])
-        com_in_lf = com_l_in_pink - l_foot_in_wf
-
-        #floating com ////是從骨盆中建，所以應該可以得知骨盆和質心的位置吧？？
-        joint_angle = np.vstack((jp_l,jp_r))
-        pin.centerOfMass(self.bipedal_floating_model,self.bipedal_floating_data,joint_angle)
-        com_floating_in_pink = np.reshape(self.bipedal_floating_data.com[0],(3,1))
-        # print(com_floating_in_pink)
-
-        # print('clf:',com_in_lf)
-        # print('crf:',com_in_rf)
-
-        return com_in_lf,com_in_rf,com_floating_in_pink
 
     def stance_change(self,state,px_in_lf,px_in_rf,stance,contact_t):
         if state == 0:
@@ -1048,6 +1010,7 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture(
             self.frame.p_pel_in_pf, self.frame.p_lf_in_pf, self.frame.p_rf_in_pf, self.frame.r_pel_to_pf, self.frame.r_lf_to_pf, self.frame.r_rf_to_pf
             )
+        com_in_pink = self.frame.com_position(self.ros, jp)
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
@@ -1057,8 +1020,6 @@ class UpperLevelController(Node):
         
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        # px_in_lf,px_in_rf = self.get_posture()
-        com_in_lf,com_in_rf,com_in_pink = self.com_position(jp)
         #算wf下的位置及姿態
         self.pelvis_in_wf()
         self.data_in_wf(com_in_pink)
@@ -1129,7 +1090,7 @@ class UpperLevelController(Node):
             # self.to_matlab()
             torque_ALIP = walking_by_ALIP(self, jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
             torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
-            torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
+            # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             # print(stance)
             
             if stance == 1:

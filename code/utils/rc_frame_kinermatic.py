@@ -6,6 +6,7 @@ from scipy.spatial.transform import Rotation as R
 import pink
 #================ import other code =====================#
 from utils.config import Config
+from utils.ros_interfaces import ROSInterfaces
 #========================================================#
 
 class RobotFrame:
@@ -94,3 +95,12 @@ class RobotFrame:
         pa_rfTOpel_in_pf = self.pa_pel_in_pf - self.pa_rf_in_pf #骨盆中心相對於右腳
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf, self.pa_pel_in_pf, self.pa_lf_in_pf, self.pa_rf_in_pf, L_Body_transfer, R_Body_transfer
+    
+    def com_position(self, ros: ROSInterfaces, jntPosotion: np.ndarray):
+        
+        pin.centerOfMass(
+            ros.bipedal_floating_model, ros.bipedal_floating_data, jntPosotion
+        )
+        com_floating_in_pink = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
+        
+        return com_floating_in_pink
