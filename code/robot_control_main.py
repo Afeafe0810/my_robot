@@ -1108,7 +1108,7 @@ class UpperLevelController(Node):
             ( self.P_Rap_pf, self.O_pfRap ),
             ( self.P_Rar_pf, self.O_pfRar ),
             ( self.P_R_pf  , self.O_pfR   ),
-        ) = self.frame.update_pfFrame()
+        ) = self.frame.update_pfFrame(config)
         
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
@@ -1118,7 +1118,7 @@ class UpperLevelController(Node):
         
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        self.get_position_pf(config)
+        # self.get_position_pf(config)
         px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf,com_in_pink = self.com_position(jp)
         #算wf下的位置及姿態
