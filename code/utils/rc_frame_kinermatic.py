@@ -4,6 +4,7 @@ from copy import deepcopy
 from math import cos, sin
 from scipy.spatial.transform import Rotation as R
 import pink
+import pinocchio as pin
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
