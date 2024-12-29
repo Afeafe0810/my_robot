@@ -133,67 +133,6 @@ class UpperLevelController(Node):
             R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
         return R    
 
-    def get_position_pf(self,configuration):
-        '''
-        把各個座標系對pf的原點、旋轉矩陣賦值到self內
-        '''
-        #frame data in pf
-        PV_pf = configuration.get_transform_frame_to_world("pelvis_link")
-        # print("p",pelvis)
-        Lhr_pf = configuration.get_transform_frame_to_world("l_hip_yaw_1")
-        Lhy_pf = configuration.get_transform_frame_to_world("l_hip_pitch_1")
-        Lhp_pf = configuration.get_transform_frame_to_world("l_thigh_1")
-        Lkp_pf = configuration.get_transform_frame_to_world("l_shank_1")
-        Lap_pf = configuration.get_transform_frame_to_world("l_ankle_1")
-        Lar_pf = configuration.get_transform_frame_to_world("l_foot_1")
-        L_pf = configuration.get_transform_frame_to_world("l_foot")
-        # print("l_foot:",self.l_foot.translation)
-        Rhr_pf = configuration.get_transform_frame_to_world("r_hip_yaw_1")
-        Rhy_pf = configuration.get_transform_frame_to_world("r_hip_pitch_1")
-        Rhp_pf = configuration.get_transform_frame_to_world("r_thigh_1")
-        Rkp_pf = configuration.get_transform_frame_to_world("r_shank_1")
-        Rap_pf = configuration.get_transform_frame_to_world("r_ankle_1")
-        Rar_pf = configuration.get_transform_frame_to_world("r_foot_1")
-        R_pf = configuration.get_transform_frame_to_world("r_foot")
-        # print("r_foot:",self.r_foot.translation)        
-
-        #frame origin position in pf
-        self.P_PV_pf = np.reshape(PV_pf.translation,(3,1))
-
-        self.P_Lhr_pf = np.reshape(Lhr_pf.translation,(3,1))
-        self.P_Lhy_pf = np.reshape(Lhy_pf.translation,(3,1))
-        self.P_Lhp_pf = np.reshape(Lhp_pf.translation,(3,1))
-        self.P_Lkp_pf = np.reshape(Lkp_pf.translation,(3,1))
-        self.P_Lap_pf = np.reshape(Lap_pf.translation,(3,1))
-        self.P_Lar_pf = np.reshape(Lar_pf.translation,(3,1))
-        self.P_L_pf = np.reshape(L_pf.translation,(3,1))
-
-        self.P_Rhr_pf = np.reshape(Rhr_pf.translation,(3,1))
-        self.P_Rhy_pf = np.reshape(Rhy_pf.translation,(3,1))
-        self.P_Rhp_pf = np.reshape(Rhp_pf.translation,(3,1))
-        self.P_Rkp_pf = np.reshape(Rkp_pf.translation,(3,1))
-        self.P_Rap_pf = np.reshape(Rap_pf.translation,(3,1))
-        self.P_Rar_pf = np.reshape(Rar_pf.translation,(3,1))
-        self.P_R_pf = np.reshape(R_pf.translation,(3,1))
-
-        #frame orientation in pf
-        self.O_pfPV = np.reshape(PV_pf.rotation,(3,3))
-        self.O_pfLhr = np.reshape(Lhr_pf.rotation,(3,3))
-        self.O_pfLhy = np.reshape(Lhy_pf.rotation,(3,3))
-        self.O_pfLhp = np.reshape(Lhp_pf.rotation,(3,3))
-        self.O_pfLkp = np.reshape(Lkp_pf.rotation,(3,3))
-        self.O_pfLap = np.reshape(Lap_pf.rotation,(3,3))
-        self.O_pfLar = np.reshape(Lar_pf.rotation,(3,3))
-        self.O_pfL = np.reshape(L_pf.rotation,(3,3))
-
-        self.O_pfRhr = np.reshape(Rhr_pf.rotation,(3,3))
-        self.O_pfRhy = np.reshape(Rhy_pf.rotation,(3,3))
-        self.O_pfRhp = np.reshape(Rhp_pf.rotation,(3,3))
-        self.O_pfRkp = np.reshape(Rkp_pf.rotation,(3,3))
-        self.O_pfRap = np.reshape(Rap_pf.rotation,(3,3))
-        self.O_pfRar = np.reshape(Rar_pf.rotation,(3,3))
-        self.O_pfR = np.reshape(R_pf.rotation,(3,3))
-          
     def get_posture(self):
         '''
         回傳(骨盆相對於左腳，骨盆相對於右腳)，但body transfer不知道是什麼
@@ -1152,7 +1091,24 @@ class UpperLevelController(Node):
         config = self.ros.update_VizAndMesh(jp)
         
         #==========更新frame==========#
-        
+        # self.frame.updateFrame(config)
+        (
+            ( self.P_PV_pf , self.O_pfPV  ),
+            ( self.P_Lhr_pf, self.O_pfLhr ),
+            ( self.P_Lhy_pf, self.O_pfLhy ),
+            ( self.P_Lhp_pf, self.O_pfLhp ),
+            ( self.P_Lkp_pf, self.O_pfLkp ),
+            ( self.P_Lap_pf, self.O_pfLap ),
+            ( self.P_Lar_pf, self.O_pfLar ),
+            ( self.P_L_pf  , self.O_pfL   ),
+            ( self.P_Rhr_pf, self.O_pfRhr ),
+            ( self.P_Rhy_pf, self.O_pfRhy ),
+            ( self.P_Rhp_pf, self.O_pfRhp ),
+            ( self.P_Rkp_pf, self.O_pfRkp ),
+            ( self.P_Rap_pf, self.O_pfRap ),
+            ( self.P_Rar_pf, self.O_pfRar ),
+            ( self.P_R_pf  , self.O_pfR   ),
+        ) = self.frame.update_pfFrame()
         
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact

@@ -73,7 +73,7 @@ class ROSInterfaces:
             ]
         ]
     
-    def update_VizAndMesh(self, jp):
+    def update_VizAndMesh(self, jp: np.ndarray) -> pink.Configuration:
         '''給定關節轉角, 更新機器人模型, 回傳機器人的configuration'''
         config = pink.Configuration(self.__meshrobot.model, self.__meshrobot.data, jp)
         self.__viz.display(config.q)
