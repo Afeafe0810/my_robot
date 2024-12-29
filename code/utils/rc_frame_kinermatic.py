@@ -29,11 +29,11 @@ class RobotFrame:
     @staticmethod
     def eularToGeometry(angle: np.ndarray):
         _, ay, az = angle.flatten()
-        return np.array(
+        return np.array([
             [ cos(ay)*cos(az), -sin(az), 0 ],
             [ cos(ay)*sin(az),  cos(az), 0 ],
             [        -sin(ay),        0, 1 ],
-        )
+        ])
         
     def update_pfFrame(self, config: pink.Configuration):
         

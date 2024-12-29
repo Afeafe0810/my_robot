@@ -1057,7 +1057,7 @@ class UpperLevelController(Node):
         
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        px_in_lf,px_in_rf = self.get_posture()
+        # px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf,com_in_pink = self.com_position(jp)
         #算wf下的位置及姿態
         self.pelvis_in_wf()
