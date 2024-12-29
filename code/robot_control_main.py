@@ -120,18 +120,6 @@ class UpperLevelController(Node):
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK') 
 
-    def xyz_rotation(self,axis,theta):
-        cos = math.cos
-        sin = math.sin
-        R = np.array((3,3))
-        if axis == 'x':
-            R = np.array([[1,0,0],[0,cos(theta),-sin(theta)],[0,sin(theta),cos(theta)]])
-        elif axis == 'y':
-            R = np.array([[cos(theta),0,sin(theta)],[0,1,0],[-sin(theta),0,cos(theta)]])
-        elif axis == 'z':
-            R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
-        return R    
-
     def stance_change(self,state,px_in_lf,px_in_rf,stance,contact_t):
         if state == 0:
             stance = 1
@@ -280,19 +268,18 @@ class UpperLevelController(Node):
         Theta12 = jp[11,0] #R_Ankle_Roll
 
         #calculate rotation matrix
-        self.L_R01 = self.xyz_rotation('x',Theta1) #L_Hip_roll
-        self.L_R12 = self.xyz_rotation('z',Theta2)
-        self.L_R23 = self.xyz_rotation('y',Theta3)
-        self.L_R34 = self.xyz_rotation('y',Theta4)
-        self.L_R45 = self.xyz_rotation('y',Theta5)
-        self.L_R56 = self.xyz_rotation('x',Theta6) #L_Ankle_roll
-
-        self.R_R01 = self.xyz_rotation('x',Theta7) #R_Hip_roll
-        self.R_R12 = self.xyz_rotation('z',Theta8)
-        self.R_R23 = self.xyz_rotation('y',Theta9)
-        self.R_R34 = self.xyz_rotation('y',Theta10)
-        self.R_R45 = self.xyz_rotation('y',Theta11)
-        self.R_R56 = self.xyz_rotation('x',Theta12) #R_Ankle_roll
+        self.L_R01 = self.frame.__get_axis_rotMat('x',Theta1) #L_Hip_roll
+        self.L_R12 = self.frame.__get_axis_rotMat('z',Theta2)
+        self.L_R23 = self.frame.__get_axis_rotMat('y',Theta3)
+        self.L_R34 = self.frame.__get_axis_rotMat('y',Theta4)
+        self.L_R45 = self.frame.__get_axis_rotMat('y',Theta5)
+        self.L_R56 = self.frame.__get_axis_rotMat('x',Theta6) #L_Ankle_roll
+        self.R_R01 = self.frame.__get_axis_rotMat('x',Theta7) #R_Hip_roll
+        self.R_R12 = self.frame.__get_axis_rotMat('z',Theta8)
+        self.R_R23 = self.frame.__get_axis_rotMat('y',Theta9)
+        self.R_R34 = self.frame.__get_axis_rotMat('y',Theta10)
+        self.R_R45 = self.frame.__get_axis_rotMat('y',Theta11)
+        self.R_R56 = self.frame.__get_axis_rotMat('x',Theta12) #R_Ankle_roll
 
     def relative_axis(self):
         '''
