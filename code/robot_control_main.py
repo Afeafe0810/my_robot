@@ -1045,7 +1045,9 @@ class UpperLevelController(Node):
             ( self.P_R_pf  , self.O_pfR   ),
         ) = self.frame.update_pfFrame(config)
         
-        px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture()
+        px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture(
+            self.frame.p_pel_in_pf, self.frame.p_lf_in_pf, self.frame.p_rf_in_pf, self.frame.r_pel_to_pf, self.frame.r_lf_to_pf, self.frame.r_rf_to_pf
+            )
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
