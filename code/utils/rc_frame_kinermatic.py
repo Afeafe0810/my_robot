@@ -12,6 +12,9 @@ from utils.ros_interfaces import ROSInterfaces
 
 class RobotFrame:
     def __init__(self):
+        self.p_pel_in_base = np.vstack(( 0, 0, 0.598 ))
+        self.r_pf_to_pel = np.identity(3)
+        
         self.p_base_in_wf: np.ndarray = None
         self.r_base_to_wf: np.ndarray = None
         
@@ -38,7 +41,6 @@ class RobotFrame:
         ])
         
     def update_pfFrame(self, config: pink.Configuration):
-        
         def _get_pfFrame(link: str):
             htm = config.get_transform_frame_to_world(link)
             p_in_pf = np.reshape( htm.translation, (3,1) )
@@ -103,5 +105,66 @@ class RobotFrame:
             ros.bipedal_floating_model, ros.bipedal_floating_data, jntPosotion
         )
         com_floating_in_pink = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
+        self.p_com_in_pf = com_floating_in_pink
         
         return com_floating_in_pink
+    
+    def pelvis_in_wf(self, p_base_in_wf, r_base_to_wf):
+        '''
+        用訂閱到的base對WF的位態,求骨盆對WF的位態
+        '''
+        self.p_pel_in_wf = r_base_to_wf @ self.p_pel_in_base + p_base_in_wf
+        self.r_pel_to_wf = deepcopy(r_base_to_wf)
+
+        return self.p_pel_in_wf, self.r_pel_to_wf
+    
+    def data_in_wf(self):
+        r_pf_to_wf = self.r_pel_to_wf @ self.r_pel_to_pf.T
+        
+        place_in_pfToWf = lambda p_in_pf: \
+            r_pf_to_wf @ (p_in_pf - self.p_pel_in_pf) + self.p_pel_in_wf
+        
+        rotat_to_pfToWf = lambda r_to_pf: \
+            r_pf_to_wf @ r_to_pf
+        
+        self.p_com_in_wf    = place_in_pfToWf(self.p_com_in_pf)
+        self.p_LhipX_in_wf  = place_in_pfToWf(self.p_LhipX_in_pf) 
+        self.p_LhipZ_in_wf  = place_in_pfToWf(self.p_LhipZ_in_pf) 
+        self.p_LhipY_in_wf  = place_in_pfToWf(self.p_LhipY_in_pf) 
+        self.p_LkneeY_in_wf = place_in_pfToWf(self.p_LkneeY_in_pf)
+        self.p_LankY_in_wf  = place_in_pfToWf(self.p_LankY_in_pf) 
+        self.p_LankX_in_wf  = place_in_pfToWf(self.p_LankX_in_pf) 
+        self.p_lf_in_wf     = place_in_pfToWf(self.p_lf_in_pf)    
+        self.p_RhipX_in_wf  = place_in_pfToWf(self.p_RhipX_in_pf) 
+        self.p_RhipZ_in_wf  = place_in_pfToWf(self.p_RhipZ_in_pf) 
+        self.p_RhipY_in_wf  = place_in_pfToWf(self.p_RhipY_in_pf) 
+        self.p_RkneeY_in_wf = place_in_pfToWf(self.p_RkneeY_in_pf)
+        self.p_RankY_in_wf  = place_in_pfToWf(self.p_RankY_in_pf) 
+        self.p_RankX_in_wf  = place_in_pfToWf(self.p_RankX_in_pf) 
+        self.p_rf_in_wf     = place_in_pfToWf(self.p_rf_in_pf)    
+        
+        self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
+        self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
+
+        return (
+            self.p_com_in_wf   ,
+            self.p_LhipX_in_wf ,
+            self.p_LhipZ_in_wf ,
+            self.p_LhipY_in_wf ,
+            self.p_LkneeY_in_wf,
+            self.p_LankY_in_wf ,
+            self.p_LankX_in_wf ,
+            self.p_lf_in_wf    ,
+            self.p_RhipX_in_wf ,
+            self.p_RhipZ_in_wf ,
+            self.p_RhipY_in_wf ,
+            self.p_RkneeY_in_wf,
+            self.p_RankY_in_wf ,
+            self.p_RankX_in_wf ,
+            self.p_rf_in_wf    ,
+            
+            self.r_lf_to_wf    ,
+            self.r_rf_to_wf,
+        )
+        
+        

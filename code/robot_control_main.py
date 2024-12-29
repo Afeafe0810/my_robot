@@ -169,20 +169,6 @@ class UpperLevelController(Node):
 
         return stance
 
-    def pelvis_in_wf(self):
-        '''
-        用訂閱到的base對WF的位態,求骨盆對WF的位態
-        '''
-        P_B_wf = copy.deepcopy(self.P_B_wf)##////base對WF的位置
-        O_wfB = copy.deepcopy(self.O_wfB)##////base對WF的旋轉矩陣
-
-        self.P_PV_wf = O_wfB@np.array([[0.0],[0.0],[0.598]]) + P_B_wf
-        self.O_wfPV = copy.deepcopy(self.O_wfB)
-
-        # self.PX_publisher.publish(Float64MultiArray(data=self.P_PV_wf))
-
-        return 
-
     def data_in_wf(self,com_in_pink):
         '''
         就.....一堆轉換
@@ -1010,19 +996,35 @@ class UpperLevelController(Node):
         px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture(
             self.frame.p_pel_in_pf, self.frame.p_lf_in_pf, self.frame.p_rf_in_pf, self.frame.r_pel_to_pf, self.frame.r_lf_to_pf, self.frame.r_rf_to_pf
             )
+        
         com_in_pink = self.frame.com_position(self.ros, jp)
+        
+        self.P_PV_wf, self.O_wfPV = self.frame.pelvis_in_wf(p_base_in_wf, r_base_to_wf)
+        
+        (
+            self.P_COM_wf,
+            self.P_Lhr_wf,
+            self.P_Lhy_wf,
+            self.P_Lhp_wf,
+            self.P_Lkp_wf,
+            self.P_Lap_wf,
+            self.P_Lar_wf,
+            self.P_L_wf  ,
+            self.P_Rhr_wf,
+            self.P_Rhy_wf,
+            self.P_Rhp_wf,
+            self.P_Rkp_wf,
+            self.P_Rap_wf,
+            self.P_Rar_wf,
+            self.P_R_wf  ,
+            self.O_wfL   ,
+            self.O_wfR   ,
+        ) = self.frame.data_in_wf()
+        
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
         
-        
-
-        
-
-        #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        #算wf下的位置及姿態
-        self.pelvis_in_wf()
-        self.data_in_wf(com_in_pink)
         #這邊算相對的矩陣
         self.rotation_matrix(jp)
         #這邊算wf下各軸姿態
