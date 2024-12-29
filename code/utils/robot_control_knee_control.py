@@ -12,7 +12,7 @@ from utils.signal_process import Dsp
 def outterloop():
     pass
 
-def endErr_to_endVel(self):
+def endErr_to_endVel(self, frame: RobotFrame):
     ref_pa_pel_in_wf = copy.deepcopy(self.PX_ref) #wf
     ref_pa_lf_in_wf  = copy.deepcopy(self.LX_ref) #wf
     ref_pa_rf_in_wf  = copy.deepcopy(self.RX_ref) #wf
@@ -36,8 +36,8 @@ def endErr_to_endVel(self):
     derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
     
     #========歐拉角速度轉幾何角速度========#
-    w_pelTOlf_in_pf = self.L_Body_transfer @ derr_pa_pelTOlf_in_pf[3:]
-    w_pelTOrf_in_pf = self.R_Body_transfer @ derr_pa_pelTOrf_in_pf[3:]
+    w_pelTOlf_in_pf = frame.eularToGeo['lf'] @ derr_pa_pelTOlf_in_pf[3:]
+    w_pelTOrf_in_pf = frame.eularToGeo['rf'] @ derr_pa_pelTOrf_in_pf[3:]
     
     vw_pelTOlf_in_pf = np.vstack(( derr_pa_pelTOlf_in_pf[:3], w_pelTOlf_in_pf ))
     vw_pelTOrf_in_pf = np.vstack(( derr_pa_pelTOrf_in_pf[:3], w_pelTOrf_in_pf ))

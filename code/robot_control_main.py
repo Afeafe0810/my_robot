@@ -114,8 +114,7 @@ class UpperLevelController(Node):
         self.ref_x_R = np.zeros((2,1))
         self.ref_y_R = np.zeros((2,1))
 
-        #touch for am tracking check
-        self.touch = 0
+
  
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
@@ -444,55 +443,6 @@ class UpperLevelController(Node):
         
         return Com_ref_wf,L_ref_wf,R_ref_wf
   
-    def ref_alip(self,stance,px_in_lf,px_in_rf,com_in_lf,com_in_rf,Com_ref_wf,L_ref_wf,R_ref_wf):
-        #ALIP
-        L_X_ref = L_ref_wf[0,0]
-        L_Y_ref = L_ref_wf[1,0]
-        L_Z_ref = L_ref_wf[2,0]
-
-        R_X_ref = R_ref_wf[0,0]
-        R_Y_ref = R_ref_wf[1,0]
-        R_Z_ref = R_ref_wf[2,0]
-
-        if stance == 1:
-            #取骨盆跟質心在位置上的差異(in_wf)
-            P_px_lf = np.reshape(copy.deepcopy(px_in_lf[0:3,0]),(3,1))
-            com2px_in_lf = P_px_lf - com_in_lf
-            O_wfL = np.array([[1,0,0],[0,1,0],[0,0,1]]) #直走&理想
-            com2px_in_wf = O_wfL@(com2px_in_lf)
-            #將質心軌跡更改成骨盆軌跡(in_wf)
-            P_X_ref = Com_ref_wf[0,0] + (com2px_in_wf[0,0])
-            P_Y_ref = Com_ref_wf[1,0] + (com2px_in_wf[1,0])
-            P_Z_ref = 0.55
-
-        elif stance == 0:
-            #取骨盆跟質心在位置上的差異(in_wf)
-            P_px_rf = np.reshape(copy.deepcopy(px_in_rf[0:3,0]),(3,1))
-            com2px_in_rf = P_px_rf - com_in_rf
-            O_wfR = np.array([[1,0,0],[0,1,0],[0,0,1]]) #直走&理想
-            com2px_in_wf = O_wfR@(com2px_in_rf)       
-            #將質心軌跡更改成骨盆軌跡(in_wf)
-            P_X_ref = Com_ref_wf[0,0] + (com2px_in_wf[0,0])
-            P_Y_ref = Com_ref_wf[1,0] + (com2px_in_wf[1,0])
-            P_Z_ref = 0.55
-        
-        #直走下預設為0
-        #骨盆姿態
-        P_Roll_ref = 0.0
-        P_Pitch_ref = 0.0
-        P_Yaw_ref = 0.0
-        #左腳腳底姿態
-        L_Roll_ref = 0.0
-        L_Pitch_ref = 0.0
-        L_Yaw_ref = 0.0
-        #右腳腳底姿態        
-        R_Roll_ref = 0.0
-        R_Pitch_ref = 0.0
-        R_Yaw_ref = 0.0
-
-        self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
-        self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
-        self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]]) 
 
 
     
@@ -974,7 +924,7 @@ class UpperLevelController(Node):
         config = self.ros.update_VizAndMesh(jp)
         
         #==========更新frame==========#
-        # self.frame.updateFrame(config)
+        
         (
             ( self.P_PV_pf , self.O_pfPV  ),
             ( self.P_Lhr_pf, self.O_pfLhr ),
@@ -991,17 +941,11 @@ class UpperLevelController(Node):
             ( self.P_Rap_pf, self.O_pfRap ),
             ( self.P_Rar_pf, self.O_pfRar ),
             ( self.P_R_pf  , self.O_pfR   ),
-        ) = self.frame.update_pfFrame(config)
-        
-        px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture(
-            self.frame.p_pel_in_pf, self.frame.p_lf_in_pf, self.frame.p_rf_in_pf, self.frame.r_pel_to_pf, self.frame.r_lf_to_pf, self.frame.r_rf_to_pf
-            )
-        
-        com_in_pink = self.frame.com_position(self.ros, jp)
-        
-        self.P_PV_wf, self.O_wfPV = self.frame.pelvis_in_wf(p_base_in_wf, r_base_to_wf)
-        
-        (
+            
+            self.PX, self.LX, self.RX,
+            
+            self.P_PV_wf, self.O_wfPV,
+            
             self.P_COM_wf,
             self.P_Lhr_wf,
             self.P_Lhy_wf,
@@ -1019,7 +963,21 @@ class UpperLevelController(Node):
             self.P_R_wf  ,
             self.O_wfL   ,
             self.O_wfR   ,
-        ) = self.frame.data_in_wf()
+            
+            
+        ) = self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
+        
+        
+        
+        
+        
+        
+        
+        pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf =\
+            self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf
+            
+        px_in_lf,px_in_rf = self.frame.get_posture(pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf)
+        
         
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
@@ -1053,7 +1011,7 @@ class UpperLevelController(Node):
         #--------膝上外環控制--------#
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
-        Le_2,Re_2 = endErr_to_endVel(self)
+        Le_2,Re_2 = endErr_to_endVel(self, self.frame)
         VL, VR = endVel_to_jv(Le_2,Re_2,jv,stance,state,JLL,JRR)
         
         #--------膝上內環控制--------#
@@ -1109,6 +1067,7 @@ class UpperLevelController(Node):
         
         self.ros.publisher["vcmd"].publish( Float64MultiArray(data = VL) )
         self.ros.publisher["velocity"].publish( Float64MultiArray(data = jv[:6]) )#檢查收到的速度(超髒)
+
 
 def main(args=None):
     rclpy.init(args=args)
