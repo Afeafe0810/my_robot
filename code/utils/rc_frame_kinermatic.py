@@ -156,7 +156,7 @@ class RobotFrame:
         ))
     
     @staticmethod
-    def __get_axis_rotMat(axis: str, theta:float)->np.ndarray:
+    def get_axis_rotMat(axis: str, theta:float)->np.ndarray:
         vec_theta = [theta, 0, 0] if axis == 'x' else\
                     [0, theta, 0] if axis == 'y' else\
                     [0, 0, theta] if axis == 'z' else None

@@ -268,18 +268,18 @@ class UpperLevelController(Node):
         Theta12 = jp[11,0] #R_Ankle_Roll
 
         #calculate rotation matrix
-        self.L_R01 = self.frame.__get_axis_rotMat('x',Theta1) #L_Hip_roll
-        self.L_R12 = self.frame.__get_axis_rotMat('z',Theta2)
-        self.L_R23 = self.frame.__get_axis_rotMat('y',Theta3)
-        self.L_R34 = self.frame.__get_axis_rotMat('y',Theta4)
-        self.L_R45 = self.frame.__get_axis_rotMat('y',Theta5)
-        self.L_R56 = self.frame.__get_axis_rotMat('x',Theta6) #L_Ankle_roll
-        self.R_R01 = self.frame.__get_axis_rotMat('x',Theta7) #R_Hip_roll
-        self.R_R12 = self.frame.__get_axis_rotMat('z',Theta8)
-        self.R_R23 = self.frame.__get_axis_rotMat('y',Theta9)
-        self.R_R34 = self.frame.__get_axis_rotMat('y',Theta10)
-        self.R_R45 = self.frame.__get_axis_rotMat('y',Theta11)
-        self.R_R56 = self.frame.__get_axis_rotMat('x',Theta12) #R_Ankle_roll
+        self.L_R01 = self.frame.get_axis_rotMat('x',Theta1) #L_Hip_roll
+        self.L_R12 = self.frame.get_axis_rotMat('z',Theta2)
+        self.L_R23 = self.frame.get_axis_rotMat('y',Theta3)
+        self.L_R34 = self.frame.get_axis_rotMat('y',Theta4)
+        self.L_R45 = self.frame.get_axis_rotMat('y',Theta5)
+        self.L_R56 = self.frame.get_axis_rotMat('x',Theta6) #L_Ankle_roll
+        self.R_R01 = self.frame.get_axis_rotMat('x',Theta7) #R_Hip_roll
+        self.R_R12 = self.frame.get_axis_rotMat('z',Theta8)
+        self.R_R23 = self.frame.get_axis_rotMat('y',Theta9)
+        self.R_R34 = self.frame.get_axis_rotMat('y',Theta10)
+        self.R_R45 = self.frame.get_axis_rotMat('y',Theta11)
+        self.R_R56 = self.frame.get_axis_rotMat('x',Theta12) #R_Ankle_roll
 
     def relative_axis(self):
         '''
