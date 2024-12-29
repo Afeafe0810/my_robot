@@ -132,71 +132,6 @@ class UpperLevelController(Node):
         elif axis == 'z':
             R = np.array([[cos(theta),-sin(theta),0],[sin(theta),cos(theta),0],[0,0,1]])
         return R    
-
-    def get_posture(self):
-        '''
-        回傳(骨盆相對於左腳，骨盆相對於右腳)，但body transfer不知道是什麼
-        '''
-        cos = math.cos
-        sin = math.sin
-
-        pelvis_p = copy.deepcopy(self.P_PV_pf)
-        l_foot_p = copy.deepcopy(self.P_L_pf)
-        r_foot_p = copy.deepcopy(self.P_R_pf)
-
-        # pelvis_p = copy.deepcopy(self.P_PV_wf)
-        # l_foot_p = copy.deepcopy(self.P_L_wf)
-        # r_foot_p = copy.deepcopy(self.P_R_wf)
-
-        pelvis_o = copy.deepcopy(self.O_pfPV)
-        l_foot_o = copy.deepcopy(self.O_pfL)
-        r_foot_o = copy.deepcopy(self.O_pfR)
-
-        # pelvis_o = copy.deepcopy(self.O_wfPV)
-        # l_foot_o = copy.deepcopy(self.O_wfL)
-        # r_foot_o = copy.deepcopy(self.O_wfR)
-
-        ##////把旋轉矩陣換成歐拉角zyx
-        pR = R.from_matrix(pelvis_o).as_euler('zyx', degrees=False)   
-        P_Yaw = pR[0]
-        P_Pitch = pR[1]
-        P_Roll = pR[2]
-
-        lR = R.from_matrix(l_foot_o).as_euler('zyx', degrees=False) 
-        L_Yaw = lR[0]
-        L_Pitch = lR[1]
-        L_Roll = lR[2]
-        
-        rR = R.from_matrix(r_foot_o).as_euler('zyx', degrees=False) 
-        R_Yaw = rR[0]
-        R_Pitch = rR[1]
-        R_Roll = rR[2]
-
-        self.PX = np.array([[pelvis_p[0,0]],[pelvis_p[1,0]],[pelvis_p[2,0]],[P_Roll],[P_Pitch],[P_Yaw]])
-        self.LX = np.array([[l_foot_p[0,0]],[l_foot_p[1,0]],[l_foot_p[2,0]],[L_Roll],[L_Pitch],[L_Yaw]])
-        self.RX = np.array([[r_foot_p[0,0]],[r_foot_p[1,0]],[r_foot_p[2,0]],[R_Roll],[R_Pitch],[R_Yaw]])
-
-        ##////這是啥
-        self.L_Body_transfer = np.array([
-            [cos(L_Pitch)*cos(L_Yaw), -sin(L_Yaw), 0],
-            [cos(L_Pitch)*sin(L_Yaw),  cos(L_Yaw), 0],
-            [-sin(L_Pitch),             0,         1]
-            ])  
-        
-        self.R_Body_transfer = np.array([
-            [cos(R_Pitch)*cos(R_Yaw), -sin(R_Yaw), 0],
-            [cos(R_Pitch)*sin(R_Yaw),  cos(R_Yaw), 0],
-            [-sin(R_Pitch),            0,          1]
-            ])  
-        
-        # print("PX",self.PX)
-        # print("LX",self.LX)
-        # print("RX",self.RX)
-
-        px_in_lf = self.PX - self.LX #骨盆中心相對於左腳
-        px_in_rf = self.PX - self.RX #骨盆中心相對於右腳
-
-        return px_in_lf,px_in_rf
  
     def com_position(self,joint_position):
         '''
@@ -1110,6 +1045,8 @@ class UpperLevelController(Node):
             ( self.P_R_pf  , self.O_pfR   ),
         ) = self.frame.update_pfFrame(config)
         
+        px_in_lf,px_in_rf, self.PX, self.LX, self.RX, self.L_Body_transfer, self.R_Body_transfer = self.frame.get_posture()
+        #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
         
@@ -1118,7 +1055,6 @@ class UpperLevelController(Node):
         
 
         #從pink拿相對base_frame的位置及姿態角  ////我覺得是相對pf吧
-        # self.get_position_pf(config)
         px_in_lf,px_in_rf = self.get_posture()
         com_in_lf,com_in_rf,com_in_pink = self.com_position(jp)
         #算wf下的位置及姿態
