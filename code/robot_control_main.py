@@ -8,7 +8,7 @@ import pinocchio as pin
 
 import numpy as np; np.set_printoptions(precision=2)
 
-import copy
+from copy import deepcopy
 import math
 from scipy.spatial.transform import Rotation as R
 
@@ -345,6 +345,8 @@ class UpperLevelController(Node):
 
         #========支撐狀態切換=====#
         self.stance_change(state, self.contact_t)
+        cf, sf = self.stance
+        cf_past, sf_past = self.stance_past
         
         #========軌跡規劃========#
         ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)
@@ -362,26 +364,24 @@ class UpperLevelController(Node):
         JLL, JRR =  self.frame.left_leg_jacobian()
         
         Le_2,Re_2 = endErr_to_endVel(self.frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf)
-        VL, VR = endVel_to_jv(Le_2,Re_2,jv,stance,state,JLL,JRR)
+        VL, VR = endVel_to_jv(Le_2, Re_2, jv, self.stance, state, JLL, JRR)
         
         #--------膝上內環控制--------#
         
         #========腳踝ALIP、PD控制========#
         self.checkpub(VL,jv)
         
-        cf, sf = ('lf','rf') if stance == 1 else \
-                ('rf','lf') # if stance == 0, 2
              
         if state == 0:
             torque = balance(jp,l_leg_gravity,r_leg_gravity)
             self.ros.publisher['effort'].publish(Float64MultiArray(data=torque))
 
         elif state == 1:
-            torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = innerloopDynamics(jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr)
             
-            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
-            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
-            if stance == 1:
+            torque[sf][4:6] = swingAnkle_PDcontrol(sf, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
+            torque[cf][4:6] = alip_control(self.frame, cf, cf_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
+            if cf == 'lf':
                 self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
@@ -389,9 +389,9 @@ class UpperLevelController(Node):
         elif state == 2:
             torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
-            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
-            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
-            if stance == 1:
+            torque[sf][4:6] = swingAnkle_PDcontrol(sf, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
+            torque[cf][4:6] = alip_control(self.frame, cf, cf_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
+            if cf == 'lf':
                 self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
@@ -411,7 +411,7 @@ class UpperLevelController(Node):
         #     # self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_ALIP))
         
         self.state_past = copy.deepcopy(state)
-        self.stance_past = copy.deepcopy(stance)
+        self.stance_past = copy.deepcopy(self.stance)
  
     def checkpub(self,VL,jv):
         

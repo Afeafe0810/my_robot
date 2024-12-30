@@ -188,12 +188,8 @@ def endErr_to_endVel(frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_p
 
     return vw_pelTOlf_in_pf, vw_pelTOrf_in_pf
 
-def endVel_to_jv(Le_2,Re_2,jv_f,stance_type,state, JLL, JRR):
-    state = copy.deepcopy(state)
-    stance = copy.deepcopy(stance_type)
-    
-    cf, sf = ('lf','rf') if stance == 1 else \
-             ('rf','lf') # if stance == 0, 2
+def endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR):
+    cf, sf = stance
     
     endVel = {'lf': Le_2, 'rf': Re_2}
     jv = {'lf': jv_f[:6], 'rf': jv_f[6:]}
@@ -265,9 +261,7 @@ def innerloopDynamics(jv, vl_cmd, vr_cmd, l_leg_gravity, r_leg_gravity, kl, kr):
         'rf': torque[6:]
     }
 
-def swingAnkle_PDcontrol(stance, r_lf_to_wf, r_rf_to_wf):
-    _, sf = ('lf','rf') if stance == 1 else \
-             ('rf','lf') # if stance == 0, 2
+def swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
     r_ft_to_wf = {
         'lf': r_lf_to_wf,
         'rf': r_rf_to_wf
@@ -279,10 +273,7 @@ def swingAnkle_PDcontrol(stance, r_lf_to_wf, r_rf_to_wf):
     
     return torque_ankle_sf
 
-def alip_control(frame:RobotFrame, stance, stance_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
-
-    cf, _ = ('lf','rf') if stance == 1 else \
-             ('rf','lf') # if stance == 0, 2
+def alip_control(frame:RobotFrame, cf, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
     
     #質心相對L frame的位置
     p_ft_in_wf = {
@@ -332,7 +323,7 @@ def alip_control(frame:RobotFrame, stance, stance_past, p_com_in_wf, p_lf_in_wf,
 
     uy = -Ky@(wy - ref_wy) #腳踝row控制x方向
 
-    if stance_past == 0 and stance == 1:
+    if cf != cf_past:
         ux = uy = 0
 
     #--torque assign
