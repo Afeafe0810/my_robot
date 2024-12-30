@@ -83,7 +83,6 @@ class UpperLevelController(Node):
     def stance_change(self, state, contact_t):
         self.stance = ['lf', 'rf'] if state == 0 else\
                       ['lf', 'rf'] if state == 1 else\
-                      ['lf', 'rf'] if state == 2 else\
                     self.stance #先不變
 
         if state == 2:
