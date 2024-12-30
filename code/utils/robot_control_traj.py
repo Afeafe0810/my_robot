@@ -1,5 +1,14 @@
 import numpy as np; np.set_printoptions(precision=2)
 
+class Trajatory:
+    def __init__(self):
+        self.ref_pa_in_wf = {
+            'lf' : np.zeros((6,1)),
+            'rf' : np.zeros((6,1)),
+            'pel': np.zeros((6,1)),
+        }
+        pass
+
 def trajRef_planning(state,DS_time, DDT):
     if state == 0: #假雙支撐
         return __bipedalBalanceTraj()

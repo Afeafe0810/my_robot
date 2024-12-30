@@ -12,13 +12,7 @@ from utils.signal_process import Dsp
 def outterloop():
     pass
 
-def endErr_to_endVel(self, frame: RobotFrame):
-    ref_pa_pel_in_wf = copy.deepcopy(self.PX_ref) #wf
-    ref_pa_lf_in_wf  = copy.deepcopy(self.LX_ref) #wf
-    ref_pa_rf_in_wf  = copy.deepcopy(self.RX_ref) #wf
-    pa_pel_in_pf = copy.deepcopy(self.PX) #pf
-    pa_lf_in_pf  = copy.deepcopy(self.LX) #pf
-    pa_rf_in_pf  = copy.deepcopy(self.RX) #pf
+def endErr_to_endVel(frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf):
     
     #========求相對骨盆的向量========#
     ref_pa_pelTOlf_in_pf = ref_pa_lf_in_wf -ref_pa_pel_in_wf
