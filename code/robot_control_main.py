@@ -287,43 +287,7 @@ class UpperLevelController(Node):
   
 
 
-    
-    def left_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        l_hip_roll = copy.deepcopy(self.P_Lhr_pf)
-        l_hip_yaw = copy.deepcopy(self.P_Lhy_pf)
-        l_hip_pitch = copy.deepcopy(self.P_Lhp_pf)
-        l_knee_pitch = copy.deepcopy(self.P_Lkp_pf)
-        l_ankle_pitch = copy.deepcopy(self.P_Lap_pf)
-        l_ankle_roll = copy.deepcopy(self.P_Lar_pf)
-        l_foot = copy.deepcopy(self.P_L_pf)
-
-        JL1 = np.cross(self.AL1,(l_foot-l_hip_roll),axis=0)
-        JL2 = np.cross(self.AL2,(l_foot-l_hip_yaw),axis=0)
-        JL3 = np.cross(self.AL3,(l_foot-l_hip_pitch),axis=0)
-        JL4 = np.cross(self.AL4,(l_foot-l_knee_pitch),axis=0)
-        JL5 = np.cross(self.AL5,(l_foot-l_ankle_pitch),axis=0)
-        JL6 = np.cross(self.AL6,(l_foot-l_ankle_roll),axis=0)
-
-        JLL_upper = np.hstack((JL1, JL2,JL3,JL4,JL5,JL6))
-        JLL_lower = np.hstack((self.AL1,self.AL2,self.AL3,self.AL4,self.AL5,self.AL6))    
-        self.JLL = np.vstack((JLL_upper,JLL_lower))  
-        # print(self.JLL)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JL_sp44 = np.reshape(self.JLL[2:,0:4],(4,4))  
-        self.JL_sp42 = np.reshape(self.JLL[2:,4:],(4,2))
-        #排除擺動.腳踝對末端速度的影響
-        JL_sw34 = np.reshape(self.JLL[0:3,0:4],(3,4)) 
-        JL_sw14 = np.reshape(self.JLL[5,0:4],(1,4)) 
-        self.JL_sw44 = np.vstack((JL_sw34,JL_sw14))
-
-        JL_sw32 = np.reshape(self.JLL[0:3,4:],(3,2)) 
-        JL_sw12 = np.reshape(self.JLL[5,4:],(1,2)) 
-        self.JL_sw42 = np.vstack((JL_sw32,JL_sw12))
-
-        return self.JLL
-
+  
     def left_leg_jacobian_wf(self):
         pelvis = copy.deepcopy(self.P_PV_wf)
         l_hip_roll = copy.deepcopy(self.P_Lhr_wf)
@@ -351,42 +315,6 @@ class UpperLevelController(Node):
         self.JL_sp42 = np.reshape(self.JLL[2:,4:],(4,2))
 
         return self.JLL
-
-    def right_leg_jacobian(self):
-        pelvis = copy.deepcopy(self.P_PV_pf)
-        r_hip_roll = copy.deepcopy(self.P_Rhr_pf)
-        r_hip_yaw = copy.deepcopy(self.P_Rhy_pf)
-        r_hip_pitch = copy.deepcopy(self.P_Rhp_pf)
-        r_knee_pitch = copy.deepcopy(self.P_Rkp_pf)
-        r_ankle_pitch = copy.deepcopy(self.P_Rap_pf)
-        r_ankle_roll = copy.deepcopy(self.P_Rar_pf)
-        r_foot = copy.deepcopy(self.P_R_pf)
-
-        JR1 = np.cross(self.AR1,(r_foot-r_hip_roll),axis=0)
-        JR2 = np.cross(self.AR2,(r_foot-r_hip_yaw),axis=0)
-        JR3 = np.cross(self.AR3,(r_foot-r_hip_pitch),axis=0)
-        JR4 = np.cross(self.AR4,(r_foot-r_knee_pitch),axis=0)
-        JR5 = np.cross(self.AR5,(r_foot-r_ankle_pitch),axis=0)
-        JR6 = np.cross(self.AR6,(r_foot-r_ankle_roll),axis=0)
-
-        JRR_upper = np.hstack((JR1,JR2,JR3,JR4,JR5,JR6))
-        JRR_lower = np.hstack((self.AR1,self.AR2,self.AR3,self.AR4,self.AR5,self.AR6))    
-        self.JRR = np.vstack((JRR_upper,JRR_lower))  
-        # print(self.JRR)
-
-        #排除支撐腳腳踝對末端速度的影響
-        self.JR_sp44 = np.reshape(self.JRR[2:,0:4],(4,4))  
-        self.JR_sp42 = np.reshape(self.JRR[2:,4:],(4,2))
-        #排除擺動.腳踝對末端速度的影響
-        JR_sw34 = np.reshape(self.JRR[0:3,0:4],(3,4)) 
-        JR_sw14 = np.reshape(self.JRR[5,0:4],(1,4)) 
-        self.JR_sw44 = np.vstack((JR_sw34,JR_sw14))
-
-        JR_sw32 = np.reshape(self.JRR[0:3,4:],(3,2)) 
-        JR_sw12 = np.reshape(self.JRR[5,4:],(1,2)) 
-        self.JR_sw42 = np.vstack((JR_sw32,JR_sw12))
-
-        return self.JRR
 
     def right_leg_jacobian_wf(self):
         pelvis = copy.deepcopy(self.P_PV_wf)
@@ -813,17 +741,8 @@ class UpperLevelController(Node):
             self.AR1, self.AR2, self.AR3, self.AR4, self.AR5, self.AR6,
             
         ) = self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
-        
-        
-        
-        
-        
-        
-        
-        pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf =\
-            self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf
-            
-        px_in_lf,px_in_rf = self.frame.get_posture(pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf)
+
+        px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
         
         #==========待刪掉==========#
@@ -850,8 +769,8 @@ class UpperLevelController(Node):
         l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(jp,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
         #========膝上雙環控制========#
         #--------膝上外環控制--------#
-        JLL = self.left_leg_jacobian()
-        JRR = self.right_leg_jacobian()
+        JLL, JRR =  self.frame.left_leg_jacobian()
+
         Le_2,Re_2 = endErr_to_endVel(self, self.frame)
         VL, VR = endVel_to_jv(Le_2,Re_2,jv,stance,state,JLL,JRR)
         

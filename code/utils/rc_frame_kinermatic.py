@@ -76,7 +76,7 @@ class RobotFrame:
             self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R,
             
             self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf,
-            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf,
+            self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf, self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf,
             
         )
     
@@ -87,7 +87,39 @@ class RobotFrame:
         pa_rfTOpel_in_pf = pa_pel_in_pf - pa_rf_in_pf #骨盆中心相對於右腳
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
-
+ 
+    def left_leg_jacobian(self):
+        Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_LhipX_in_pf ), axis = 0 )
+        Jp2_L = np.cross( self.axis_2L_in_pf, (self.p_lf_in_pf - self.p_LhipZ_in_pf ), axis = 0 )
+        Jp3_L = np.cross( self.axis_3L_in_pf, (self.p_lf_in_pf - self.p_LhipY_in_pf ), axis = 0 )
+        Jp4_L = np.cross( self.axis_4L_in_pf, (self.p_lf_in_pf - self.p_LkneeY_in_pf), axis = 0 )
+        Jp5_L = np.cross( self.axis_5L_in_pf, (self.p_lf_in_pf - self.p_LankY_in_pf ), axis = 0 )
+        Jp6_L = np.cross( self.axis_6L_in_pf, (self.p_lf_in_pf - self.p_LankX_in_pf ), axis = 0 )
+        
+        Jp_L = np.hstack(( Jp1_L, Jp2_L, Jp3_L, Jp4_L, Jp5_L, Jp6_L ))
+        Ja_L = np.hstack(( 
+            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf,
+            self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf
+        ))
+        
+        JL = np.vstack(( Jp_L, Ja_L ))
+        
+        Jp1_R = np.cross( self.axis_1R_in_pf, (self.p_rf_in_pf - self.p_RhipX_in_pf ), axis = 0 )
+        Jp2_R = np.cross( self.axis_2R_in_pf, (self.p_rf_in_pf - self.p_RhipZ_in_pf ), axis = 0 )
+        Jp3_R = np.cross( self.axis_3R_in_pf, (self.p_rf_in_pf - self.p_RhipY_in_pf ), axis = 0 )
+        Jp4_R = np.cross( self.axis_4R_in_pf, (self.p_rf_in_pf - self.p_RkneeY_in_pf), axis = 0 )
+        Jp5_R = np.cross( self.axis_5R_in_pf, (self.p_rf_in_pf - self.p_RankY_in_pf ), axis = 0 )
+        Jp6_R = np.cross( self.axis_6R_in_pf, (self.p_rf_in_pf - self.p_RankX_in_pf ), axis = 0 )
+        
+        Jp_R = np.hstack(( Jp1_R, Jp2_R, Jp3_R, Jp4_R, Jp5_R, Jp6_R ))
+        Ja_R = np.hstack(( 
+            self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf,
+            self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf
+        ))
+        
+        JR = np.vstack(( Jp_R, Ja_R ))
+        
+        return JL, JR
 
     #=======================封裝主要的部份================================#
     
@@ -173,12 +205,12 @@ class RobotFrame:
         self.axis_5L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ vec_axes[4]
         self.axis_6L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ self.r_5_to_4_L @ vec_axes[5]
         
-        self.axis_1L_in_pf = RP @ vec_axes[0]
-        self.axis_2L_in_pf = RP @ self.r_1_to_0_R @ vec_axes[1]
-        self.axis_3L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ vec_axes[2]
-        self.axis_4L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ vec_axes[3]
-        self.axis_5L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ vec_axes[4]
-        self.axis_6L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ self.r_5_to_4_R @ vec_axes[5]
+        self.axis_1R_in_pf = RP @ vec_axes[0]
+        self.axis_2R_in_pf = RP @ self.r_1_to_0_R @ vec_axes[1]
+        self.axis_3R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ vec_axes[2]
+        self.axis_4R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ vec_axes[3]
+        self.axis_5R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ vec_axes[4]
+        self.axis_6R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ self.r_5_to_4_R @ vec_axes[5]
         
     #========================toolbox================================#
     @staticmethod
