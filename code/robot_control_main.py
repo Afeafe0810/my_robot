@@ -1,38 +1,16 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer
 
 from std_msgs.msg import String
 from std_msgs.msg import Float64MultiArray 
 
-from sensor_msgs.msg import JointState
-from gazebo_msgs.msg import ContactsState
-
-from nav_msgs.msg import Odometry
-
-from control_msgs.action import FollowJointTrajectory
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-
 import pinocchio as pin
-import qpsolvers
-
-import pink
-from pink import solve_ik
-from pink.tasks import FrameTask, JointCouplingTask, PostureTask
-import meshcat_shapes
-import qpsolvers
 
 import numpy as np; np.set_printoptions(precision=2)
 
-from sys import argv
-from os.path import dirname, join, abspath
-import os
 import copy
 import math
 from scipy.spatial.transform import Rotation as R
-
-import pandas as pd
-import csv
 
 from linkattacher_msgs.srv import AttachLink
 from linkattacher_msgs.srv import DetachLink
@@ -48,24 +26,17 @@ from utils.robot_control_knee_control import *
 class UpperLevelController(Node):
 
     def __init__(self):
-        #==============================================================node==============================================================#
+        #建立ROS的node
         super().__init__('upper_level_controllers')
+        
+        #負責模型與ROS的功能
         self.ros = ROSInterfaces(self, self.main_controller_callback)
-        self.frame = RobotFrame() # 各部位的位置與姿態
+        
+        #負責量測各部位的位置與姿態
+        self.frame = RobotFrame()
+        
+        #負責處理軌跡
         self.traj = Trajatory()
-        self.robot = self.ros.meshrobot
-        self.bipedal_floating_model, self.bipedal_floating_data = self.ros.bipedal_floating_model, self.ros.bipedal_floating_data
-        self.stance_l_model, self.stance_l_data = self.ros.stance_l_model, self.ros.stance_l_data
-        self.stance_r_model, self.stance_r_data = self.ros.stance_r_model, self.ros.stance_r_data
-        self.bipedal_l_model, self.bipedal_l_data = self.ros.bipedal_l_model, self.ros.bipedal_l_data
-        self.bipedal_r_model, self.bipedal_r_data = self.ros.bipedal_r_model, self.ros.bipedal_r_data
-        #==============================================================robot interface==============================================================#
-        #joint_velocity_cal
-        self.joint_position_past = np.zeros((12,1))
-
-        #joint_velocity_filter (jp = after filter)
-        self.jp = np.zeros((12,1))
-        self.jv = np.zeros((12,1))
         
         #==============================================================robot constant==============================================================#     
         self.stance = 2
@@ -73,17 +44,6 @@ class UpperLevelController(Node):
         self.DS_time = 0.0
 
         #==============================================================robot frame==============================================================#     
-        #data in wf_initial_data
-        self.P_B_wf = np.zeros((3,1))
-        self.P_PV_wf = np.array([[0.0],[0.0],[0.6]])
-        self.P_COM_wf = np.array([[0.0],[0.0],[0.6]])
-        self.P_L_wf= np.array([[0.0],[0.1],[0.0]])
-        self.P_R_wf = np.array([[0.0],[-0.1],[0.0]])
-        
-        self.O_wfB = np.zeros((3,3))
-        self.O_wfPV = np.zeros((3,3))
-        self.O_wfL = np.zeros((3,3))
-        self.O_wfR = np.zeros((3,3))
 
         self.state_past = 0
         #data_in_pf 
@@ -120,40 +80,22 @@ class UpperLevelController(Node):
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK') 
 
-    def stance_change(self,state,px_in_lf,px_in_rf,stance,contact_t):
-        if state == 0:
-            stance = 1
-            
-        elif state == 1:
-            stance = 1
+    def stance_change(self, state, stance, contact_t):
+        stance = 1 if state == 0 else\
+                 1 if state == 1 else\
+                 1 if state == 2 else\
+                stance #先不變
 
-        elif state == 2:
-            stance = 1
+        if state == 2:
             if self.DS_time <= 10 * Config.DDT:
                 self.DS_time += Config.TIMER_PERIOD
                 print("DS",self.DS_time)
 
-        if state == 30:
-
-            #踩到地面才切換支撐腳
-            if abs(contact_t-0.5)<=0.005:#(T)
-                if self.stance == 1:
-                    stance = 0
-                    # if self.P_R_wf[2,0] <= 0.01:
-                    #     stance = 0
-                    # else:
-                    #     stance = 1
-                elif self.stance == 0:
-                    stance = 1
-                    # if self.P_L_wf[2,0] <= 0.01:
-                    #     stance = 1
-                    # else:
-                    #     stance = 0
-            else:
-                 self.stance = stance
-
-        self.stance = stance
-
+        # 時間到就做兩隻腳的切換
+        if state == 30 and abs(contact_t-0.5) <= 0.005 :
+            stance = 0 if stance == 1 else\
+                     1 #if self.stance == 0
+                     
         return stance  
 
     def get_initial_data(self,stance):
@@ -282,156 +224,8 @@ class UpperLevelController(Node):
             self.ref_y_R = np.array([[Xy_cf[0,0]],[Xy_cf[1,0]]])
         
         return Com_ref_wf,L_ref_wf,R_ref_wf
-  
-    def gravity_compemsate(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,state):
-
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-        stance = copy.deepcopy((stance_type))
-        
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l,axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(self.stance_l_model, self.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-
-        jp_R_DS = np.flip(-jp_r,axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(self.stance_r_model, self.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
-
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r,axis=0)
-        jp_RSS = np.vstack((jp_R_RSS,jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(self.bipedal_r_model, self.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l,axis=0)
-        jp_LSS = np.vstack((jp_L_LSS,jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(self.bipedal_l_model, self.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        if stance == 2:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-
-            # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-            #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
-            
-            # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-            #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
-            
-            # else:
-            #     Leg_gravity = DS_gravity
-        
-        elif stance == 0:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-            # if r_contact == 1:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-                
-            # # if l_contact ==1:
-            # #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            # # else:
-            # #     Leg_gravity = RSS_gravity
-     
-        elif stance == 1:
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-            else:
-                Leg_gravity = DS_gravity
-
-            # if l_contact == 1:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-                
-            # # if r_contact ==1:
-            # #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            # # else:
-            # #     Leg_gravity = LSS_gravity
-
-
-        if state == 1:
-            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-        
-        if state == 2:
-            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
-        self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
-        
-        return l_leg_gravity,r_leg_gravity,kl,kr
     
+   
     def gravity_ALIP(self,joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact):
         jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
         jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
@@ -540,84 +334,35 @@ class UpperLevelController(Node):
         config = self.ros.update_VizAndMesh(jp)
         
         #==========更新frame==========#
-        
-        (
-            ( self.P_PV_pf , self.O_pfPV  ),
-            ( self.P_Lhr_pf, self.O_pfLhr ),
-            ( self.P_Lhy_pf, self.O_pfLhy ),
-            ( self.P_Lhp_pf, self.O_pfLhp ),
-            ( self.P_Lkp_pf, self.O_pfLkp ),
-            ( self.P_Lap_pf, self.O_pfLap ),
-            ( self.P_Lar_pf, self.O_pfLar ),
-            ( self.P_L_pf  , self.O_pfL   ),
-            ( self.P_Rhr_pf, self.O_pfRhr ),
-            ( self.P_Rhy_pf, self.O_pfRhy ),
-            ( self.P_Rhp_pf, self.O_pfRhp ),
-            ( self.P_Rkp_pf, self.O_pfRkp ),
-            ( self.P_Rap_pf, self.O_pfRap ),
-            ( self.P_Rar_pf, self.O_pfRar ),
-            ( self.P_R_pf  , self.O_pfR   ),
-            
-            self.PX, self.LX, self.RX,
-            
-            self.P_PV_wf, self.O_wfPV,
-            
-            self.P_COM_wf,
-            self.P_Lhr_wf,
-            self.P_Lhy_wf,
-            self.P_Lhp_wf,
-            self.P_Lkp_wf,
-            self.P_Lap_wf,
-            self.P_Lar_wf,
-            self.P_L_wf  ,
-            self.P_Rhr_wf,
-            self.P_Rhy_wf,
-            self.P_Rhp_wf,
-            self.P_Rkp_wf,
-            self.P_Rap_wf,
-            self.P_Rar_wf,
-            self.P_R_wf  ,
-            self.O_wfL   ,
-            self.O_wfR   ,
-            
-            self.L_R01, self.L_R12, self.L_R23, self.L_R34, self.L_R45, self.L_R56,
-            self.R_R01, self.R_R12, self.R_R23, self.R_R34, self.R_R45, self.R_R56,
-            
-            self.AL1, self.AL2, self.AL3, self.AL4, self.AL5, self.AL6,
-            self.AR1, self.AR2, self.AR3, self.AR4, self.AR5, self.AR6,
-            
-        ) = self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
+        self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
 
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
-        
         
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
         
+        #========接觸判斷========#
+        l_contact = (self.frame.p_lf_in_wf[2,0] <= 0.01)
+        r_contact = (self.frame.p_rf_in_wf[2,0] <= 0.01)
 
-        if self.P_L_wf[2,0] <= 0.01:##\\\\接觸的判斷是z方向在不在0.01以內
-            l_contact == 1
-        else:
-            l_contact == 0
-        if self.P_R_wf[2,0] <= 0.01:
-            r_contact == 1
-        else:
-            r_contact == 0
-
-        #========怎麼切支撐狀態要改========!!!!!#
-        stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.contact_t)
+        #========支撐狀態切換=====#
+        stance = self.stance_change(state, state, self.contact_t)
         
         #========軌跡規劃========#
-        self.PX_ref, self.LX_ref, self.RX_ref = trajRef_planning(state, self.DS_time, Config.DDT)
-
-        #================#
-        l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(jp,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
+        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)
+        
+        #========重力補償跟kl,kr========#
+        l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(self.ros, jp, stance, px_in_lf, px_in_rf, l_contact, r_contact, state)
+        
+        self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
+        self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
+        
         #========膝上雙環控制========#
         #--------膝上外環控制--------#
         JLL, JRR =  self.frame.left_leg_jacobian()
         
-        Le_2,Re_2 = endErr_to_endVel(self.frame, self.PX_ref, self.LX_ref, self.RX_ref,self.PX, self.LX, self.RX)
+        Le_2,Re_2 = endErr_to_endVel(self.frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf)
         VL, VR = endVel_to_jv(Le_2,Re_2,jv,stance,state,JLL,JRR)
         
         #--------膝上內環控制--------#
@@ -635,8 +380,8 @@ class UpperLevelController(Node):
         elif state == 1:
             torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
-            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
-            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
+            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
+            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
             if stance == 1:
                 self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
@@ -645,26 +390,26 @@ class UpperLevelController(Node):
         elif state == 2:
             torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
             
-            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.O_wfL, self.O_wfR)
-            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.PX_ref, self.LX_ref,self.RX_ref)
+            torque[sf][4:6] = swingAnkle_PDcontrol(stance, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
+            torque[cf][4:6] = alip_control(self.frame, stance, self.stance_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
             if stance == 1:
                 self.ros.publisher["torque_l"].publish( Float64MultiArray(data = torque['lf'][4:6] ))
             # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
             self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
 
-        elif state == 30:
-            # self.to_matlab()
-            torque_ALIP = walking_by_ALIP(self, jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
-            torque_L =  alip_L(self, stance, torque_ALIP, self.PX_ref, self.LX_ref)
-            # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
-            # print(stance)
+        # elif state == 30:
+        #     # self.to_matlab()
+        #     torque_ALIP = walking_by_ALIP(self, jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr, self.O_wfL, self.O_wfR)
+        #     torque_L =  alip_L(self, stance, torque_ALIP, ref_pa_pel_in_wf, ref_pa_lf_in_wf)
+        #     # torque_R =  alip_R(self, stance,px_in_lf,torque_ALIP,com_in_rf,state)
+        #     # print(stance)
             
-            if stance == 1:
-                self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_L))
+        #     if stance == 1:
+        #         self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_L))
 
-            elif stance == 0:
-                self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_R))
-            # self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_ALIP))
+        #     elif stance == 0:
+        #         self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_R))
+        #     # self.ros.publisher['effort'].publish(Float64MultiArray(data=torque_ALIP))
         
         self.state_past = copy.deepcopy(state)
         self.stance_past = copy.deepcopy(stance)

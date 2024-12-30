@@ -31,54 +31,6 @@ class RobotFrame:
             'lf': self.__eularToGeometry(self.pa_lf_in_pf[3:]),
             'rf': self.__eularToGeometry(self.pa_rf_in_pf[3:])
         }
-        
-        return (
-            (self.p_pel_in_pf,    self.r_pel_to_pf   ),
-            (self.p_LhipX_in_pf,  self.r_LhipX_to_pf ),
-            (self.p_LhipZ_in_pf,  self.r_LhipZ_to_pf ),
-            (self.p_LhipY_in_pf,  self.r_LhipY_to_pf ),
-            (self.p_LkneeY_in_pf, self.r_LkneeY_to_pf),
-            (self.p_LankY_in_pf,  self.r_LankY_to_pf ),
-            (self.p_LankX_in_pf,  self.r_LankX_to_pf ),
-            (self.p_lf_in_pf,     self.r_lf_to_pf    ),
-            (self.p_RhipX_in_pf,  self.r_RhipX_to_pf ),
-            (self.p_RhipZ_in_pf,  self.r_RhipZ_to_pf ),
-            (self.p_RhipY_in_pf,  self.r_RhipY_to_pf ),
-            (self.p_RkneeY_in_pf, self.r_RkneeY_to_pf),
-            (self.p_RankY_in_pf,  self.r_RankY_to_pf ),
-            (self.p_RankX_in_pf,  self.r_RankX_to_pf ),
-            (self.p_rf_in_pf,     self.r_rf_to_pf    ),
-
-            self.pa_pel_in_pf, self.pa_lf_in_pf, self.pa_rf_in_pf,
-            
-            self.p_pel_in_wf, self.r_pel_to_wf,
-            
-            self.p_com_in_wf   ,
-            self.p_LhipX_in_wf ,
-            self.p_LhipZ_in_wf ,
-            self.p_LhipY_in_wf ,
-            self.p_LkneeY_in_wf,
-            self.p_LankY_in_wf ,
-            self.p_LankX_in_wf ,
-            self.p_lf_in_wf    ,
-            self.p_RhipX_in_wf ,
-            self.p_RhipZ_in_wf ,
-            self.p_RhipY_in_wf ,
-            self.p_RkneeY_in_wf,
-            self.p_RankY_in_wf ,
-            self.p_RankX_in_wf ,
-            self.p_rf_in_wf    ,
-            
-            self.r_lf_to_wf    ,
-            self.r_rf_to_wf,
-            
-            self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L,
-            self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R,
-            
-            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf,
-            self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf, self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf,
-            
-        )
     
     @staticmethod
     def get_posture(pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf):
