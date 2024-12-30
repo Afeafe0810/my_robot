@@ -11,7 +11,7 @@ from utils.rc_frame_kinermatic import RobotFrame
 from utils.config import Config
 from utils.signal_process import Dsp
 
-def gravity_compemsate(ros: ROSInterfaces, joint_position,stance_type,px_in_lf,px_in_rf,l_contact,r_contact,state):
+def gravity_compemsate(ros: ROSInterfaces, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
 
     jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
     jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳

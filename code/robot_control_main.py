@@ -39,8 +39,8 @@ class UpperLevelController(Node):
         self.traj = Trajatory()
         
         #==============================================================robot constant==============================================================#     
-        self.stance = 2
-        self.stance_past = 2
+        self.stance = ['lf', 'rf'] # 第一個是cf, 第二個是sf
+        self.stance_past = ['lf', 'rf']
         self.DS_time = 0.0
 
         #==============================================================robot frame==============================================================#     
@@ -80,11 +80,11 @@ class UpperLevelController(Node):
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK') 
 
-    def stance_change(self, state, stance, contact_t):
-        stance = 1 if state == 0 else\
-                 1 if state == 1 else\
-                 1 if state == 2 else\
-                stance #先不變
+    def stance_change(self, state, contact_t):
+        self.stance = ['lf', 'rf'] if state == 0 else\
+                      ['lf', 'rf'] if state == 1 else\
+                      ['lf', 'rf'] if state == 2 else\
+                    self.stance #先不變
 
         if state == 2:
             if self.DS_time <= 10 * Config.DDT:
@@ -93,10 +93,8 @@ class UpperLevelController(Node):
 
         # 時間到就做兩隻腳的切換
         if state == 30 and abs(contact_t-0.5) <= 0.005 :
-            stance = 0 if stance == 1 else\
-                     1 #if self.stance == 0
+            self.stance.reverse()
                      
-        return stance  
 
     def get_initial_data(self,stance):
         P_L_wf = copy.deepcopy(self.P_L_wf)
@@ -347,13 +345,15 @@ class UpperLevelController(Node):
         r_contact = (self.frame.p_rf_in_wf[2,0] <= 0.01)
 
         #========支撐狀態切換=====#
-        stance = self.stance_change(state, state, self.contact_t)
+        self.stance_change(state, self.contact_t)
         
         #========軌跡規劃========#
         ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)
         
         #========重力補償跟kl,kr========#
-        l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(self.ros, jp, stance, px_in_lf, px_in_rf, l_contact, r_contact, state)
+        l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(
+            self.ros, jp, self.stance, px_in_lf, px_in_rf, l_contact, r_contact, state
+        )
         
         self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
         self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
@@ -371,7 +371,7 @@ class UpperLevelController(Node):
         self.checkpub(VL,jv)
         
         cf, sf = ('lf','rf') if stance == 1 else \
-             ('rf','lf') # if stance == 0, 2
+                ('rf','lf') # if stance == 0, 2
              
         if state == 0:
             torque = balance(jp,l_leg_gravity,r_leg_gravity)
