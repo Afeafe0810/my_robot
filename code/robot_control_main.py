@@ -154,154 +154,9 @@ class UpperLevelController(Node):
 
         self.stance = stance
 
-        return stance
+        return stance  
 
-    def data_in_wf(self,com_in_pink):
-        '''
-        就.....一堆轉換
-        '''
-        #pf_p
-        P_PV_pf = copy.deepcopy(self.P_PV_pf)
-        P_COM_pf = copy.deepcopy(com_in_pink)
-
-        P_Lhr_pf = copy.deepcopy(self.P_Lhr_pf)
-        P_Lhy_pf = copy.deepcopy(self.P_Lhy_pf)
-        P_Lhp_pf = copy.deepcopy(self.P_Lhp_pf)
-        P_Lkp_pf = copy.deepcopy(self.P_Lkp_pf)
-        P_Lap_pf = copy.deepcopy(self.P_Lap_pf)
-        P_Lar_pf = copy.deepcopy(self.P_Lar_pf)
-
-        P_L_pf= copy.deepcopy(self.P_L_pf) 
-
-        P_Rhr_pf = copy.deepcopy(self.P_Rhr_pf)
-        P_Rhy_pf = copy.deepcopy(self.P_Rhy_pf)
-        P_Rhp_pf = copy.deepcopy(self.P_Rhp_pf)
-        P_Rkp_pf = copy.deepcopy(self.P_Rkp_pf)
-        P_Rap_pf = copy.deepcopy(self.P_Rap_pf)
-        P_Rar_pf = copy.deepcopy(self.P_Rar_pf)
-
-        P_R_pf = copy.deepcopy(self.P_R_pf) 
-
-        #pf_o
-        O_pfL = copy.deepcopy(self.O_pfL)
-        O_pfR = copy.deepcopy(self.O_pfR)
-        
-        #PV_o ////直走所以是單位矩陣，沒有旋轉
-        O_PVpf = np.identity(3)
-        #wf_p
-        P_PV_wf = copy.deepcopy(self.P_PV_wf) #ros-3d
-        O_wfPV = copy.deepcopy(self.O_wfPV) #ros-3d
-        P_COM_wf = O_wfPV@O_PVpf@(P_COM_pf - P_PV_pf) + P_PV_wf
-
-        P_Lhr_wf = O_wfPV@O_PVpf@(P_Lhr_pf - P_PV_pf) + P_PV_wf
-        P_Lhy_wf = O_wfPV@O_PVpf@(P_Lhy_pf - P_PV_pf) + P_PV_wf
-        P_Lhp_wf = O_wfPV@O_PVpf@(P_Lhp_pf - P_PV_pf) + P_PV_wf
-        P_Lkp_wf = O_wfPV@O_PVpf@(P_Lkp_pf - P_PV_pf) + P_PV_wf
-        P_Lap_wf = O_wfPV@O_PVpf@(P_Lap_pf - P_PV_pf) + P_PV_wf
-        P_Lar_wf = O_wfPV@O_PVpf@(P_Lar_pf - P_PV_pf) + P_PV_wf
     
-        P_L_wf = O_wfPV@O_PVpf@(P_L_pf - P_PV_pf) + P_PV_wf
-
-        P_Rhr_wf = O_wfPV@O_PVpf@(P_Rhr_pf - P_PV_pf) + P_PV_wf
-        P_Rhy_wf = O_wfPV@O_PVpf@(P_Rhy_pf - P_PV_pf) + P_PV_wf
-        P_Rhp_wf = O_wfPV@O_PVpf@(P_Rhp_pf - P_PV_pf) + P_PV_wf
-        P_Rkp_wf = O_wfPV@O_PVpf@(P_Rkp_pf - P_PV_pf) + P_PV_wf
-        P_Rap_wf = O_wfPV@O_PVpf@(P_Rap_pf - P_PV_pf) + P_PV_wf
-        P_Rar_wf = O_wfPV@O_PVpf@(P_Rar_pf - P_PV_pf) + P_PV_wf
-
-        P_R_wf = O_wfPV@O_PVpf@(P_R_pf - P_PV_pf) + P_PV_wf
-
-        #wf_o
-        O_wfR = O_wfPV@O_PVpf@O_pfR
-        O_wfL = O_wfPV@O_PVpf@O_pfL
-
-        #assign data for global use
-        #position in wf
-        self.P_PV_wf = copy.deepcopy(P_PV_wf)
-        self.P_COM_wf = copy.deepcopy(P_COM_wf)
-
-        self.P_Lhr_wf = copy.deepcopy(P_Lhr_wf)
-        self.P_Lhy_wf = copy.deepcopy(P_Lhy_wf)
-        self.P_Lhp_wf = copy.deepcopy(P_Lhp_wf)
-        self.P_Lkp_wf = copy.deepcopy(P_Lkp_wf)
-        self.P_Lap_wf = copy.deepcopy(P_Lap_wf)
-        self.P_Lar_wf = copy.deepcopy(P_Lar_wf)
-
-        self.P_L_wf = copy.deepcopy(P_L_wf)
-
-        self.P_Rhr_wf = copy.deepcopy(P_Rhr_wf)
-        self.P_Rhy_wf = copy.deepcopy(P_Rhy_wf)
-        self.P_Rhp_wf = copy.deepcopy(P_Rhp_wf)
-        self.P_Rkp_wf = copy.deepcopy(P_Rkp_wf)
-        self.P_Rap_wf = copy.deepcopy(P_Rap_wf)
-        self.P_Rar_wf = copy.deepcopy(P_Rar_wf)
-
-        self.P_R_wf = copy.deepcopy(P_R_wf)
-        #orientation in wf
-        self.O_wfPV = copy.deepcopy(O_wfPV)
-        self.O_wfL = copy.deepcopy(O_wfL)
-        self.O_wfR = copy.deepcopy(O_wfR)
-
-        # self.PX_publisher.publish(Float64MultiArray(data=P_PV_wf))
-        # self.COM_publisher.publish(Float64MultiArray(data=P_COM_wf))
-        # self.LX_publisher.publish(Float64MultiArray(data=P_L_wf))
-        # self.RX_publisher.publish(Float64MultiArray(data=P_R_wf))
-
-        return 
-
-    def rotation_matrix(self,joint_position):
-        jp = copy.deepcopy(joint_position)
-        
-        # 各關節角度
-        Theta1 = jp[0,0] #L_Hip_Roll
-        Theta2 = jp[1,0]
-        Theta3 = jp[2,0]
-        Theta4 = jp[3,0]
-        Theta5 = jp[4,0]
-        Theta6 = jp[5,0] #L_Ankle_Roll
-
-        Theta7 = jp[6,0] #R_Hip_Roll
-        Theta8 = jp[7,0]
-        Theta9 = jp[8,0]
-        Theta10 = jp[9,0]
-        Theta11 = jp[10,0]
-        Theta12 = jp[11,0] #R_Ankle_Roll
-
-        #calculate rotation matrix
-        self.L_R01 = self.frame.get_axis_rotMat('x',Theta1) #L_Hip_roll
-        self.L_R12 = self.frame.get_axis_rotMat('z',Theta2)
-        self.L_R23 = self.frame.get_axis_rotMat('y',Theta3)
-        self.L_R34 = self.frame.get_axis_rotMat('y',Theta4)
-        self.L_R45 = self.frame.get_axis_rotMat('y',Theta5)
-        self.L_R56 = self.frame.get_axis_rotMat('x',Theta6) #L_Ankle_roll
-        self.R_R01 = self.frame.get_axis_rotMat('x',Theta7) #R_Hip_roll
-        self.R_R12 = self.frame.get_axis_rotMat('z',Theta8)
-        self.R_R23 = self.frame.get_axis_rotMat('y',Theta9)
-        self.R_R34 = self.frame.get_axis_rotMat('y',Theta10)
-        self.R_R45 = self.frame.get_axis_rotMat('y',Theta11)
-        self.R_R56 = self.frame.get_axis_rotMat('x',Theta12) #R_Ankle_roll
-
-    def relative_axis(self):
-        '''
-        不知道是幹麻的
-        '''
-        #骨盆姿態(要確認！)
-        self.RP = np.array([[1,0,0],[0,1,0],[0,0,1]])
-        # self.RP = copy.deepcopy(self.O_wfPV)
-
-        self.AL1 = self.RP@(np.array([[1],[0],[0]])) #L_Hip_roll
-        self.AL2 = self.RP@self.L_R01@(np.array([[0],[0],[1]])) 
-        self.AL3 = self.RP@self.L_R01@self.L_R12@(np.array([[0],[1],[0]])) 
-        self.AL4 = self.RP@self.L_R01@self.L_R12@self.L_R23@(np.array([[0],[1],[0]]))
-        self.AL5 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@(np.array([[0],[1],[0]])) 
-        self.AL6 = self.RP@self.L_R01@self.L_R12@self.L_R23@self.L_R34@self.L_R45@(np.array([[1],[0],[0]])) #L_Ankle_Roll
-
-        self.AR1 = self.RP@(np.array([[1],[0],[0]])) #R_Hip_roll
-        self.AR2 = self.RP@self.R_R01@(np.array([[0],[0],[1]])) 
-        self.AR3 = self.RP@self.R_R01@self.R_R12@(np.array([[0],[1],[0]])) 
-        self.AR4 = self.RP@self.R_R01@self.R_R12@self.R_R23@(np.array([[0],[1],[0]]))
-        self.AR5 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@(np.array([[0],[1],[0]])) 
-        self.AR6 = self.RP@self.R_R01@self.R_R12@self.R_R23@self.R_R34@self.R_R45@(np.array([[1],[0],[0]])) #R_Ankle_Roll
 
     def get_initial_data(self,stance):
         P_L_wf = copy.deepcopy(self.P_L_wf)
@@ -951,6 +806,11 @@ class UpperLevelController(Node):
             self.O_wfL   ,
             self.O_wfR   ,
             
+            self.L_R01, self.L_R12, self.L_R23, self.L_R34, self.L_R45, self.L_R56,
+            self.R_R01, self.R_R12, self.R_R23, self.R_R34, self.R_R45, self.R_R56,
+            
+            self.AL1, self.AL2, self.AL3, self.AL4, self.AL5, self.AL6,
+            self.AR1, self.AR2, self.AR3, self.AR4, self.AR5, self.AR6,
             
         ) = self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
         
@@ -969,12 +829,6 @@ class UpperLevelController(Node):
         #==========待刪掉==========#
         self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
         l_contact,r_contact = self.l_contact, self.r_contact
-        
-        #這邊算相對的矩陣
-        self.rotation_matrix(jp)
-        #這邊算wf下各軸姿態
-        self.relative_axis()
-
         
 
         if self.P_L_wf[2,0] <= 0.01:##\\\\接觸的判斷是z方向在不在0.01以內

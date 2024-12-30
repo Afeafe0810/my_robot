@@ -20,9 +20,12 @@ class RobotFrame:
         
         pass
     
+    #=======================對外的接口=================================#
     def updateFrame(self, ros: ROSInterfaces, config: pink.Configuration, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray, jp: np.ndarray):
         self.__update_pfFrame(config, ros, jp)
         self.__update_wfFrame(p_base_in_wf, r_base_to_wf)
+        self.__update_linkRotMat(jp)
+        self.__update_axisVec()
         
         self.eularToGeo ={
             'lf': self.__eularToGeometry(self.pa_lf_in_pf[3:]),
@@ -68,6 +71,13 @@ class RobotFrame:
             
             self.r_lf_to_wf    ,
             self.r_rf_to_wf,
+            
+            self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L,
+            self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R,
+            
+            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf,
+            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf,
+            
         )
     
     @staticmethod
@@ -77,6 +87,9 @@ class RobotFrame:
         pa_rfTOpel_in_pf = pa_pel_in_pf - pa_rf_in_pf #骨盆中心相對於右腳
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
+
+
+    #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
@@ -126,7 +139,48 @@ class RobotFrame:
         
         self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
         self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
- 
+
+    def __update_linkRotMat(self, jps: np.ndarray):
+        axes = ['x', 'z', 'y', 'y', 'y', 'x']
+        
+        self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L = [
+            self.__get_axis_rotMat(axis, jp) for axis, jp in zip( axes, jps[:6,0] ) 
+        ]
+        
+        self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R = [
+            self.__get_axis_rotMat(axis, jp) for axis, jp in zip( axes, jps[6:,0] ) 
+        ]
+
+    def __update_axisVec(self):
+        '''
+        不知道是幹麻的
+        '''
+        #骨盆姿態(要確認！)
+        RP = np.eye(3)
+        # self.RP = copy.deepcopy(self.O_wfPV)
+        axes = ['x', 'z', 'y', 'y', 'y', 'x']
+        axes_map = {
+            'x': np.vstack(( 1, 0, 0 )),
+            'y': np.vstack(( 0, 1, 0 )),
+            'z': np.vstack(( 0, 0, 1 )),
+        }
+        vec_axes = [ axes_map[axis] for axis in axes ]
+
+        self.axis_1L_in_pf = RP @ vec_axes[0]
+        self.axis_2L_in_pf = RP @ self.r_1_to_0_L @ vec_axes[1]
+        self.axis_3L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ vec_axes[2]
+        self.axis_4L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ vec_axes[3]
+        self.axis_5L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ vec_axes[4]
+        self.axis_6L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ self.r_5_to_4_L @ vec_axes[5]
+        
+        self.axis_1L_in_pf = RP @ vec_axes[0]
+        self.axis_2L_in_pf = RP @ self.r_1_to_0_R @ vec_axes[1]
+        self.axis_3L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ vec_axes[2]
+        self.axis_4L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ vec_axes[3]
+        self.axis_5L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ vec_axes[4]
+        self.axis_6L_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ self.r_5_to_4_R @ vec_axes[5]
+        
+    #========================toolbox================================#
     @staticmethod
     def __getOneInPf(config: pink.Configuration, link: str):
         htm = config.get_transform_frame_to_world(link)
@@ -156,14 +210,13 @@ class RobotFrame:
         ))
     
     @staticmethod
-    def get_axis_rotMat(axis: str, theta:float)->np.ndarray:
+    def __get_axis_rotMat(axis: str, theta:float)->np.ndarray:
         vec_theta = [theta, 0, 0] if axis == 'x' else\
                     [0, theta, 0] if axis == 'y' else\
                     [0, 0, theta] if axis == 'z' else None
                     
         return R.from_rotvec(vec_theta).as_matrix()
         
-    
     @staticmethod
     def __eularToGeometry(angle: np.ndarray):
         _, ay, az = angle.flatten()
