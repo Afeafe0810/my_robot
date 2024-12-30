@@ -11,11 +11,10 @@ from utils.rc_frame_kinermatic import RobotFrame
 from utils.config import Config
 from utils.signal_process import Dsp
 
-def gravity_compemsate(ros: ROSInterfaces, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
+def gravity_compemsate(ros: ROSInterfaces, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
 
     jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
     jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
-    stance = copy.deepcopy((stance_type))
     
     #DS_gravity
     jp_L_DS = np.flip(-jp_l,axis=0)
@@ -55,35 +54,35 @@ def gravity_compemsate(ros: ROSInterfaces, joint_position, stance, px_in_lf, px_
     R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
     LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
 
-    if stance == 2:
-        if r_contact == 1:
-            kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        else:
-            kr = np.array([[1],[1],[1],[1],[1],[1]])
-        if l_contact == 1:
-            kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        else:
-            kl = np.array([[1],[1],[1],[1],[1],[1]])
+    # if stance == 2:
+    #     if r_contact == 1:
+    #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+    #     else:
+    #         kr = np.array([[1],[1],[1],[1],[1],[1]])
+    #     if l_contact == 1:
+    #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+    #     else:
+    #         kl = np.array([[1],[1],[1],[1],[1],[1]])
 
-        if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-            Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
+    #     if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
+    #         Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
         
-        elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-            Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
+    #     elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
+    #         Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
         
-        else:
-            Leg_gravity = DS_gravity
+    #     else:
+    #         Leg_gravity = DS_gravity
 
-        # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-        #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
+    #     # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
+    #     #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
         
-        # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-        #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
+    #     # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
+    #     #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
         
-        # else:
-        #     Leg_gravity = DS_gravity
+    #     # else:
+    #     #     Leg_gravity = DS_gravity
     
-    elif stance == 0:
+    if cf == 'rf':
         if r_contact == 1:
             kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
         else:
@@ -113,7 +112,7 @@ def gravity_compemsate(ros: ROSInterfaces, joint_position, stance, px_in_lf, px_
         # # else:
         # #     Leg_gravity = RSS_gravity
     
-    elif stance == 1:
+    elif cf == 'lf':
         if r_contact == 1:
             kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
         else:

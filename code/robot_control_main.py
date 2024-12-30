@@ -353,7 +353,7 @@ class UpperLevelController(Node):
         
         #========重力補償跟kl,kr========#
         l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(
-            self.ros, jp, self.stance, px_in_lf, px_in_rf, l_contact, r_contact, state
+            self.ros, jp, cf, px_in_lf, px_in_rf, l_contact, r_contact, state
         )
         
         self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
