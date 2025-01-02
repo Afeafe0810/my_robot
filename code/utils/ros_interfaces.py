@@ -82,7 +82,7 @@ class ROSInterfaces:
     @staticmethod
     def __createPublishers(node: Node):
         '''
-        建立發布器，其中effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩
+        建立發布器, 其中effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩
         ->我們程式的目的就是為了pub他
         '''
         return {
@@ -125,16 +125,18 @@ class ROSInterfaces:
         self.__r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
     
     def __update_state_callback(self, msg:Float64MultiArray):
+        '''state是我們控制的模式, 用pub與subscibe來控制'''
         self.__state = msg.data[0]
   
     def __update_contact_callback(self, msg:ContactsState ):
-        
+        '''可以判斷是否『接觸』, 無法判斷是否『踩穩』'''
         if msg.header.frame_id == 'l_foot_1':
             self.__contact_lf = len(msg.states)>=1
         elif msg.header.frame_id == 'r_foot_1':
             self.__contact_rf = len(msg.states)>=1
             
     def __update_jp_callback(self, msg:JointState ):
+        '''訂閱jp, 且每5次會callback主程式一次'''
         if len(msg.position) == 12:
             jp_pair = {jnt: value for jnt,value in zip( Config.JNT_ORDER_SUB, msg.position) }
             self.__jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
@@ -146,6 +148,7 @@ class ROSInterfaces:
             
     @staticmethod
     def __loadMeshcatModel(urdf_path: str):
+        '''高級動力學模型'''
         robot = pin.RobotWrapper.BuildFromURDF(
             filename = Config.ROBOT_MODEL_DIR + urdf_path,
             package_dirs = ["."],
@@ -158,7 +161,7 @@ class ROSInterfaces:
     
     @staticmethod
     def __loadSimpleModel(urdf_path: str):
-        
+        '''基礎動力學模型, 只用來算重力矩'''
         urdf_filename = Config.ROBOT_MODEL_DIR + urdf_path if len(argv)<2 else argv[1]
         model  = pin.buildModelFromUrdf(urdf_filename)
         print('model name: ' + model.name)
@@ -168,6 +171,7 @@ class ROSInterfaces:
      
     @staticmethod
     def  __meshcatVisualize(meshrobot: pin.RobotWrapper):
+        '''可視化高級動力學模型'''
         viz = pin.visualize.MeshcatVisualizer( meshrobot.model, meshrobot.collision_model, meshrobot.visual_model )
         meshrobot.setVisualizer(viz, init=False)
         viz.initViewer(open=True)
