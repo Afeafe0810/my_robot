@@ -38,6 +38,8 @@ class UpperLevelController(Node):
         #負責處理軌跡
         self.traj = Trajatory()
         
+        self.ctrl = TorqueControl()
+        
         #==============================================================robot constant==============================================================#     
         self.stance = ['lf', 'rf'] # 第一個是cf, 第二個是sf
         self.stance_past = ['lf', 'rf']
@@ -348,20 +350,15 @@ class UpperLevelController(Node):
         #========軌跡規劃========#
         ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)
         
-        #========重力補償跟kl,kr========#
-        l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(
-            self.ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_lf, state
-        )
-        
-        self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
-        self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
+        # self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
+        # self.ros.publisher["gravity_r"].publish(Float64MultiArray(data=r_leg_gravity))
         
         #========膝上雙環控制========#
         #--------膝上外環控制--------#
+        
         JLL, JRR =  self.frame.left_leg_jacobian()
         
-        Le_2,Re_2 = endErr_to_endVel(self.frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf)
-        VL, VR = endVel_to_jv(Le_2, Re_2, jv, self.stance, state, JLL, JRR)
+        VL, VR = Outterloop.get_jv_cmd(self.frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, self.stance, state, JLL, JRR)
         
         #--------膝上內環控制--------#
         
@@ -370,11 +367,11 @@ class UpperLevelController(Node):
         
              
         if state == 0:
-            torque = balance(jp,l_leg_gravity,r_leg_gravity)
+            torque = Innerloop.balance(jp,self.ros,cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
             self.ros.publisher['effort'].publish(Float64MultiArray(data=torque))
 
         elif state == 1:
-            torque = innerloopDynamics(jv, VL, VR, l_leg_gravity, r_leg_gravity, kl, kr)
+            torque = Innerloop.innerloopDynamics(jv, VL, VR, self.ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
             
             torque[sf][4:6] = swingAnkle_PDcontrol(sf, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
             torque[cf][4:6] = alip_control(self.frame, cf, cf_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
@@ -384,7 +381,7 @@ class UpperLevelController(Node):
             self.ros.publisher['effort'].publish(Float64MultiArray(data = np.vstack(( torque['lf'], torque['rf'] )) ) )
             
         elif state == 2:
-            torque = innerloopDynamics(jv,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr)
+            torque = Innerloop.innerloopDynamics(jv, VL, VR, self.ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
             
             torque[sf][4:6] = swingAnkle_PDcontrol(sf, self.frame.r_lf_to_wf, self.frame.r_rf_to_wf)
             torque[cf][4:6] = alip_control(self.frame, cf, cf_past, self.frame.p_com_in_wf, self.frame.p_lf_in_wf, self.frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
