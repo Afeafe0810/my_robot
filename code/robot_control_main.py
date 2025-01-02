@@ -335,13 +335,10 @@ class UpperLevelController(Node):
 
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
-        #==========待刪掉==========#
-        self.P_B_wf, self.O_wfB, self.pub_state, self.l_contact, self.r_contact, self.jp_sub = p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp
-        l_contact,r_contact = self.l_contact, self.r_contact
         
         #========接觸判斷========#
-        l_contact = (self.frame.p_lf_in_wf[2,0] <= 0.01)
-        r_contact = (self.frame.p_rf_in_wf[2,0] <= 0.01)
+        contact_lf = (self.frame.p_lf_in_wf[2,0] <= 0.01)
+        contact_rf = (self.frame.p_rf_in_wf[2,0] <= 0.01)
 
         #========支撐狀態切換=====#
         self.stance_change(state, self.contact_t)
@@ -353,7 +350,7 @@ class UpperLevelController(Node):
         
         #========重力補償跟kl,kr========#
         l_leg_gravity, r_leg_gravity, kl, kr = gravity_compemsate(
-            self.ros, jp, cf, px_in_lf, px_in_rf, l_contact, r_contact, state
+            self.ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_lf, state
         )
         
         self.ros.publisher["gravity_l"].publish(Float64MultiArray(data=l_leg_gravity))
