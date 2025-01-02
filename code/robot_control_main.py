@@ -18,9 +18,9 @@ from linkattacher_msgs.srv import DetachLink
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
-from utils.rc_frame_kinermatic import RobotFrame
-from utils.robot_control_traj import *
-from utils.robot_control_knee_control import *
+from utils.frame_kinermatic import RobotFrame
+from utils.trajatory_planning import *
+from utils.torque_control import *
 #========================================================#
 
 class UpperLevelController(Node):

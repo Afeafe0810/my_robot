@@ -7,7 +7,7 @@ import pinocchio as pin
 
 #================ import library ========================#
 from utils.ros_interfaces import ROSInterfaces
-from utils.rc_frame_kinermatic import RobotFrame
+from utils.frame_kinermatic import RobotFrame
 from utils.config import Config
 from utils.signal_process import Dsp
 
