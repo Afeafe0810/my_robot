@@ -1,5 +1,5 @@
 from std_msgs.msg import Float64MultiArray 
-import numpy as np; np.set_printoptions(precision=2)
+import numpy as np; np.set_printoptions(precision=4)
 from copy import deepcopy
 from math import cos, sin
 from scipy.spatial.transform import Rotation as R
@@ -12,18 +12,20 @@ from utils.ros_interfaces import ROSInterfaces
 
 class RobotFrame:
     def __init__(self):
-        self.P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
-        self.r_pf_to_pel = np.identity(3)
-        
-        self.p_base_in_wf: np.ndarray = None
-        self.r_base_to_wf: np.ndarray = None
-        
+
         pass
     
     #=======================對外的接口=================================#
     def updateFrame(self, ros: ROSInterfaces, config: pink.Configuration, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray, jp: np.ndarray):
+        '''更新所有frame下的座標'''
+        
+        #透過機器人的meshcat的config來更新pink frame下的座標
         self.__update_pfFrame(config, ros, jp)
+        
+        #透過pink的座標, 以及訂閱到的base_in_wf, 可以用運動學得到其他部位in_wf (事後發現, 其實pink frame就是base)
         self.__update_wfFrame(p_base_in_wf, r_base_to_wf)
+        
+        #得到link間的旋轉矩陣
         self.__update_linkRotMat(jp)
         self.__update_axisVec()
         
@@ -76,6 +78,7 @@ class RobotFrame:
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
+        '''可以得到各部位在pink frame下的資訊'''
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
         self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1")
         self.p_LhipZ_in_pf,  self.r_LhipZ_to_pf  = self.__getOneInPf(config, "l_hip_pitch_1")
@@ -99,12 +102,14 @@ class RobotFrame:
         self.pa_rf_in_pf  = np.vstack(( self.p_rf_in_pf , self.__rotMat_to_euler(self.r_rf_to_pf)  ))
               
     def __update_wfFrame(self, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray):
-        self.p_pel_in_wf, self.r_pel_to_wf = self.__get_pelInWf(p_base_in_wf, r_base_to_wf)
+        '''得到各點在world frame下的資訊'''
         
-        r_pf_to_wf = self.r_pel_to_wf @ self.r_pel_to_pf.T
-        place_in_pfToWf = lambda p_in_pf: r_pf_to_wf @ (p_in_pf - self.p_pel_in_pf) + self.p_pel_in_wf
+        p_pf_in_wf, r_pf_to_wf = p_base_in_wf, r_base_to_wf
+        
+        place_in_pfToWf = lambda p_in_pf: r_pf_to_wf @ p_in_pf + p_pf_in_wf
         rotat_to_pfToWf = lambda r_to_pf: r_pf_to_wf @ r_to_pf
         
+        self.p_pel_in_wf    = place_in_pfToWf(self.p_pel_in_pf)
         self.p_com_in_wf    = place_in_pfToWf(self.p_com_in_pf)
         self.p_LhipX_in_wf  = place_in_pfToWf(self.p_LhipX_in_pf) 
         self.p_LhipZ_in_wf  = place_in_pfToWf(self.p_LhipZ_in_pf) 
@@ -121,10 +126,12 @@ class RobotFrame:
         self.p_RankX_in_wf  = place_in_pfToWf(self.p_RankX_in_pf) 
         self.p_rf_in_wf     = place_in_pfToWf(self.p_rf_in_pf)    
         
-        self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
-        self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
+        self.r_pel_to_wf = rotat_to_pfToWf(self.r_pel_to_pf)
+        self.r_lf_to_wf  = rotat_to_pfToWf(self.r_lf_to_pf)
+        self.r_rf_to_wf  = rotat_to_pfToWf(self.r_rf_to_pf)
 
     def __update_linkRotMat(self, jps: np.ndarray):
+        '''利用旋轉軸向量得到link間的旋轉矩陣'''
         axes = ['x', 'z', 'y', 'y', 'y', 'x']
         
         self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L = [
@@ -136,12 +143,8 @@ class RobotFrame:
         ]
 
     def __update_axisVec(self):
-        '''
-        不知道是幹麻的
-        '''
-        #骨盆姿態(要確認！)
-        RP = np.eye(3)
-        # self.RP = copy.deepcopy(self.O_wfPV)
+        '''得到各關節軸的單位向量'''
+        
         axes = ['x', 'z', 'y', 'y', 'y', 'x']
         axes_map = {
             'x': np.vstack(( 1, 0, 0 )),
@@ -149,42 +152,39 @@ class RobotFrame:
             'z': np.vstack(( 0, 0, 1 )),
         }
         vec_axes = [ axes_map[axis] for axis in axes ]
-
-        self.axis_1L_in_pf = RP @ vec_axes[0]
-        self.axis_2L_in_pf = RP @ self.r_1_to_0_L @ vec_axes[1]
-        self.axis_3L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ vec_axes[2]
-        self.axis_4L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ vec_axes[3]
-        self.axis_5L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ vec_axes[4]
-        self.axis_6L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ self.r_5_to_4_L @ vec_axes[5]
         
-        self.axis_1R_in_pf = RP @ vec_axes[0]
-        self.axis_2R_in_pf = RP @ self.r_1_to_0_R @ vec_axes[1]
-        self.axis_3R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ vec_axes[2]
-        self.axis_4R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ vec_axes[3]
-        self.axis_5R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ vec_axes[4]
-        self.axis_6R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ self.r_5_to_4_R @ vec_axes[5]
+        #hint: link0就是base(也就是pel的姿態)
+        r_n_to_0_L = np.cumprod(
+            [ np.eye(3), self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L ],
+            axis=0
+        )
+        r_n_to_0_R = np.cumprod(
+            [ np.eye(3), self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R ],
+            axis=0
+        )
+        self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf = [
+            r_n_to_0_L[i] @ vec_axes[i] for i in range(6)
+        ]
+        
+        self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf, self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf = [
+            r_n_to_0_R[i] @ vec_axes[i] for i in range(6)
+        ]
+        
         
     #========================toolbox================================#
     @staticmethod
     def __getOneInPf(config: pink.Configuration, link: str):
+        '''利用機器人模型, 得到pink frame下的座標'''
         htm = config.get_transform_frame_to_world(link)
         p_in_pf = np.reshape( htm.translation, (3,1) )
         r_to_pf = np.reshape( htm.rotation, (3,3) )
         return p_in_pf, r_to_pf 
     
     def __get_comInPf(self, ros: ROSInterfaces, jp: np.ndarray):
-        
-        pin.centerOfMass(
-            ros.bipedal_floating_model, ros.bipedal_floating_data, jp
-        )
-        p_com_in_pf = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
-        return p_com_in_pf
-           
-    def __get_pelInWf(self, p_base_in_wf, r_base_to_wf):
-        return(
-            r_base_to_wf @ self.P_PEL_IN_BASE + p_base_in_wf,
-            deepcopy(r_base_to_wf)
-        )
+        '''利用機器人模型, 得到pink frame下的座標'''
+        return np.vstack((
+            pin.centerOfMass( ros.bipedal_floating_model, ros.bipedal_floating_data, jp )
+        ))
         
     @staticmethod
     def __rotMat_to_euler(r_to_frame: np.ndarray)->np.ndarray:

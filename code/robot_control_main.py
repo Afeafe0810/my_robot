@@ -72,7 +72,6 @@ class UpperLevelController(Node):
 
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
-        
         #========接觸判斷========#
         contact_lf = (self.frame.p_lf_in_wf[2,0] <= 0.01)
         contact_rf = (self.frame.p_rf_in_wf[2,0] <= 0.01)
