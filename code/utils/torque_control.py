@@ -114,37 +114,58 @@ class Outterloop:
     
     @classmethod
     def get_jv_cmd(cls, frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv_f, stance, state, JLL, JRR):
+        ref_pa_in_wf = {
+            'pel': ref_pa_pel_in_wf,
+            'lf': ref_pa_lf_in_wf,
+            'rf': ref_pa_rf_in_wf
+        }
         
-        Le_2, Re_2 = cls.__endErr_to_endVel(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf)
+        pa_in_pf = {
+            'pel': frame.pa_pel_in_pf,
+            'lf': frame.pa_lf_in_pf,
+            'rf': frame.pa_rf_in_pf
+        }
+        
+        D = cls.__endErr_to_endVel(ref_pa_in_wf, pa_in_pf, frame.eularToGeo)
+        Le_2, Re_2 = D['lf'], D['rf']
         
         return cls.__endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR)
 
     @staticmethod           
-    def __endErr_to_endVel(frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
-        pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf = frame.pa_pel_in_pf, frame.pa_lf_in_pf , frame.pa_rf_in_pf
+    def __endErr_to_endVel(ref_pa_in_wf, pa_in_pf, eularToGeo):
         #========求相對骨盆的向量========#
-        ref_pa_pelTOlf_in_pf = ref_pa_lf_in_wf -ref_pa_pel_in_wf
-        ref_pa_pelTOrf_in_pf = ref_pa_rf_in_wf -ref_pa_pel_in_wf
-        
-        pa_pelTOlf_in_pf = pa_lf_in_pf -pa_pel_in_pf
-        pa_pelTOrf_in_pf = pa_rf_in_pf -pa_pel_in_pf
+        ref_pa_pelTOft_in_wf = {
+            'lf': ref_pa_in_wf['lf'] - ref_pa_in_wf['pel'],
+            'rf': ref_pa_in_wf['rf'] - ref_pa_in_wf['pel']
+        }
+
+        pa_pelTO_ft_in_pf = {
+            'lf': pa_in_pf['lf'] - pa_in_pf['pel'],
+            'rf': pa_in_pf['rf'] - pa_in_pf['pel'],
+        }
         
         #========經加法器算誤差========#
-        err_pa_pelTOlf_in_pf = ref_pa_pelTOlf_in_pf - pa_pelTOlf_in_pf
-        err_pa_pelTOrf_in_pf = ref_pa_pelTOrf_in_pf - pa_pelTOrf_in_pf
+        err_pa_pelTOft_in_pf = {
+            'lf': ref_pa_pelTOft_in_wf['lf'] - pa_pelTO_ft_in_pf['lf'],
+            'rf': ref_pa_pelTOft_in_wf['rf'] - pa_pelTO_ft_in_pf['rf']
+        }
 
         #========經P gain作為微分========#
-        derr_pa_pelTOlf_in_pf = 20 * err_pa_pelTOlf_in_pf
-        derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
+        derr_pa_pelTOft_in_pf = {
+            'lf': 20 * err_pa_pelTOft_in_pf['lf'],
+            'rf': 20 * err_pa_pelTOft_in_pf['rf']
+        }
         
         #========歐拉角速度轉幾何角速度========#
-        w_pelTOlf_in_pf = frame.eularToGeo['lf'] @ derr_pa_pelTOlf_in_pf[3:]
-        w_pelTOrf_in_pf = frame.eularToGeo['rf'] @ derr_pa_pelTOrf_in_pf[3:]
-        
-        vw_pelTOlf_in_pf = np.vstack(( derr_pa_pelTOlf_in_pf[:3], w_pelTOlf_in_pf ))
-        vw_pelTOrf_in_pf = np.vstack(( derr_pa_pelTOrf_in_pf[:3], w_pelTOrf_in_pf ))
+        w_pelTOft_in_pf = {
+            'lf': eularToGeo['lf'] @ derr_pa_pelTOft_in_pf['lf'][3:],
+            'rf': eularToGeo['rf'] @ derr_pa_pelTOft_in_pf['rf'][3:],
+        }
 
-        return vw_pelTOlf_in_pf, vw_pelTOrf_in_pf
+        return {
+            'lf': np.vstack(( derr_pa_pelTOft_in_pf['lf'][:3], w_pelTOft_in_pf['lf'] )),
+            'rf': np.vstack(( derr_pa_pelTOft_in_pf['rf'][:3], w_pelTOft_in_pf['rf'] )),
+        }
 
     @staticmethod
     def __endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR):
