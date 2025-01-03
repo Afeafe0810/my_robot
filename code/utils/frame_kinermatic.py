@@ -76,7 +76,10 @@ class RobotFrame:
         
         JR = np.vstack(( Jp_R, Ja_R ))
         
-        return JL, JR
+        return {
+            'lf': JL,
+            'rf': JR
+        }
 
     #=======================封裝主要的部份================================#
     

@@ -27,8 +27,8 @@ class TorqueControl:
     
     @staticmethod
     def __kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
-        VL, VR = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
-        return Innerloop.innerloopDynamics(jv, VL, VR, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
+        cmd_jv = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
+        return Innerloop.innerloopDynamics(jv, cmd_jv, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
     
     @staticmethod
     def __swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
@@ -113,7 +113,7 @@ class TorqueControl:
 class Outterloop:
     
     @classmethod
-    def get_jv_cmd(cls, frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv_f, stance, state, JLL, JRR):
+    def get_jv_cmd(cls, frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
         ref_pa_in_wf = {
             'pel': ref_pa_pel_in_wf,
             'lf': ref_pa_lf_in_wf,
@@ -126,13 +126,14 @@ class Outterloop:
             'rf': frame.pa_rf_in_pf
         }
         
-        D = cls.__endErr_to_endVel(ref_pa_in_wf, pa_in_pf, frame.eularToGeo)
-        Le_2, Re_2 = D['lf'], D['rf']
+        endVel = cls.__endErr_to_endVel(ref_pa_in_wf, pa_in_pf, frame.eularToGeo)
         
-        return cls.__endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR)
+        
+        return cls.__endVel_to_jv(state, stance, jv, endVel, frame.getJacobian())
 
     @staticmethod           
     def __endErr_to_endVel(ref_pa_in_wf, pa_in_pf, eularToGeo):
+        '''外環減法器與P gain, 並轉成幾何角速度'''
         #========求相對骨盆的向量========#
         ref_pa_pelTOft_in_wf = {
             'lf': ref_pa_in_wf['lf'] - ref_pa_in_wf['pel'],
@@ -168,15 +169,16 @@ class Outterloop:
         }
 
     @staticmethod
-    def __endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR):
+    def __endVel_to_jv(state, stance, joint_velocity, endVel: dict, J:dict):
         cf, sf = stance
         
-        endVel = {'lf': Le_2, 'rf': Re_2}
-        jv = {'lf': jv_f[:6], 'rf': jv_f[6:]}
-        jv_ankle = {'lf': jv['lf'][-2:], 'rf': jv['rf'][-2:]}
-        J = {
-            'lf': JLL,
-            'rf': JRR
+        jv = {
+            'lf': joint_velocity[:6],
+            'rf': joint_velocity[6:]
+        }
+        jv_ankle = {
+            'lf': jv['lf'][-2:],
+            'rf': jv['rf'][-2:]
         }
         
         if state == 0 or state == 2 :
@@ -186,22 +188,25 @@ class Outterloop:
             }
             
         elif state == 1: #or state == 2 :#真雙支撐
-            #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
-            #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
+            #支撐腳膝上四關節: 控骨盆z, axyz
+            #擺動腳膝上四關節: 控落點xyz, az
+            tgt = {
+                cf: slice(2, 6),
+                sf: [0,1,2,5]
+            }
+            
             ctrlVel = {
-                cf: endVel[cf][2:],
-                sf: endVel[sf][[0,1,2,5]]
+                cf: endVel[cf][tgt[cf]],
+                sf: endVel[sf][tgt[sf]]
             }
             J_ankle_to_ctrlVel = {
-                cf: J[cf][2:, 4:],
-                sf: J[sf][[0,1,2,-1], 4:]
+                cf: J[cf][tgt[cf], 4:],
+                sf: J[sf][tgt[sf], 4:]
             }
-            
             J_knee_to_ctrlVel = {
-                cf: J[cf][2:, :4],
-                sf: J[sf][[0,1,2,-1], :4]
+                cf: J[cf][tgt[cf], :4],
+                sf: J[sf][tgt[sf], :4]
             }
-            
             cmd_jv_knee = {
                 cf: np.linalg.pinv(J_knee_to_ctrlVel[cf]) @ ( ctrlVel[cf] - J_ankle_to_ctrlVel[cf] @ jv_ankle[cf] ),
                 sf: np.linalg.pinv(J_knee_to_ctrlVel[sf]) @ ( ctrlVel[sf] - J_ankle_to_ctrlVel[sf] @ jv_ankle[sf] )
@@ -211,7 +216,7 @@ class Outterloop:
                 sf: np.vstack(( cmd_jv_knee[sf], 0, 0 ))
             }
         
-        return cmd_jv['lf'], cmd_jv['rf']
+        return cmd_jv
     
 class Innerloop:
     
@@ -229,18 +234,28 @@ class Innerloop:
         return torque
     
     @classmethod
-    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, ros: ROSInterfaces, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
-        cmd_v = np.vstack(( vl_cmd, vr_cmd ))
-        l_leg_gravity, r_leg_gravity, kl,kr = cls.__gravity_compemsate(ros, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state)
+    def innerloopDynamics(cls, joint_velocity, cmd_jv: dict, ros: ROSInterfaces, jp, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
+        jv = {
+            'lf': joint_velocity[:6],
+            'rf': joint_velocity[6:]
+        }
         
-        gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
-        kp = np.vstack(( kl,kr ))
+        l_leg_gravity, r_leg_gravity, kl,kr = cls.__gravity_compemsate(ros, jp, cf, px_in_lf, px_in_rf, l_contact, r_contact, state)
+        
+        gravity = {
+            'lf': l_leg_gravity,
+            'rf': r_leg_gravity
+        }
+        kp = {
+            'lf': kl,
+            'rf': kr
+        }
 
-        torque = kp * (cmd_v - jv) + gravity
 
         return {
-            'lf': torque[:6],
-            'rf': torque[6:]
+            'lf': kp['lf'] * (cmd_jv['lf'] - jv['lf']) + gravity['lf'],
+            'rf': kp['rf'] * (cmd_jv['rf'] - jv['rf']) + gravity['rf']
+
         }
     
     @staticmethod
