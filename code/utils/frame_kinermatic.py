@@ -5,6 +5,8 @@ from math import cos, sin
 from scipy.spatial.transform import Rotation as R
 import pink
 import pinocchio as pin
+from itertools import accumulate
+from operator import matmul
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
@@ -154,14 +156,15 @@ class RobotFrame:
         vec_axes = [ axes_map[axis] for axis in axes ]
         
         #hint: link0就是base(也就是pel的姿態)
-        r_n_to_0_L = np.cumprod(
+        r_n_to_0_L = list(accumulate(
             [ np.eye(3), self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L ],
-            axis=0
-        )
-        r_n_to_0_R = np.cumprod(
+            func = matmul
+        ))
+        r_n_to_0_R = list(accumulate(
             [ np.eye(3), self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R, self.r_6_to_5_R ],
-            axis=0
-        )
+            func = matmul
+        ))
+        
         self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf, self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf = [
             r_n_to_0_L[i] @ vec_axes[i] for i in range(6)
         ]
