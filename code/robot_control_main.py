@@ -83,7 +83,7 @@ class UpperLevelController(Node):
         
         #========軌跡規劃========#
         ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)        
-        JLL, JRR =  self.frame.left_leg_jacobian()
+        JLL, JRR =  self.frame.getJacobian()
 
         #========扭矩控制========#
         

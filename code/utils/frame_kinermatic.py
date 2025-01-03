@@ -44,7 +44,8 @@ class RobotFrame:
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
  
-    def left_leg_jacobian(self):
+    def getJacobian(self):
+        '''回傳geomerty Jacobian'''
         Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_LhipX_in_pf ), axis = 0 )
         Jp2_L = np.cross( self.axis_2L_in_pf, (self.p_lf_in_pf - self.p_LhipZ_in_pf ), axis = 0 )
         Jp3_L = np.cross( self.axis_3L_in_pf, (self.p_lf_in_pf - self.p_LhipY_in_pf ), axis = 0 )
@@ -172,7 +173,6 @@ class RobotFrame:
         self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf, self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf = [
             r_n_to_0_R[i] @ vec_axes[i] for i in range(6)
         ]
-        
         
     #========================toolbox================================#
     @staticmethod
