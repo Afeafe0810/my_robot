@@ -255,62 +255,45 @@ class Innerloop:
  
     @staticmethod
     def __calculate_gravity(ros: ROSInterfaces, joint_position, stance, px_in_lf, px_in_rf):
-        cf, sf = stance
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]), (6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]), (6,1))  #右腳
+        jp = {
+            'lf': joint_position[:6],
+            'rf': joint_position[6:]
+        }
+        jp_from_ft = {
+            'lf': np.vstack( -jp['lf'][::-1], jp['rf'] ),
+            'rf': np.vstack( -jp['rf'][::-1], jp['lf'] )
+
+        }
         
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l, axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(ros.stance_l_model, ros.stance_l_data, jp_L_DS, jv_L_DS, c_L_DS), (6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity, axis=0)
+        jv_single_leg = ja_single_leg = np.zeros((6,1))
+        jv_total = ja_total = np.zeros((12,1))
+        
+        #半邊單腳模型6*1
+        gravity_single_ft = {
+            'lf': np.vstack(
+                -pin.rnea(ros.stance_l_model, ros.stance_l_data, -jp['lf'][::-1], jv_single_leg, ja_single_leg)[::-1],
+                ),
+            'rf': np.vstack(
+                -pin.rnea(ros.stance_r_model, ros.stance_r_data, -jp['rf'][::-1], jv_single_leg, ja_single_leg)[::-1],
+                )
 
-        jp_R_DS = np.flip(-jp_r, axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(ros.stance_r_model, ros.stance_r_data, jp_R_DS, jv_R_DS, c_R_DS), (6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity, axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
+        }
+        gravity_singleft = np.vstack( gravity_single_ft['lf'], gravity_single_ft['rf'] )
+        
+        #腳底建起的整體模型12*1
+        _gravity_from_ft = {
+            'lf': pin.rnea(ros.bipedal_l_model, ros.bipedal_l_data, jp_from_ft['lf'], jv_total, ja_total),
+            'rf': pin.rnea(ros.bipedal_r_model, ros.bipedal_r_data, jp_from_ft['rf'], jv_total, ja_total),
+        }
+        
+        gravity_from_ft = {
+            'lf': np.vstack( -_gravity_from_ft['lf'][:6][::-1],  _gravity_from_ft['lf'][6:]       ),
+            'rf': np.vstack(  _gravity_from_ft['rf'][:6]      , -_gravity_from_ft['rf'][6:][::-1] )
+        }
 
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r, axis=0)
-        jp_RSS = np.vstack((jp_R_RSS, jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(ros.bipedal_r_model, ros.bipedal_r_data, jp_RSS, jv_RSS, c_RSS), (12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0], (6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0], (6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity, axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l, axis=0)
-        jp_LSS = np.vstack((jp_L_LSS, jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(ros.bipedal_l_model, ros.bipedal_l_data, jp_LSS, jv_LSS, c_LSS), (12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0], (6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity, axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0], (6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        if cf == 'rf':
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            elif abs(px_in_rf[1,0]) < abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            else:
-                Leg_gravity = DS_gravity
-        elif cf == 'lf':
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            elif abs(px_in_rf[1,0]) < abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            else:
-                Leg_gravity = DS_gravity
+        Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf'] if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+                      (abs(px_in_rf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf'] if abs(px_in_rf[1,0]) < abs(px_in_lf[1,0]) else\
+                      gravity_single_ft
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0], (6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0], (6,1))
