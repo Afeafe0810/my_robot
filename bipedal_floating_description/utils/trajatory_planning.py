@@ -27,7 +27,11 @@ def __bipedalBalanceTraj():
     ref_p_lf_in_wf = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
     ref_p_rf_in_wf = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
     
-    return ref_p_pel_in_wf, ref_p_lf_in_wf, ref_p_rf_in_wf
+    return {
+        'pel': ref_p_pel_in_wf, 
+        'lf' : ref_p_lf_in_wf ,
+        'rf' : ref_p_rf_in_wf ,
+    }
     
 def __comMoveTolf(DS_time, DDT):
     ref_pa_lf_in_wf  =  np.vstack(( 0,  0.1,  0,   0, 0, 0 ))
@@ -43,7 +47,11 @@ def __comMoveTolf(DS_time, DDT):
     ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
                       np.vstack(( 0, 0.09,                     0.55, 0, 0, 0 ))
                       
-    return ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf
+    return {
+        'pel': ref_pa_pel_in_wf, 
+        'lf' : ref_pa_lf_in_wf ,
+        'rf' : ref_pa_rf_in_wf ,
+    }
 
 
 def ref_alip(self,stance,px_in_lf,px_in_rf,com_in_lf,com_in_rf,Com_ref_wf,L_ref_wf,R_ref_wf):

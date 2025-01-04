@@ -82,12 +82,12 @@ class UpperLevelController(Node):
         cf_past, sf_past = self.stance_past
         
         #========軌跡規劃========#
-        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)        
+        ref_pa_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)        
         JLL, JRR =  self.frame.getJacobian()
 
         #========扭矩控制========#
         
-        torque = self.ctrl.update_torque(self.frame, jp, self.ros, cf_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, self.stance, JLL, JRR)
+        torque = self.ctrl.update_torque(self.frame, jp, self.ros, cf_past, px_in_lf, px_in_rf, state, ref_pa_in_wf, jv, self.stance)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.state_past, self.stance_past = self.state, self.stance

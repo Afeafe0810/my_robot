@@ -13,22 +13,22 @@ from utils.signal_process import Dsp
 class TorqueControl:
     
     @classmethod
-    def update_torque(cls, frame: RobotFrame, jp, ros, cf_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, JLL, JRR):
+    def update_torque(cls, frame: RobotFrame, jp, ros, cf_past, px_in_lf, px_in_rf, state, ref_pa_in_wf, jv, stance):
         if state == 0:
             torque = Innerloop.balance(jp, ros, stance, px_in_lf, px_in_rf)
         if state in [1, 2]:
             cf, sf = stance
-            torque = cls.__kneecontrol(frame, ros, jp, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
+            torque = cls.__kneecontrol(frame, ros, jp, px_in_lf, px_in_rf, ref_pa_in_wf, jv, stance, state)
             
             torque[sf][4:6] = cls.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = cls.__alip_control(frame, cf, cf_past, frame.p_com_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
+            torque[cf][4:6] = cls.__alip_control(frame, cf, cf_past, frame.p_com_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf, ref_pa_in_wf)
             torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
     
     @staticmethod
-    def __kneecontrol(frame, ros, jp, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
+    def __kneecontrol(frame, ros, jp, px_in_lf, px_in_rf, ref_pa_in_wf, jv, stance, state):
         cf, _ = stance
-        cmd_jv = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state)
+        cmd_jv = Outterloop.get_jv_cmd(frame, ref_pa_in_wf, jv, stance, state)
         return Innerloop.innerloopDynamics(jv, cmd_jv, ros, jp, stance, px_in_lf, px_in_rf)
     
     @staticmethod
@@ -45,8 +45,8 @@ class TorqueControl:
         return torque_ankle_sf
 
     @staticmethod
-    def __alip_control(frame:RobotFrame, cf, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
-        
+    def __alip_control(frame:RobotFrame, cf, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_in_wf):
+        ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = ref_pa_in_wf['pel'], ref_pa_in_wf['lf'], ref_pa_in_wf['rf']
         #質心相對L frame的位置
         p_ft_in_wf = {
             'lf': p_lf_in_wf,
@@ -113,12 +113,7 @@ class TorqueControl:
 class Outterloop:
     
     @classmethod
-    def get_jv_cmd(cls, frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state):
-        ref_pa_in_wf = {
-            'pel': ref_pa_pel_in_wf,
-            'lf': ref_pa_lf_in_wf,
-            'rf': ref_pa_rf_in_wf
-        }
+    def get_jv_cmd(cls, frame: RobotFrame, ref_pa_in_wf, jv, stance, state):
         
         pa_in_pf = {
             'pel': frame.pa_pel_in_pf,
@@ -127,7 +122,6 @@ class Outterloop:
         }
         
         endVel = cls.__endErr_to_endVel(ref_pa_in_wf, pa_in_pf, frame.eularToGeo)
-        
         
         return cls.__endVel_to_jv(state, stance, jv, endVel, frame.getJacobian())
 
