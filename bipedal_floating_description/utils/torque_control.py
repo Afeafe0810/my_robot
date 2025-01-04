@@ -260,8 +260,8 @@ class Innerloop:
             'rf': joint_position[6:]
         }
         jp_from_ft = {
-            'lf': np.vstack( -jp['lf'][::-1], jp['rf'] ),
-            'rf': np.vstack( -jp['rf'][::-1], jp['lf'] )
+            'lf': np.vstack([ -jp['lf'][::-1], jp['rf'] ]),
+            'rf': np.vstack([ -jp['rf'][::-1], jp['lf'] ])
 
         }
         
@@ -271,14 +271,14 @@ class Innerloop:
         #半邊單腳模型6*1
         gravity_single_ft = {
             'lf': np.vstack(
-                -pin.rnea(ros.stance_l_model, ros.stance_l_data, -jp['lf'][::-1], jv_single_leg, ja_single_leg)[::-1],
+                -pin.rnea(ros.stance_l_model, ros.stance_l_data, -jp['lf'][::-1], jv_single_leg, ja_single_leg)[::-1]
                 ),
             'rf': np.vstack(
-                -pin.rnea(ros.stance_r_model, ros.stance_r_data, -jp['rf'][::-1], jv_single_leg, ja_single_leg)[::-1],
+                -pin.rnea(ros.stance_r_model, ros.stance_r_data, -jp['rf'][::-1], jv_single_leg, ja_single_leg)[::-1]
                 )
 
         }
-        gravity_singleft = np.vstack( gravity_single_ft['lf'], gravity_single_ft['rf'] )
+        gravity_singleft = np.vstack(( gravity_single_ft['lf'], gravity_single_ft['rf'] ))
         
         #腳底建起的整體模型12*1
         _gravity_from_ft = {
@@ -287,10 +287,10 @@ class Innerloop:
         }
         
         gravity_from_ft = {
-            'lf': np.vstack( -_gravity_from_ft['lf'][:6][::-1],  _gravity_from_ft['lf'][6:]       ),
-            'rf': np.vstack(  _gravity_from_ft['rf'][:6]      , -_gravity_from_ft['rf'][6:][::-1] )
+            'lf': np.vstack(( *-_gravity_from_ft['lf'][:6][::-1],  *_gravity_from_ft['lf'][6:]       )),
+            'rf': np.vstack(( * _gravity_from_ft['rf'][:6]      , *-_gravity_from_ft['rf'][6:][::-1] ))
         }
-
+        return gravity_from_ft['lf'][:6], gravity_from_ft['lf'][6:]
         Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf'] if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
                       (abs(px_in_rf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf'] if abs(px_in_rf[1,0]) < abs(px_in_lf[1,0]) else\
                       gravity_single_ft
