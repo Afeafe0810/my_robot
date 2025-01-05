@@ -290,7 +290,7 @@ class Innerloop:
             'lf': np.vstack(( *-_gravity_from_ft['lf'][:6][::-1],  *_gravity_from_ft['lf'][6:]       )),
             'rf': np.vstack(( * _gravity_from_ft['rf'][6:]      , *-_gravity_from_ft['rf'][:6][::-1] ))
         }
-        return gravity_from_ft['lf'][:6], gravity_from_ft['lf'][6:]
+        # return gravity_from_ft['lf'][:6], gravity_from_ft['lf'][6:]
         Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf'] if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
                       (abs(px_in_rf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf'] if abs(px_in_rf[1,0]) < abs(px_in_lf[1,0]) else\
                       gravity_single_ft

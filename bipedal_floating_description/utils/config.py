@@ -31,7 +31,15 @@ class Config:
     
     #單腳支撐時間?
     DDT = 2
+    STEP_TIMELENGTH = 0.5
     
+    #機器人的物理模型
+    MASS = 9
+    IDEAL_Z_COM_IN_WF = 0.45
+    IDEAL_Y_RFTOLF_IN_WF = 0.2
+    GC = 9.81
+    OMEGA = ( GC / IDEAL_Z_COM_IN_WF )**0.5
+    STEP_HEIGHT = 0.02
     
     
     
