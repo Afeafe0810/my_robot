@@ -288,7 +288,7 @@ class Innerloop:
         
         gravity_from_ft = {
             'lf': np.vstack(( *-_gravity_from_ft['lf'][:6][::-1],  *_gravity_from_ft['lf'][6:]       )),
-            'rf': np.vstack(( * _gravity_from_ft['rf'][:6]      , *-_gravity_from_ft['rf'][6:][::-1] ))
+            'rf': np.vstack(( * _gravity_from_ft['rf'][6:]      , *-_gravity_from_ft['rf'][:6][::-1] ))
         }
         return gravity_from_ft['lf'][:6], gravity_from_ft['lf'][6:]
         Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_singleft + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf'] if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
@@ -297,6 +297,8 @@ class Innerloop:
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0], (6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0], (6,1))
+        print('加權的:', np.vstack(( l_leg_gravity, r_leg_gravity )).flatten()) 
+        print('左腳建起的:', gravity_from_ft['lf'].flatten())
 
         return l_leg_gravity, r_leg_gravity
 
