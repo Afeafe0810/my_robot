@@ -10,6 +10,7 @@ from operator import matmul
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
+from utils.signal_process import Dsp
 #========================================================#
 
 class RobotFrame:
@@ -43,7 +44,70 @@ class RobotFrame:
         pa_rfTOpel_in_pf = pa_pel_in_pf - pa_rf_in_pf #骨盆中心相對於右腳
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
- 
+    
+    def get_alipState(self, cf):
+        
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        
+        # p_ft_in_wf = {
+        #     'lf': self.p_lf_in_wf,
+        #     'rf': self.p_rf_in_wf
+        # }
+        # r_wf_to_ft = {
+        #     'lf': self.r_lf_to_wf.T,
+        #     'rf': self.r_rf_to_wf.T
+        # }
+
+        #質心位置
+        # p_pel_in_ft = {
+        #     'lf': r_wf_to_ft['lf'] @ (self.p_pel_in_wf - p_ft_in_wf['lf']),
+        #     'rf': r_wf_to_ft['rf'] @ (self.p_pel_in_wf - p_ft_in_wf['rf'])
+        # }
+        p_pel_in_ft = {
+            'lf': self.p_lf_in_wf - self.p_com_in_wf,
+            'rf': self.p_rf_in_wf - self.p_com_in_wf
+        }
+        
+        
+        #質心速度
+        v_pel_in_ft = {
+            'lf': Dsp.FILTER['v_pel_in_lf'].filt(
+                    Dsp.DIFFTER['p_pel_in_lf'].diff(p_pel_in_ft['lf'])
+                ),
+            'rf': Dsp.FILTER['v_pel_in_rf'].filt(
+                    Dsp.DIFFTER['p_pel_in_rf'].diff(p_pel_in_ft['rf'])
+                )
+        }
+        
+        #質心對cf的角動量
+        Ly_pel_in_cf =  m * v_pel_in_ft[cf][0,0] * H
+        Lx_pel_in_cf = -m * v_pel_in_ft[cf][1,0] * H
+        
+        var_x = np.vstack(( p_pel_in_ft[cf][0,0], Ly_pel_in_cf ))
+        var_y = np.vstack(( p_pel_in_ft[cf][1,0], Lx_pel_in_cf ))
+        
+        return var_x, var_y
+    
+    @staticmethod
+    def get_refAlipState(cf, ref_pa_in_wf):
+        
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        
+        #參考質心位置
+        ref_pa_pel_in_cf = ref_pa_in_wf['pel'] - ref_pa_in_wf[cf]
+        
+        #參考質心角動量
+        ref_Ly_pel_in_cf = 0
+        ref_Lx_pel_in_cf = 0
+        
+        ref_var_x = np.vstack(( ref_pa_pel_in_cf[0,0], ref_Ly_pel_in_cf ))
+        ref_var_y = np.vstack(( ref_pa_pel_in_cf[1,0], ref_Lx_pel_in_cf ))
+        
+        return ref_var_x, ref_var_y
+
+    
     def getJacobian(self):
         '''回傳geomerty Jacobian'''
         Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_LhipX_in_pf ), axis = 0 )

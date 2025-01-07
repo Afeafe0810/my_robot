@@ -1,7 +1,8 @@
 import numpy as np; np.set_printoptions(precision=2)
-from math import cosh, sinh, cos, sin
+from math import cosh, sinh, cos, sin, pi
 #================ import library ========================#
 from utils.config import Config
+from utils.frame_kinermatic import RobotFrame
 #========================================================#
 
 
@@ -60,7 +61,7 @@ def __comMoveTolf(DS_time, DDT):
     }
 
 class ALIP_traj:
-    def plan(cls, stance, des_vx_com_in_cf_2T, t, X0, Y0):
+    def plan(cls, stance, des_vx_com_in_cf_2T, t):
         cf, sf = stance
         
         m = Config.MASS
@@ -77,52 +78,42 @@ class ALIP_traj:
         des_Lx_com_in_cf_2T = sign * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) ) 
         
         #現在的質心ref
-        X0, Y0, p_cf_in_wf = cls.__getInitialData()
+        X0, Y0, p0_cf_in_wf, p0_sfTOcom_in_wf = cls.__getInitialData()
         
         var_x = cls.__getAlipMatA('x', t) @ X0
         var_y = cls.__getAlipMatA('y', t) @ Y0
 
         ref_p_com_in_cf = np.vstack(( var_x[0,0], var_y[0,0], H ))
-        ref_p_com_in_wf = ref_p_com_in_cf + p_cf_in_wf
+        ref_p_com_in_wf = ref_p_com_in_cf + p0_cf_in_wf
         
         #預測的下一步的初始角動量
         pdc_Ly_com_in_cf_1T = var_x[1,0]
         pdc_Lx_com_in_cf_1T = var_y[1,0]
         
-        ref_xy_swTOcom_in_cf_T = np.vstack(( 
+        #下一步的軌跡點
+        pdc_xy_swTOcom_in_cf_T = np.vstack(( 
             ( des_Ly_com_in_cf_2T - cosh(w*T)*pdc_Ly_com_in_cf_1T ) / ( m*H*w*sinh(w*T) ),
             ( des_Lx_com_in_cf_2T - cosh(w*T)*pdc_Lx_com_in_cf_1T ) / -( m*H*w*sinh(w*T) )
         ))
-
         
-        #理想上，下一步擺動腳踩踏點(相對於下一步踩踏時刻下的質心位置)
-        Psw2com_x_T = (Ly_des_2T - cosh(l*T)*Ly_T)/(m*H*l*sinh(l*T))
-        Psw2com_y_T = (Lx_des_2T - cosh(l*T)*Lx_T)/-(m*H*l*sinh(l*T))
-        #理想上，擺動腳相對接觸點的位置(x,y,z)
-        pv = t/T #變數 用於連接擺動腳軌跡
-        Sw_x_cf = Com_x_cf - (0.5*((1+cos(pi*pv))*Psw2com_x_0 + (1-cos(pi*pv))*Psw2com_x_T))
-        Sw_y_cf = Com_y_cf - (0.5*((1+cos(pi*pv))*Psw2com_y_0 + (1-cos(pi*pv))*Psw2com_y_T))
-        Sw_z_cf = Com_z_cf - (4*zCL*(pv-0.5)**2 + (H-zCL))
-        #轉成大地座標下的軌跡
-        Swing_ref_wf = O_wfcf@np.array([[Sw_x_cf],[Sw_y_cf],[Sw_z_cf]]) + P_cf_wf
-
-        #根據支撐狀態分配支撐腳軌跡、擺動腳軌跡、ALIP參考軌跡(質心、角動量)
-        if stance == 1:
-            L_ref_wf = Support_ref_wf
-            R_ref_wf = Swing_ref_wf
-            self.ref_x_L = copy.deepcopy(np.array([[Xx_cf[0,0]],[Xx_cf[1,0]]]))
-            self.ref_y_L = copy.deepcopy(np.array([[Xy_cf[0,0]],[Xy_cf[1,0]]]))
-        else:
-            L_ref_wf = Swing_ref_wf
-            R_ref_wf = Support_ref_wf
-            self.ref_x_R = np.array([[Xx_cf[0,0]],[Xx_cf[1,0]]])
-            self.ref_y_R = np.array([[Xy_cf[0,0]],[Xy_cf[1,0]]])
+        #一步內擬和出的軌跡
+        ratio = t/T
         
-        return Com_ref_wf,L_ref_wf,R_ref_wf
+        ref_p_sfTOcom_in_cf = np.vstack((
+            0.5*((1+cos(pi*ratio))*p0_sfTOcom_in_wf[:2] + (1-cos(pi*ratio))*pdc_xy_swTOcom_in_cf_T),
+            4*h*(ratio-0.5)**2 + (H-h)
+        ))
 
-    @staticmethod
-    def __getInitialData():
-        return 
+        ref_p_sf_in_cf = ref_p_com_in_cf - ref_p_sfTOcom_in_cf
+        ref_p_sf_in_wf = ref_p_sf_in_cf + p0_cf_in_wf
+        
+        return {
+            'pel': ref_p_com_in_wf,
+               cf: p0_cf_in_wf,
+               sf: ref_p_sf_in_wf,
+        }
+
+    
     
     @staticmethod
     def __getAlipMatA(axis:str, t:float) -> np.ndarray:
