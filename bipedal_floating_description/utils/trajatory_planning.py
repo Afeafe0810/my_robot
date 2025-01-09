@@ -7,49 +7,42 @@ from utils.frame_kinermatic import RobotFrame
 
 class Trajatory:
     
-    def plan(self, state, ):
+    def plan(self, state, DS_time):
         if state in [0,1]: #假雙支撐, 真雙支撐
             return self.__bipedalBalanceTraj()
         
         elif state == 2: #骨盆移到支撐腳
-            return __comMoveTolf()
+            return self.__comMoveTolf(DS_time)
         
         elif state == 30: #ALIP規劃
             pass
     
     @staticmethod
     def __bipedalBalanceTraj():
-        return {
+        A = {
             'pel': np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
             'lf' : np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
             'rf' : np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
         }
+        return A['pel'], A['lf'], A['rf']
     
-def __comMoveTolf(DS_time):
-    DDT = Config.DDT
-    pel_moving_time = [0, 0.5*DDT]
-    rf_moving_time = [0, 1.2*DDT]
-    #==========左腳支撐腳固定==========#
-    ref_pa_lf_in_wf  =  np.vstack(( 0,  0.1,  0,   0, 0, 0 ))
-    
-    #==========骨盆線性平移到支撐腳上方==========#
-    if 0 < DS_time <= 0.5*DDT
-    ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
-                       np.vstack(( 0, 0.09,                     0.55, 0, 0, 0 ))
-    
-    #==========骨盆移好後將右腳擺動腳往上抬==========#
-    ref_pa_rf_in_wf  =  np.vstack(( 0, -0.1,  0,   0, 0, 0 )) if 0 < DS_time <= DDT else \
-                        np.vstack(( 0, -0.1,  0.05* (DS_time-0*DDT)/(0.2*DDT), 0, 0, 0 )) if DDT < DS_time <= 0.2*DDT else\
-                        np.vstack(( 0, -0.1,  0.05, 0, 0, 0 ))
-                        # np.vstack(( 0, -0.1,  0.05 - 0.05* (DS_time-0.8*DDT)/(0.2*DDT), 0, 0, 0 )) if 0.8*DDT < DS_time <= DDT else\
-                        # np.vstack(( 0, -0.1,  0, 0, 0, 0 ))
-    
-    # ref_pa_pel_in_wf = np.vstack(( 0, 0.06*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
-    #                   np.vstack(( 0, 0.06,                     0.55, 0, 0, 0 ))
-    
-    
-                      
-    return ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf
+    @staticmethod
+    def __comMoveTolf(t):
+        T = Config.DDT
+
+        #==========線性移動==========#
+        linearMove = lambda t, x0, x1, t0, t1:\
+            np.clip(x0 + (x1-x0) * (t-t0)/(t1-t0), x0, x1 )
+            
+        y_pel = linearMove(t, *[0, 0.09], *[0*T, 0.5*T])
+        z_sf  = linearMove(t, *[0, 0.05], *[1*T, 1.1*T])
+        
+        A = {
+            'pel': np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
+            'lf' : np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
+            'rf' : np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
+        }
+        return A['pel'], A['lf'], A['rf']
 
 
 def ref_alip(self,stance,px_in_lf,px_in_rf,com_in_lf,com_in_rf,Com_ref_wf,L_ref_wf,R_ref_wf):
