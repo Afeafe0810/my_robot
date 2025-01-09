@@ -1,36 +1,43 @@
 import numpy as np; np.set_printoptions(precision=2)
+from math import cosh, sinh, cos, sin, pi
+#================ import library ========================#
+from utils.config import Config
+from utils.frame_kinermatic import RobotFrame
+#========================================================#
 
 class Trajatory:
-    def __init__(self):
-        self.ref_pa_in_wf = {
-            'lf' : np.zeros((6,1)),
-            'rf' : np.zeros((6,1)),
-            'pel': np.zeros((6,1)),
+    
+    def plan(self, state, ):
+        if state in [0,1]: #假雙支撐, 真雙支撐
+            return self.__bipedalBalanceTraj()
+        
+        elif state == 2: #骨盆移到支撐腳
+            return __comMoveTolf()
+        
+        elif state == 30: #ALIP規劃
+            pass
+    
+    @staticmethod
+    def __bipedalBalanceTraj():
+        return {
+            'pel': np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
+            'lf' : np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
+            'rf' : np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
         }
-        pass
-
-def trajRef_planning(state,DS_time, DDT):
-    if state == 0: #假雙支撐
-        return __bipedalBalanceTraj()
     
-    elif state == 1: #真雙支撐
-        return __bipedalBalanceTraj()
-    
-    elif state == 2: #骨盆移到支撐腳
-        return __comMoveTolf(DS_time, DDT)
-    
-    elif state == 30: #ALIP規劃
-        pass
-    
-def __bipedalBalanceTraj():
-    ref_p_pel_in_wf = np.array([[0.0],[0.0],[0.57],[0.0],[0.0],[0.0]])
-    ref_p_lf_in_wf = np.array([[0.0],[0.1],[0.0],[0.0],[0.0],[0.0]])
-    ref_p_rf_in_wf = np.array([[0.0],[-0.1],[0.0],[0.0],[0.0],[0.0]])
-    
-    return ref_p_pel_in_wf, ref_p_lf_in_wf, ref_p_rf_in_wf
-    
-def __comMoveTolf(DS_time, DDT):
+def __comMoveTolf(DS_time):
+    DDT = Config.DDT
+    pel_moving_time = [0, 0.5*DDT]
+    rf_moving_time = [0, 1.2*DDT]
+    #==========左腳支撐腳固定==========#
     ref_pa_lf_in_wf  =  np.vstack(( 0,  0.1,  0,   0, 0, 0 ))
+    
+    #==========骨盆線性平移到支撐腳上方==========#
+    if 0 < DS_time <= 0.5*DDT
+    ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
+                       np.vstack(( 0, 0.09,                     0.55, 0, 0, 0 ))
+    
+    #==========骨盆移好後將右腳擺動腳往上抬==========#
     ref_pa_rf_in_wf  =  np.vstack(( 0, -0.1,  0,   0, 0, 0 )) if 0 < DS_time <= DDT else \
                         np.vstack(( 0, -0.1,  0.05* (DS_time-0*DDT)/(0.2*DDT), 0, 0, 0 )) if DDT < DS_time <= 0.2*DDT else\
                         np.vstack(( 0, -0.1,  0.05, 0, 0, 0 ))
@@ -40,8 +47,7 @@ def __comMoveTolf(DS_time, DDT):
     # ref_pa_pel_in_wf = np.vstack(( 0, 0.06*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
     #                   np.vstack(( 0, 0.06,                     0.55, 0, 0, 0 ))
     
-    ref_pa_pel_in_wf = np.vstack(( 0, 0.09*DS_time/( 0.5*DDT ), 0.55, 0, 0, 0 )) if 0 < DS_time <= 0.5*DDT else \
-                      np.vstack(( 0, 0.09,                     0.55, 0, 0, 0 ))
+    
                       
     return ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf
 
