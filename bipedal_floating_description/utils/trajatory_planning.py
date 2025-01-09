@@ -6,25 +6,35 @@ from utils.frame_kinermatic import RobotFrame
 #========================================================#
 
 class Trajatory:
-    
-    def plan(self, state, DS_time):
+    def __init__(self):
+        
+        #state 2, 單腳舉起的時間
+        self.leg_lift_time = 0
+        
+        #state 30, ALIP行走當下時間
+        self.alip_time = 0
+        
+    def plan(self, state):
         if state in [0,1]: #假雙支撐, 真雙支撐
             return self.__bipedalBalanceTraj()
         
         elif state == 2: #骨盆移到支撐腳
-            return self.__comMoveTolf(DS_time)
+            if self.leg_lift_time <= 10 * Config.DDT:
+                self.leg_lift_time += Config.TIMER_PERIOD
+                print("DS",self.leg_lift_time)
+                
+            return self.__comMoveTolf(self.leg_lift_time)
         
         elif state == 30: #ALIP規劃
             pass
     
     @staticmethod
     def __bipedalBalanceTraj():
-        A = {
+        return {
             'pel': np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
             'lf' : np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
             'rf' : np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
         }
-        return A['pel'], A['lf'], A['rf']
     
     @staticmethod
     def __comMoveTolf(t):
@@ -37,13 +47,11 @@ class Trajatory:
         y_pel = linearMove(t, *[0, 0.09], *[0*T, 0.5*T])
         z_sf  = linearMove(t, *[0, 0.05], *[1*T, 1.1*T])
         
-        A = {
+        return {
             'pel': np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
             'lf' : np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
             'rf' : np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
         }
-        return A['pel'], A['lf'], A['rf']
-
 
 def ref_alip(self,stance,px_in_lf,px_in_rf,com_in_lf,com_in_rf,Com_ref_wf,L_ref_wf,R_ref_wf):
     #ALIP
