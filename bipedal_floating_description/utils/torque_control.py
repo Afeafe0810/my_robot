@@ -34,7 +34,7 @@ class TorqueControl:
     @staticmethod
     def __kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
         VL, VR = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
-        return Innerloop.innerloopDynamics(jv, VL, VR, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
+        return Innerloop.innerloopDynamics(jv, VL, VR, ros, jp, stance, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
     
     @staticmethod
     def __swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
@@ -206,7 +206,7 @@ class Innerloop:
         ref_jp = np.zeros((12,1))
         kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
         
-        l_leg_gravity, r_leg_gravity, *_ = cls.__gravity_compemsate(ros, jp, cf, px_in_lf, px_in_rf, l_contact, r_contact, state)
+        l_leg_gravity, r_leg_gravity, *_ = cls.__calculateGravity(ros, jp, px_in_lf, px_in_rf)
         gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
         
         torque = kp * (ref_jp-jp) + gravity
@@ -214,9 +214,10 @@ class Innerloop:
         return torque
     
     @classmethod
-    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, ros: ROSInterfaces, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
+    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, ros: ROSInterfaces, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
         cmd_v = np.vstack(( vl_cmd, vr_cmd ))
-        l_leg_gravity, r_leg_gravity, kl,kr = cls.__gravity_compemsate(ros, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state)
+        l_leg_gravity, r_leg_gravity = cls.__calculateGravity(ros, joint_position, px_in_lf, px_in_rf)
+        kl, kr  = cls.__determineK(state, stance)
         
         gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
         kp = np.vstack(( kl,kr ))
@@ -229,7 +230,7 @@ class Innerloop:
         }
     
     @staticmethod
-    def __gravity_compemsate(ros: ROSInterfaces, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
+    def __calculateGravity(ros: ROSInterfaces, joint_position, px_in_lf, px_in_rf):
 
         jp = {
             'lf': joint_position[:6],
@@ -266,27 +267,35 @@ class Innerloop:
         Leg_gravity = weighted(px_in_lf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
                       weighted(px_in_rf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
                       gravity_single
-        
-        if cf == 'rf':
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
+
+        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
+        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
+
+        return l_leg_gravity,r_leg_gravity
+    
+    @staticmethod
+    def __determineK(state, stance):
+        cf, sf = stance
+        # if cf == 'rf':
+        #     if r_contact == 1:
+        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+        #     else:
+        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
+        #     if l_contact == 1:
+        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+        #     else:
+        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
 
         
-        elif cf == 'lf':
-            if r_contact == 1:
-                kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kr = np.array([[1],[1],[1],[1],[1],[1]])
-            if l_contact == 1:
-                kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            else:
-                kl = np.array([[1],[1],[1],[1],[1],[1]])
+        # elif cf == 'lf':
+        #     if r_contact == 1:
+        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+        #     else:
+        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
+        #     if l_contact == 1:
+        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
+        #     else:
+        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
 
 
 
@@ -297,8 +306,5 @@ class Innerloop:
         if state == 2:
             kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        return l_leg_gravity,r_leg_gravity,kl,kr
+            
+        return kl, kr
