@@ -259,6 +259,14 @@ class Innerloop:
             'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
         }
         
+        #==========加權==========#
+        weighted = lambda x, x0, x1, g0, g1 :\
+            g0 +(g1-g0)/(x1-x0)*(x-x0)
+        
+        Leg_gravity = weighted(px_in_lf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+                      weighted(px_in_rf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+                      gravity_single
+        
         if cf == 'rf':
             if r_contact == 1:
                 kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
@@ -268,15 +276,6 @@ class Innerloop:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             else:
                 kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf']
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf']
-            
-            else:
-                Leg_gravity = gravity_single
 
         
         elif cf == 'lf':
@@ -288,15 +287,6 @@ class Innerloop:
                 kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
             else:
                 kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-            if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf']
-            
-            elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*gravity_single+ ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf']
-            
-            else:
-                Leg_gravity = gravity_single
 
 
 
