@@ -231,74 +231,33 @@ class Innerloop:
     @staticmethod
     def __gravity_compemsate(ros: ROSInterfaces, joint_position, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
 
-        jp_l = np.reshape(copy.deepcopy(joint_position[0:6,0]),(6,1)) #左腳
-        jp_r = np.reshape(copy.deepcopy(joint_position[6:,0]),(6,1))  #右腳
+        jp = {
+            'lf': joint_position[:6],
+            'rf': joint_position[6:]
+        }
+        jp_from_ft = {
+            'lf': np.vstack(( -jp['lf'][::-1], jp['rf'] )),
+            'rf': np.vstack(( -jp['rf'][::-1], jp['lf'] ))
+        }
+        jv_single = ja_single = np.zeros(( 6,1))
+        jv_double = ja_double = np.zeros((12,1))
         
-        #DS_gravity
-        jp_L_DS = np.flip(-jp_l,axis=0)
-        jv_L_DS = np.zeros((6,1))
-        c_L_DS = np.zeros((6,1))
-        L_DS_gravity = np.reshape(-pin.rnea(ros.stance_l_model, ros.stance_l_data, jp_L_DS,jv_L_DS,(c_L_DS)),(6,1))  
-        L_DS_gravity = np.flip(L_DS_gravity,axis=0)
-
-        jp_R_DS = np.flip(-jp_r,axis=0)
-        jv_R_DS = np.zeros((6,1))
-        c_R_DS = np.zeros((6,1))
-        R_DS_gravity = np.reshape(-pin.rnea(ros.stance_r_model, ros.stance_r_data, jp_R_DS,jv_R_DS,(c_R_DS)),(6,1))  
-        R_DS_gravity = np.flip(R_DS_gravity,axis=0)
-        DS_gravity = np.vstack((L_DS_gravity, R_DS_gravity))
-
-        #RSS_gravity
-        jp_R_RSS = np.flip(-jp_r,axis=0)
-        jp_RSS = np.vstack((jp_R_RSS,jp_l))
-        jv_RSS = np.zeros((12,1))
-        c_RSS = np.zeros((12,1))
-        Leg_RSS_gravity = np.reshape(pin.rnea(ros.bipedal_r_model, ros.bipedal_r_data, jp_RSS,jv_RSS,(c_RSS)),(12,1))  
-
-        L_RSS_gravity = np.reshape(Leg_RSS_gravity[6:,0],(6,1))
-        R_RSS_gravity = np.reshape(-Leg_RSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        R_RSS_gravity = np.flip(R_RSS_gravity,axis=0)
-        RSS_gravity = np.vstack((L_RSS_gravity, R_RSS_gravity))
-
-        #LSS_gravity
-        jp_L_LSS = np.flip(-jp_l,axis=0)
-        jp_LSS = np.vstack((jp_L_LSS,jp_r))
-        jv_LSS = np.zeros((12,1))
-        c_LSS = np.zeros((12,1))
-        Leg_LSS_gravity = np.reshape(pin.rnea(ros.bipedal_l_model, ros.bipedal_l_data, jp_LSS,jv_LSS,(c_LSS)),(12,1))  
-
-        L_LSS_gravity = np.reshape(-Leg_LSS_gravity[0:6,0],(6,1)) #加負號(相對關係)
-        L_LSS_gravity = np.flip(L_LSS_gravity,axis=0)
-        R_LSS_gravity = np.reshape(Leg_LSS_gravity[6:,0],(6,1))
-        LSS_gravity = np.vstack((L_LSS_gravity, R_LSS_gravity))
-
-        # if stance == 2:
-        #     if r_contact == 1:
-        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #     if l_contact == 1:
-        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-        #     if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-        #         Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
-            
-        #     elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-        #         Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
-            
-        #     else:
-        #         Leg_gravity = DS_gravity
-
-        #     # if abs(px_in_rf[1,0])<=0.05 and r_contact ==1:
-        #     #     Leg_gravity = (abs(px_in_rf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_rf[1,0]))/0.05)*RSS_gravity
-            
-        #     # elif abs(px_in_lf[1,0])<=0.05 and l_contact ==1:
-        #     #     Leg_gravity = (abs(px_in_lf[1,0])/0.05)*DS_gravity + ((0.05-abs(px_in_lf[1,0]))/0.05)*LSS_gravity
-            
-        #     # else:
-        #     #     Leg_gravity = DS_gravity
+        #==========半邊單腳模型==========#
+        _gravity_single_ft = {
+            'lf': -pin.rnea(ros.stance_l_model, ros.stance_l_data, -jp['lf'][::-1], jv_single, (ja_single))[::-1],
+            'rf': -pin.rnea(ros.stance_r_model, ros.stance_r_data, -jp['rf'][::-1], jv_single, (ja_single))[::-1]
+        }
+        gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
+        
+        #==========腳底建起的模型==========#
+        _gravity_from_ft = {
+            'lf': pin.rnea(ros.bipedal_l_model, ros.bipedal_l_data, jp_from_ft['lf'], jv_double, (ja_double)),
+            'rf': pin.rnea(ros.bipedal_r_model, ros.bipedal_r_data, jp_from_ft['rf'], jv_double, (ja_double)),
+        }
+        gravity_from_ft = {
+            'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),
+            'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
+        }
         
         if cf == 'rf':
             if r_contact == 1:
@@ -311,24 +270,14 @@ class Innerloop:
                 kl = np.array([[1],[1],[1],[1],[1],[1]])
 
             if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
+                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf']
             
             elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
+                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf']
             
             else:
-                Leg_gravity = DS_gravity
-            # if r_contact == 1:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # kl = np.array([[1],[1],[1],[0.8],[0.8],[0.8]])
-            # Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-                
-            # # if l_contact ==1:
-            # #     Leg_gravity = (px_in_rf[1,0]/0.1)*DS_gravity + ((0.1-px_in_rf[1,0])/0.1)*RSS_gravity
-            # # else:
-            # #     Leg_gravity = RSS_gravity
+                Leg_gravity = gravity_single
+
         
         elif cf == 'lf':
             if r_contact == 1:
@@ -341,24 +290,14 @@ class Innerloop:
                 kl = np.array([[1],[1],[1],[1],[1],[1]])
 
             if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]):
-                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_lf[1,0]))/0.1)*LSS_gravity
+                Leg_gravity = (abs(px_in_lf[1,0])/0.1)*gravity_single + ((0.1-abs(px_in_lf[1,0]))/0.1)*gravity_from_ft['lf']
             
             elif abs(px_in_rf[1,0])< abs(px_in_lf[1,0]):
-                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*DS_gravity + ((0.1-abs(px_in_rf[1,0]))/0.1)*RSS_gravity
+                Leg_gravity = (abs(px_in_rf[1,0])/0.1)*gravity_single+ ((0.1-abs(px_in_rf[1,0]))/0.1)*gravity_from_ft['rf']
             
             else:
-                Leg_gravity = DS_gravity
+                Leg_gravity = gravity_single
 
-            # if l_contact == 1:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.5],[1.5]])
-            # else:
-            #     kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-            # Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-                
-            # # if r_contact ==1:
-            # #     Leg_gravity = (-px_in_lf[1,0]/0.1)*DS_gravity + ((0.1+px_in_lf[1,0])/0.1)*LSS_gravity
-            # # else:
-            # #     Leg_gravity = LSS_gravity
 
 
         if state == 1:
@@ -372,6 +311,4 @@ class Innerloop:
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
 
-        
-        
         return l_leg_gravity,r_leg_gravity,kl,kr

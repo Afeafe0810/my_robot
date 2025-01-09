@@ -63,8 +63,11 @@ class UpperLevelController(Node):
         
         
         #========接觸判斷========#
-        contact_lf = (self.frame.p_lf_in_wf[2,0] <= 0.01)
-        contact_rf = (self.frame.p_rf_in_wf[2,0] <= 0.01)
+        contact = {
+            'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
+            'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
+        }
+        contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
         self.stance_change(state, self.traj.alip_time)
