@@ -1,8 +1,8 @@
 import numpy as np; np.set_printoptions(precision=2)
 from rclpy.node import Node
 from typing import Callable
-import pinocchio as pin
-import pink
+import pinocchio as pin #2.6.21
+import pink #2.1.0
 from sys import argv
 from copy import deepcopy
 from scipy.spatial.transform import Rotation as R
