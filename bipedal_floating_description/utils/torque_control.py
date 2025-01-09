@@ -14,7 +14,13 @@ from utils.signal_process import Dsp
 class TorqueControl:
     
     @classmethod
-    def update_torque(cls, frame, jp, ros, cf, sf, cf_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, JLL, JRR):
+    def update_torque(cls, frame: RobotFrame, jp, ros, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
+        cf, sf = stance
+        cf_past, sf_past = stance_past
+        JLL, JRR = frame.left_leg_jacobian()
+        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = ref['pel'], ref['lf'], ref['rf']
+        
+        
         if state == 0:
             torque = Innerloop.balance(jp, ros, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
         if state in [1, 2]:
