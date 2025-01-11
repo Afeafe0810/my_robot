@@ -40,24 +40,13 @@ class UpperLevelController(Node):
         self.stance = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
         self.stance_past = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
         
-        #雙支撐時間(?)(重心移到單腳上)
-        self.DS_time = 0.0
-        
-        #ALIP的時間
-        self.contact_t = 0.0
-        
-    def stance_change(self, state, contact_t):
+    def stance_change(self, state, alip_time):
         self.stance = ['lf', 'rf'] if state == 0 else\
                       ['lf', 'rf'] if state == 1 else\
                     self.stance #先不變
 
-        if state == 2:
-            if self.DS_time <= 10 * Config.DDT:
-                self.DS_time += Config.TIMER_PERIOD
-                print("DS",self.DS_time)
-
         # 時間到就做兩隻腳的切換
-        if state == 30 and abs(contact_t-0.5) <= 0.005 :
+        if state == 30 and abs(alip_time-0.5) <= 0.005 :
             self.stance.reverse()
  
     def main_controller_callback(self):
@@ -72,21 +61,24 @@ class UpperLevelController(Node):
 
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
+        
         #========接觸判斷========#
-        contact_lf = (self.frame.p_lf_in_wf[2,0] <= 0.01)
-        contact_rf = (self.frame.p_rf_in_wf[2,0] <= 0.01)
+        contact = {
+            'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
+            'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
+        }
+        contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
-        self.stance_change(state, self.contact_t)
+        self.stance_change(state, self.traj.alip_time)
         cf, sf = self.stance
         cf_past, sf_past = self.stance_past
         
         #========軌跡規劃========#
-        ref_pa_in_wf = trajRef_planning(state, self.DS_time, Config.DDT)        
+        ref = self.traj.plan(state)
 
         #========扭矩控制========#
-        
-        torque = self.ctrl.update_torque(self.frame, jp, self.ros, cf_past, px_in_lf, px_in_rf, state, ref_pa_in_wf, jv, self.stance)
+        torque = self.ctrl.update_torque(self.frame, jp, self.ros, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.state_past, self.stance_past = self.state, self.stance
