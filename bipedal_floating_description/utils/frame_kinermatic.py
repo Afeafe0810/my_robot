@@ -5,9 +5,11 @@ from math import cos, sin
 from scipy.spatial.transform import Rotation as R
 import pink
 import pinocchio as pin
+from itertools import accumulate
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces
+from utils.signal_process import Dsp
 #========================================================#
 
 class RobotFrame:
@@ -22,8 +24,15 @@ class RobotFrame:
     
     #=======================對外的接口=================================#
     def updateFrame(self, ros: ROSInterfaces, config: pink.Configuration, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray, jp: np.ndarray):
+        '''更新所有frame下的座標'''
+        
+        #透過機器人的meshcat的config來更新pink frame下的座標
         self.__update_pfFrame(config, ros, jp)
+        
+        #透過pink的座標, 以及訂閱到的base_in_wf, 可以用運動學得到其他部位in_wf (事後發現, 其實pink frame就是base)
         self.__update_wfFrame(p_base_in_wf, r_base_to_wf)
+        
+        #得到link間的旋轉矩陣
         self.__update_linkRotMat(jp)
         self.__update_axisVec()
         
@@ -76,6 +85,7 @@ class RobotFrame:
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
+        '''可以得到各部位在pink frame下的資訊'''
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
         self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1")
         self.p_LhipZ_in_pf,  self.r_LhipZ_to_pf  = self.__getOneInPf(config, "l_hip_pitch_1")
@@ -99,12 +109,14 @@ class RobotFrame:
         self.pa_rf_in_pf  = np.vstack(( self.p_rf_in_pf , self.__rotMat_to_euler(self.r_rf_to_pf)  ))
               
     def __update_wfFrame(self, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray):
-        self.p_pel_in_wf, self.r_pel_to_wf = self.__get_pelInWf(p_base_in_wf, r_base_to_wf)
+        '''得到各點在world frame下的資訊'''
         
-        r_pf_to_wf = self.r_pel_to_wf @ self.r_pel_to_pf.T
-        place_in_pfToWf = lambda p_in_pf: r_pf_to_wf @ (p_in_pf - self.p_pel_in_pf) + self.p_pel_in_wf
+        p_pf_in_wf, r_pf_to_wf = p_base_in_wf, r_base_to_wf
+        
+        place_in_pfToWf = lambda p_in_pf: r_pf_to_wf @ p_in_pf + p_pf_in_wf
         rotat_to_pfToWf = lambda r_to_pf: r_pf_to_wf @ r_to_pf
         
+        self.p_pel_in_wf    = place_in_pfToWf(self.p_pel_in_pf)
         self.p_com_in_wf    = place_in_pfToWf(self.p_com_in_pf)
         self.p_LhipX_in_wf  = place_in_pfToWf(self.p_LhipX_in_pf) 
         self.p_LhipZ_in_wf  = place_in_pfToWf(self.p_LhipZ_in_pf) 
@@ -121,8 +133,9 @@ class RobotFrame:
         self.p_RankX_in_wf  = place_in_pfToWf(self.p_RankX_in_pf) 
         self.p_rf_in_wf     = place_in_pfToWf(self.p_rf_in_pf)    
         
-        self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
-        self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
+        self.r_pel_to_wf = rotat_to_pfToWf(self.r_pel_to_pf)
+        self.r_lf_to_wf  = rotat_to_pfToWf(self.r_lf_to_pf)
+        self.r_rf_to_wf  = rotat_to_pfToWf(self.r_rf_to_pf)
 
     def __update_linkRotMat(self, jps: np.ndarray):
         axes = ['x', 'z', 'y', 'y', 'y', 'x']
