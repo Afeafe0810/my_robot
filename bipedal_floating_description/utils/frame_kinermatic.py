@@ -13,13 +13,7 @@ from utils.signal_process import Dsp
 #========================================================#
 
 class RobotFrame:
-    def __init__(self):
-        self.P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
-        self.r_pf_to_pel = np.identity(3)
-        
-        self.p_base_in_wf: np.ndarray = None
-        self.r_base_to_wf: np.ndarray = None
-        
+    def __init__(self):        
         pass
     
     #=======================對外的接口=================================#
@@ -138,6 +132,7 @@ class RobotFrame:
         self.r_rf_to_wf  = rotat_to_pfToWf(self.r_rf_to_pf)
 
     def __update_linkRotMat(self, jps: np.ndarray):
+        '''利用旋轉軸的向量得到link間的旋轉矩陣'''
         axes = ['x', 'z', 'y', 'y', 'y', 'x']
         
         self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L, self.r_6_to_5_L = [
@@ -149,33 +144,41 @@ class RobotFrame:
         ]
 
     def __update_axisVec(self):
-        '''
-        不知道是幹麻的
-        '''
-        #骨盆姿態(要確認！)
-        RP = np.eye(3)
-        # self.RP = copy.deepcopy(self.O_wfPV)
+        '''得到各關節軸的單位向量'''
+        
+        #==========骨盆到腳底各軸的方向==========#
         axes = ['x', 'z', 'y', 'y', 'y', 'x']
-        axes_map = {
+        
+        #==========軸方向的映射==========#
+        mapping = {
             'x': np.vstack(( 1, 0, 0 )),
             'y': np.vstack(( 0, 1, 0 )),
             'z': np.vstack(( 0, 0, 1 )),
         }
-        vec_axes = [ axes_map[axis] for axis in axes ]
-
-        self.axis_1L_in_pf = RP @ vec_axes[0]
-        self.axis_2L_in_pf = RP @ self.r_1_to_0_L @ vec_axes[1]
-        self.axis_3L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ vec_axes[2]
-        self.axis_4L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ vec_axes[3]
-        self.axis_5L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ vec_axes[4]
-        self.axis_6L_in_pf = RP @ self.r_1_to_0_L @ self.r_2_to_1_L @ self.r_3_to_2_L @ self.r_4_to_3_L @ self.r_5_to_4_L @ vec_axes[5]
+        vec_axes = [ mapping[axis] for axis in axes ]
         
-        self.axis_1R_in_pf = RP @ vec_axes[0]
-        self.axis_2R_in_pf = RP @ self.r_1_to_0_R @ vec_axes[1]
-        self.axis_3R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ vec_axes[2]
-        self.axis_4R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ vec_axes[3]
-        self.axis_5R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ vec_axes[4]
-        self.axis_6R_in_pf = RP @ self.r_1_to_0_R @ self.r_2_to_1_R @ self.r_3_to_2_R @ self.r_4_to_3_R @ self.r_5_to_4_R @ vec_axes[5]
+        #==========各link到base的旋轉矩陣==========#
+        r_n_to_0_L = list(accumulate(
+            [ np.eye(3), self.r_1_to_0_L, self.r_2_to_1_L, self.r_3_to_2_L, self.r_4_to_3_L, self.r_5_to_4_L ],
+            func = np.matmul
+        ))
+        r_n_to_0_R = list(accumulate(
+            [ np.eye(3), self.r_1_to_0_R, self.r_2_to_1_R, self.r_3_to_2_R, self.r_4_to_3_R, self.r_5_to_4_R ],
+            func = np.matmul
+        ))
+        
+        #==========旋轉軸的向量==========#
+        (
+            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf,
+            self.axis_4L_in_pf, self.axis_5L_in_pf, self.axis_6L_in_pf
+            
+        ) = [ r_n_to_0_L[i] @ vec_axes[i] for i in range(6) ]
+        
+        (
+            self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf,
+            self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf
+            
+        ) = [ r_n_to_0_R[i] @ vec_axes[i] for i in range(6) ]
         
     #========================toolbox================================#
     @staticmethod
@@ -192,12 +195,6 @@ class RobotFrame:
         )
         p_com_in_pf = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
         return p_com_in_pf
-           
-    def __get_pelInWf(self, p_base_in_wf, r_base_to_wf):
-        return(
-            r_base_to_wf @ self.P_PEL_IN_BASE + p_base_in_wf,
-            deepcopy(r_base_to_wf)
-        )
         
     @staticmethod
     def __rotMat_to_euler(r_to_frame: np.ndarray)->np.ndarray:
