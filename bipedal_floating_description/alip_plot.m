@@ -1,3 +1,4 @@
+close all
 % 讀取 CSV 文件
 data = readmatrix('output_data.csv');
 

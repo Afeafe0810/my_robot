@@ -110,11 +110,11 @@ class AlipTraj:
         #==初始狀態==
         H = Config.IDEAL_Z_COM_IN_WF
         var0 = {
-            'x': np.vstack(( 0, 0 )),
-            'y': np.vstack(( -0.1, 0))
+            'x': np.vstack(( 0.01, 0 )),
+            'y': np.vstack(( -0.01, 0))
         }
         p0_cf_in_wf = np.vstack(( 0, 0.1, 0 ))
-        p0_sfTOcom_in_wf = np.vstack(( 0, 0.1, H))
+        p0_sfTOcom_in_wf = np.vstack(( 0, 0.2, H))
         
         return var0, p0_cf_in_wf, p0_sfTOcom_in_wf
         
@@ -197,9 +197,14 @@ class AlipTraj:
         factor = cos(pi * ratio)
         
         angularMove = lambda factor, x0, x1:\
-            x0 + (x1-x0)/(1-(-1)) * (factor-(-1))
+            x0 + (x1-x0)/(-1-1) * (factor-1)
         
         ref_xy_sfTOcom_in_cf = angularMove( factor, *[ p0_sfTOcom_in_wf[:2], ref_xy_swTOcom_in_cf_T] )
+        print(p0_sfTOcom_in_wf[:2]==ref_xy_sfTOcom_in_cf)
+        print(factor)
+        print(p0_sfTOcom_in_wf[:2].flatten())
+        print(ref_xy_sfTOcom_in_cf.flatten())
+        # input()
         
         #ratio從[0,1]的拋物線，最高點在h
         parabolicMove = lambda ratio:\
