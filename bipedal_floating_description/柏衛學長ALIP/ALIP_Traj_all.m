@@ -296,7 +296,7 @@ for i=1:length(lx_collect)
         j=j+1;
     end
 
-    
+    % input('go')
     pause(0.00001)    
     if mod(i,T/ts+1) ~= 0
         delete(CL);

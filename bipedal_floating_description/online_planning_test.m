@@ -22,7 +22,7 @@ function online_planning_dynamic()
     
 
     
-    Vx_des_2T = 0.15; % 下一步速度
+    Vx_des_2T = 0; % 下一步速度
     Ly_des_2T = m * Vx_des_2T * H; % y方向理想角動量
     Lx_des_2T_1 = (0.5 * m * H * W) * (l * sinh(l * T)) / (1 + cosh(l * T));
     Lx_des_2T_2 = -(0.5 * m * H * W) * (l * sinh(l * T)) / (1 + cosh(l * T));
