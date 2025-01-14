@@ -30,6 +30,9 @@ class RobotFrame:
         self.__update_linkRotMat(jp)
         self.__update_axisVec()
         
+        #更新com速度和角動量
+        self.__update_com_VandL()
+        
         self.eularToGeo ={
             'lf': self.__eularToGeometry(self.pa_lf_in_pf[3:]),
             'rf': self.__eularToGeometry(self.pa_rf_in_pf[3:])
@@ -75,7 +78,24 @@ class RobotFrame:
         JR = np.vstack(( Jp_R, Ja_R ))
         
         return JL, JR
-
+    
+    def get_alipInitialDate(self, stance):
+        cf, sf = stance
+        
+        #先用wf代替in cf好了
+        p0_ftTocom_in_wf = {
+            'lf': self.p_com_in_wf - self.p_lf_in_wf,
+            'rf': self.p_com_in_wf - self.p_rf_in_wf
+        }
+        L_com_in_ft = {
+            'lf': self.L_com_in_lf,
+            'rf': self.L_com_in_rf,
+        }
+        var0 = {
+            'x': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
+            'y': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['x'])),
+        }
+        return var0, p0_ftTocom_in_wf
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
@@ -179,6 +199,27 @@ class RobotFrame:
             self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf
             
         ) = [ r_n_to_0_R[i] @ vec_axes[i] for i in range(6) ]
+    
+    def __update_com_VandL(self):
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        
+        _v_com_in_wf = Dsp.DIFFTER_p_com_in_wf.diff(self.p_com_in_wf)
+        self.v_com_in_wf = Dsp.FILTER_v_com_in_wf.filt(_v_com_in_wf)
+        
+        p0_ftTocom_in_wf = {
+            'lf': self.p_com_in_wf - self.p_lf_in_wf,
+            'rf': self.p_com_in_wf - self.p_rf_in_wf
+        }
+        #學長直接用0.45, 要注意一下到底要不要改
+        self.L_com_in_lf = {
+            'y':   m * H * self.v_com_in_wf[0,0],
+            'x': - m * H * self.v_com_in_wf[1,0],
+        }
+        self.L_com_in_rf = {
+            'y':   m * H * self.v_com_in_wf[0,0],
+            'x': - m * H * self.v_com_in_wf[1,0],
+        }
         
     #========================toolbox================================#
     @staticmethod

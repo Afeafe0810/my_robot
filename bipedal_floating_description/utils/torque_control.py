@@ -65,6 +65,7 @@ class TorqueControl:
         ref_x_cfTOcom_in_wf, ref_y_cfTOcom_in_wf = ( ref_pa_com_in_wf - ref_pa_ft_in_wf[cf] ) [0:2,0]
 
         #計算質心速度(v從世界座標下求出)
+        assert('記得改')
         vx_com_in_wf, vy_com_in_wf = Dsp.FILTER["v_com_in_wf"].filt(
             Dsp.DIFFTER["p_com_in_wf"].diff(p_com_in_wf) 
         ) [0:2,0]

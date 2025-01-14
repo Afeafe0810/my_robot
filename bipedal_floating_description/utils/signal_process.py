@@ -49,15 +49,16 @@ class Diffter:
 class Dsp:
     #====================微分器====================#
     DIFFTER = {
-        "p_com_in_wf" : Diffter(),
+        # "p_com_in_wf" : Diffter(),
         "p_pel_in_lf" : Diffter(),
         "p_pel_in_rf" : Diffter(),
         "jp" : Diffter(),
     }
-    
+    DIFFTER_p_com_in_wf = Diffter()
     #====================濾波器====================#
+    FILTER_v_com_in_wf = Filter([0, 0.2592], [1, -0.7408])
     FILTER = {
-        "v_com_in_wf" : Filter([0, 0.2592], [1, -0.7408]),
+        # "v_com_in_wf" : Filter([0, 0.2592], [1, -0.7408]),
         "v_pel_in_lf" : Filter([0, 0.2592], [1, -0.7408]),
         "v_pel_in_rf" : Filter([0, 0.2592], [1, -0.7408]),
         # "jp": Filter([0, 0.1453, 0.1078],[1, -1.1580, 0.4112]), #10Hz
