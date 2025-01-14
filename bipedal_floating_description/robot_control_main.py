@@ -40,14 +40,10 @@ class UpperLevelController(Node):
         self.stance = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
         self.stance_past = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
         
-    def stance_change(self, state, alip_time):
+    def stance_change(self, state):
         self.stance = ['lf', 'rf'] if state == 0 else\
                       ['lf', 'rf'] if state == 1 else\
                     self.stance #先不變
-
-        # 時間到就做兩隻腳的切換
-        if state == 30 and abs(alip_time-0.5) <= 0.005 :
-            self.stance.reverse()
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
@@ -70,7 +66,7 @@ class UpperLevelController(Node):
         contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
-        self.stance_change(state, self.traj.alip_time)
+        self.stance_change(state)
         cf, sf = self.stance
         cf_past, sf_past = self.stance_past
         

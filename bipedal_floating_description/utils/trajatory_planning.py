@@ -12,8 +12,8 @@ class Trajatory:
         #state 2, 單腳舉起的時間
         self.leg_lift_time = 0
         
-        #state 30, ALIP行走當下時間
-        self.alip_time = 0
+        #state 30
+        self.aliptraj = AlipTraj()
         
     def plan(self, state):
         if state in [0,1]: #假雙支撐, 真雙支撐
@@ -56,89 +56,40 @@ class Trajatory:
 
 class AlipTraj:
     def __init__(self):
-        # 初始化檔案名稱
-        self.csv_filename = "output_data.csv"
-        # 初始化 CSV 檔案並寫入標題行
-        with open(self.csv_filename, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["t", "com_x", "com_y", "com_z", "lf_x", "lf_y", "lf_z", "rf_x", "rf_y", "rf_z"])
-            
-    def play(self):
-        t = 0
-        stance = ['lf', 'rf']
-
-        while t <= Config.STEP_TIMELENGTH:
-            ref = self.plan(stance, 0.15, t)
-            
-            # 提取數據
-            com = ref['com']
-            lf = ref['lf']
-            rf = ref['rf']
-
-            # 將數據存入 CSV 檔案
-            with open(self.csv_filename, mode="a", newline="") as file:
-                writer = csv.writer(file)
-                writer.writerow([
-                    t,
-                    com[0][0], com[1][0], com[2][0],
-                    lf[0][0], lf[1][0], lf[2][0],
-                    rf[0][0], rf[1][0], rf[2][0]
-                ])
-
-            t += Config.TIMER_PERIOD
-        
-    def plan(self, stance, des_vx_com_in_cf_2T, t):
-        cf, sf = stance
-        
-        #==========切換瞬間拿取初值==========#
-        var0, p0_cf_in_wf, p0_sfTOcom_in_wf = self.__getInitialData(stance, t)
-
-        #==========規劃質心軌跡與骨盆軌跡==========#
-        ref_p_com_in_cf, ref_p_com_in_wf = self.__plan_com(t, var0, p0_cf_in_wf)
-        
-        #==========規劃擺動腳軌跡==========#
-        ref_p_sf_in_wf = self.__plan_sf(t, stance, des_vx_com_in_cf_2T, var0, p0_sfTOcom_in_wf, p0_cf_in_wf, ref_p_com_in_cf)
-        
-        return {
-            'com': ref_p_com_in_wf,
-              cf : p0_cf_in_wf,
-              sf : ref_p_sf_in_wf,
-        }
-        
-    @staticmethod
-    def __getInitialData(stance,t):
-        #==初始狀態==
-        H = Config.IDEAL_Z_COM_IN_WF
-        var0 = {
-            'x': np.vstack(( 0.01, 0 )),
-            'y': np.vstack(( -0.01, 0))
-        }
-        p0_cf_in_wf = np.vstack(( 0, 0.1, 0 ))
-        p0_sfTOcom_in_wf = np.vstack(( 0, 0.2, H))
-        
-        return var0, p0_cf_in_wf, p0_sfTOcom_in_wf
-        
-    @staticmethod
-    def matA(t):
-        m = Config.MASS
-        H = Config.IDEAL_Z_COM_IN_WF
-        w = Config.OMEGA
-        return {
-            'x': np.array([
-                    [         cosh(w*t), sinh(w*t)/(m*H*w) ], 
-                    [ m*H*w * sinh(w*t), cosh(w*t)         ]   
-                ]),
-            'y': np.array([
-                    [          cosh(w*t), -sinh(w*t)/(m*H*w) ],
-                    [ -m*H*w * sinh(w*t),  cosh(w*t)         ]
-                ])
-        }
+        self.t = 0.0
     
-    def __plan_com(self, t, var0: dict[str, np.ndarray], p0_cf_in_wf: np.ndarray):
-        H = Config.IDEAL_Z_COM_IN_WF
-        A = self.matA(t)
+    
+    def plan(self, frame: RobotFrame, stance:list ):
+        isJustStarted = ( self.t == 0 )
+        isTimesUp = ( self.t > Config.STEP_TIMELENGTH )
         
-        #state equation
+        #==========當一步踩完, 時間歸零+主被動腳交換==========#
+        if isTimesUp:
+            self.t -= Config.STEP_TIMELENGTH
+            stance.reverse()
+            
+        #==========踩第一步的時候, 拿取初值與預測==========#
+        if isJustStarted or isTimesUp:
+            var0, p0_ftTocom_in_wf = frame.get_alipInitialDate(stance)
+
+        #==========得到軌跡點==========#
+        #迭代吐點
+        self.__plan_com()
+        
+        #==========更新時間==========#
+        self.t +=Config.TIMER_PERIOD
+    
+    #==========主要演算法==========#
+    
+    def __plan_com(self, var0: dict[str, np.ndarray], p0_cf_in_wf: np.ndarray):
+        
+        #==========規格==========#
+        H = Config.IDEAL_Z_COM_IN_WF
+        
+        #==========state transform matrix==========#
+        A = self.get_alipMatA(self.t)
+        
+        #==========state equation==========#
         var = {
             'x': A['x'] @ var0['x'],
             'y': A['y'] @ var0['y'],
@@ -154,7 +105,29 @@ class AlipTraj:
         # ref_L_com_in_cf = np.vstack(( var['y'][1,0], var['x'][1,0] ))
         
         return ref_p_com_in_cf, ref_p_com_in_wf
+ 
+    #==========工具function==========#
+
+    
         
+
+        
+    @staticmethod
+    def get_alipMatA(t):
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        w = Config.OMEGA
+        return {
+            'x': np.array([
+                    [         cosh(w*t), sinh(w*t)/(m*H*w) ], 
+                    [ m*H*w * sinh(w*t), cosh(w*t)         ]   
+                ]),
+            'y': np.array([
+                    [          cosh(w*t), -sinh(w*t)/(m*H*w) ],
+                    [ -m*H*w * sinh(w*t),  cosh(w*t)         ]
+                ])
+        }
+       
     def __plan_sf(self, t, stance, des_vx_com_in_cf_2T, var0: dict[str, np.ndarray], p0_sfTOcom_in_wf, p0_cf_in_wf, ref_p_com_in_cf):
         cf, sf = stance
         
@@ -167,7 +140,7 @@ class AlipTraj:
         T = Config.STEP_TIMELENGTH
         
         #==========狀態轉移矩陣==========#
-        A = self.matA(t)
+        A = self.matA(T)
         
         #==========下兩步的理想角動量==========#
         sign_Lx = -1 if sf == 'rf' else\
@@ -218,4 +191,21 @@ class AlipTraj:
         ref_p_sf_in_wf = ref_p_sf_in_cf + p0_cf_in_wf
         
         return ref_p_sf_in_wf
-    
+        
+    def plan(self, stance, des_vx_com_in_cf_2T, t):
+        cf, sf = stance
+        
+        #==========切換瞬間拿取初值==========#
+        var0, p0_cf_in_wf, p0_sfTOcom_in_wf = self.__getInitialData(stance, t)
+
+        #==========規劃質心軌跡與骨盆軌跡==========#
+        ref_p_com_in_cf, ref_p_com_in_wf = self.__plan_com(t, var0, p0_cf_in_wf)
+        
+        #==========規劃擺動腳軌跡==========#
+        ref_p_sf_in_wf = self.__plan_sf(t, stance, des_vx_com_in_cf_2T, var0, p0_sfTOcom_in_wf, p0_cf_in_wf, ref_p_com_in_cf)
+        
+        return {
+            'com': ref_p_com_in_wf,
+              cf : p0_cf_in_wf,
+              sf : ref_p_sf_in_wf,
+        }
