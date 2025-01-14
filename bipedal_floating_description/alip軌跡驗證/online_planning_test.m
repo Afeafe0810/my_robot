@@ -15,7 +15,7 @@ function online_planning_dynamic()
     stance = 1; % 當前支撐腳：1為左腳，0為右腳
     contact_t = 0:0.01:0.5; % 支撐狀態運行時間
     P_cf_wf = [0; 0.1; 0]; % 支撐腳在地面座標系中的位置
-    X0 = [0.0; m*H*0.15]; % x方向初始狀態 (xc(0), ly(0))
+    X0 = [0.0; 0]; % x方向初始狀態 (xc(0), ly(0))
     Y0 = [-0.1; -(0.5 * m * H * W) * (l * sinh(l * T)) / (1 + cosh(l * T))]; % y方向初始狀態 (yc(0), lx(0))
     P_Psw2com_0 = [0.0; 0.1]; % 擺動腳初始相對於質心的位置
 
@@ -51,6 +51,7 @@ function online_planning_dynamic()
 
     for t = contact_t
         % ALIP 模型動態
+        input('go')
         ALIP_x = [cosh(l * t), sinh(l * t) / (m * H * l);
                   m * H * l * sinh(l * t), cosh(l * t)];
         ALIP_y = [cosh(l * t), -sinh(l * t) / (m * H * l);
@@ -80,6 +81,8 @@ function online_planning_dynamic()
         pv = t / T; % 插值參數
         Psw2com_x_T = (Ly_des_2T - cosh(l * T) * Ly_T) / (m * H * l * sinh(l * T));
         Psw2com_y_T = (Lx_des_2T - cosh(l * T) * Lx_T) / (-m * H * l * sinh(l * T));
+        [0.5 * ((1 + cos(pi * pv)) * P_Psw2com_0(1) - (1 - cos(pi * pv)) * Psw2com_x_T);
+            0.5 * ((1 + cos(pi * pv)) * P_Psw2com_0(2) - (1 - cos(pi * pv)) * Psw2com_y_T);]
         Sw_x_cf = Com_x_cf - 0.5 * ((1 + cos(pi * pv)) * P_Psw2com_0(1) + (1 - cos(pi * pv)) * Psw2com_x_T);
         Sw_y_cf = Com_y_cf - 0.5 * ((1 + cos(pi * pv)) * P_Psw2com_0(2) + (1 - cos(pi * pv)) * Psw2com_y_T);
         Sw_z_cf = Com_z_cf - (4 * zCL * (pv - 0.5)^2 + (H - zCL));

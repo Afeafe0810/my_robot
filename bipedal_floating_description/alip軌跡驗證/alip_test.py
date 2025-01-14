@@ -1,4 +1,5 @@
-import numpy as np; np.set_printoptions(precision=2)
+import numpy as np
+import pandas as pd
 from math import cosh, sinh, cos, sin, pi
 import csv
 #================ import library ========================#
@@ -6,81 +7,54 @@ from utils.config import Config
 from utils.frame_kinermatic import RobotFrame
 #========================================================#
 
-class Trajatory:
-    def __init__(self):
-        
-        #state 2, 單腳舉起的時間
-        self.leg_lift_time = 0
-        
-        #state 30
-        self.aliptraj = AlipTraj()
-        
-    def plan(self, state):
-        if state in [0,1]: #假雙支撐, 真雙支撐
-            return self.__bipedalBalanceTraj()
-        
-        elif state == 2: #骨盆移到支撐腳
-            if self.leg_lift_time <= 10 * Config.DDT:
-                self.leg_lift_time += Config.TIMER_PERIOD
-                print("DS",self.leg_lift_time)
-                
-            return self.__comMoveTolf(self.leg_lift_time)
-        
-        elif state == 30: #ALIP規劃
-            pass
-    
-    @staticmethod
-    def __bipedalBalanceTraj():
-        return {
-            'pel': np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
-            'lf' : np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
-            'rf' : np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
-        }
-    
-    @staticmethod
-    def __comMoveTolf(t):
-        T = Config.DDT
-
-        #==========線性移動==========#
-        linearMove = lambda t, x0, x1, t0, t1:\
-            np.clip(x0 + (x1-x0) * (t-t0)/(t1-t0), x0, x1 )
-            
-        y_pel = linearMove(t, *[0, 0.09], *[0*T, 0.5*T])
-        z_sf  = linearMove(t, *[0, 0.05], *[1*T, 1.1*T])
-        
-        return {
-            'pel': np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
-            'lf' : np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
-            'rf' : np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
-        }
-
 class AlipTraj:
     def __init__(self):
         self.t = 0.0
-        
+        H = Config.IDEAL_Z_COM_IN_WF
         #初值
-        self.var0 = None
-        self.p0_ftTocom_in_wf = None
-        self.p0_ft_in_wf = None
+        self.var0 = {
+            'x': np.vstack((0, 0)),
+            'y': np.vstack((-0.1, 0))
+        }
+        self.p0_ftTocom_in_wf = {
+            'lf': np.vstack(( 0, -0.1, H )),
+            'rf': np.vstack(( 0,  0.1, H ))
+        }
+        self.p0_ft_in_wf = {
+            'lf': np.vstack(( 0, 0.1, 0 )),
+            'rf': np.vstack(( 0, -0.1, 0 ))
+        }
     
     def plan(self, frame: RobotFrame, stance:list, des_vx_com_in_wf_2T ):
+        # input('go')
+        
+        
         isJustStarted = ( self.t == 0 )
-        isTimesUp = ( self.t > Config.STEP_TIMELENGTH )
+        isTimesUp = ( self.t  - Config.STEP_TIMELENGTH > 1e-8)
         
         #==========當一步踩完, 時間歸零+主被動腳交換==========#
         if isTimesUp:
-            self.t -= Config.STEP_TIMELENGTH
+            print('timesup', self.t)
+            self.t =0
             stance.reverse()
+            self.p1_ft_in_wf = {
+                'lf': self.Ans['lf'],
+                'rf': self.Ans['rf']
+            }
+            # print(self.p1_ft_in_wf)
             
         cf, sf = stance
-        
         #==========踩第一步的時候, 拿取初值與預測==========#
-        if isJustStarted or isTimesUp:
-            self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipInitialDate(stance)
-            
+        if isTimesUp:
+            self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = self.get_alipInitialDate()
+        if isTimesUp or isJustStarted:
+            # print("did i")
             #(側旋角動量Lx須用ref, 不然軌跡極怪)
             self.var0['y'][1,0] = self.__get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self.__sf_placement(stance, des_vx_com_in_wf_2T)
+            # print(self.ref_xy_swTOcom_in_wf_T)
+            
+            
 
         #==========得到軌跡點==========#
         ref_p_cfTOcom_in_wf = self.__plan_com(stance)
@@ -93,11 +67,13 @@ class AlipTraj:
         #==========更新時間==========#
         self.t +=Config.TIMER_PERIOD
         
-        return {
+        self.Ans = {
             'com': ref_p_com_in_wf,
                cf: self.p0_ft_in_wf[cf],
                sf: ref_p_sf_in_wf
         }
+        
+        return self.Ans
     
     #==========主要演算法==========# 
     def __plan_com(self, stance):
@@ -114,7 +90,7 @@ class AlipTraj:
             'x': A['x'] @ self.var0['x'],
             'y': A['y'] @ self.var0['y'],
         }
-        
+        # print('this', var)
         return np.vstack(( var['x'][0,0], var['y'][0,0], H ))
        
     def __sf_placement(self, stance, des_vx_com_in_wf_2T):
@@ -136,17 +112,30 @@ class AlipTraj:
         
         #==========下步落地的角動量==========#
         A = self.__get_alipMatA(T)
-        ref_L_com_1T = {
+        L1 = ref_L_com_1T = {
             'y': ( A['x'] @ self.var0['x'] ) [1,0],
             'x': ( A['y'] @ self.var0['y'] ) [1,0]
         }
+        
+        cf1 = np.vstack([
+            ( A['x'] @ self.var0['x'] ) [0,0],
+            ( A['y'] @ self.var0['y'] ) [0,0]
+        ])
         
         #==========下步落地向量==========#
         ref_xy_swTOcom_in_wf_T = np.vstack(( 
             ( des_L_com_2T['y'] - cosh(w*T)*ref_L_com_1T['y'] ) /  ( m*H*w*sinh(w*T) ),
             ( des_L_com_2T['x'] - cosh(w*T)*ref_L_com_1T['x'] ) / -( m*H*w*sinh(w*T) )
         ))
-        
+        # print(ref_xy_swTOcom_in_wf_T)
+        self.var1 = {
+            'x': np.vstack((ref_xy_swTOcom_in_wf_T[0,0], L1['y'])),
+            'y': np.vstack((ref_xy_swTOcom_in_wf_T[1,0], L1['x'])),
+        }
+        self.p1_ftTocom_in_wf = {
+             cf: cf1 ,
+             sf: np.vstack(( ref_xy_swTOcom_in_wf_T, 0 ))
+        }
         return ref_xy_swTOcom_in_wf_T
 
     def __sf_trajFit(self, stance):
@@ -162,7 +151,7 @@ class AlipTraj:
         xy0_sfTocom_in_wf = self.p0_ftTocom_in_wf[sf][:2]
         xy1_sfTocom_in_wf = self.ref_xy_swTOcom_in_wf_T
         ref_xy_sfTOcom_in_wf = xy0_sfTocom_in_wf + (xy1_sfTocom_in_wf - xy0_sfTocom_in_wf)/(-2) * ( cos(pi*ratioT)-1 )
-        
+        # print(xy1_sfTocom_in_wf.flatten())
         #z方向用拋物線, 最高點在h
         ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
         
@@ -198,3 +187,37 @@ class AlipTraj:
         sign_Lx = 1 if cf =='lf' else\
                  -1 #if cf == 'rf'
         return sign_Lx * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) )
+
+    def get_alipInitialDate(self):
+        return self.var1, self.p1_ftTocom_in_wf, self.p1_ft_in_wf
+
+test = AlipTraj()
+data_list = []
+stance = ['lf', 'rf']
+for i in np.arange(0, Config.STEP_TIMELENGTH*10+Config.TIMER_PERIOD, Config.TIMER_PERIOD):
+    output = test.plan(None, stance, 0.15)
+    com = output['com'].flatten()
+    lf = output['lf'].flatten()
+    rf = output['rf'].flatten()
+    
+    # 添加到數據列表
+    data_list.append({
+        'time_step': i,
+        'com_x': com[0],
+        'com_y': com[1],
+        'com_z': com[2],
+        'lf_x': lf[0],
+        'lf_y': lf[1],
+        'lf_z': lf[2],
+        'rf_x': rf[0],
+        'rf_y': rf[1],
+        'rf_z': rf[2],
+    })
+
+# 轉為 DataFrame
+df = pd.DataFrame(data_list)
+
+# 保存為 CSV
+df.to_csv('alip_traj_output.csv', index=False)
+
+print("數據已成功存儲為 'alip_traj_output.csv'")

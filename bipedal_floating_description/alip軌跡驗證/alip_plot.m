@@ -1,6 +1,6 @@
 close all
 % 讀取 CSV 文件
-data = readmatrix('output_data.csv');
+data = readmatrix('alip_traj_output.csv');
 
 % 提取時間和數據
 t = data(:, 1);       % 時間
@@ -18,8 +18,11 @@ rf_z = data(:, 10);   % rf 的 z
 x_min = min([com_x; lf_x; rf_x]) - 0.1;
 x_max = max([com_x; lf_x; rf_x]) + 0.1;
 y_min = min([com_y; lf_y; rf_y]) - 0.1;
+% y_min = -1
 y_max = max([com_y; lf_y; rf_y]) + 0.1;
-z_min = min([com_z; lf_z; rf_z]) - 0.1;
+% y_max = 1
+% z_min = min([com_z; lf_z; rf_z]) - 0.1;
+z_min = 0
 z_max = max([com_z; lf_z; rf_z]) + 0.1;
 
 % 初始化 3D 圖
@@ -56,7 +59,8 @@ for i = 1:length(t)
     plot3(rf_x(1:i), rf_y(1:i), rf_z(1:i), 'r-', 'LineWidth', 1.5);  % RF
     legend({'COM', 'LF', 'RF'}, 'Location', 'best'); % 設置 Legend 標籤
     % 暫停以模擬動態效果
-    pause(0.1);
+    pause(0.01);
+    % input('go')
 end
 
 hold off;
