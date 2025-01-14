@@ -67,11 +67,9 @@ class ROSInterfaces:
         __jv = np.clip( Dsp.DIFFTER["jp"].diff(self.__jp), -0.75, 0.75) #微分後設定飽和
         jv = Dsp.FILTER["jv"].filt(__jv)
         
-        return [
-            deepcopy(data) for data in [
-                self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_lf, self.__contact_rf, self.__jp, jv
-            ]
-        ]
+        return list( map( deepcopy,
+            [ self.__p_base_in_wf, self.__r_base_to_wf, self.__state, self.__contact_lf, self.__contact_rf, self.__jp, jv ]
+        ))
     
     def update_VizAndMesh(self, jp: np.ndarray) -> pink.Configuration:
         '''給定關節轉角, 更新機器人模型, 回傳機器人的configuration'''

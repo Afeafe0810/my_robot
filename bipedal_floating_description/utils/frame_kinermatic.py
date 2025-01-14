@@ -80,9 +80,13 @@ class RobotFrame:
         return JL, JR
     
     def get_alipInitialDate(self, stance):
+        """先用wf代替in cf好了"""
         cf, sf = stance
         
-        #先用wf代替in cf好了
+        p_ft_in_wf = {
+            'lf': self.p_lf_in_wf,
+            'rf': self.p_rf_in_wf
+        }
         p0_ftTocom_in_wf = {
             'lf': self.p_com_in_wf - self.p_lf_in_wf,
             'rf': self.p_com_in_wf - self.p_rf_in_wf
@@ -95,7 +99,10 @@ class RobotFrame:
             'x': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
             'y': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['x'])),
         }
-        return var0, p0_ftTocom_in_wf
+        return list( map( deepcopy, 
+            [var0, p0_ftTocom_in_wf, p_ft_in_wf]
+        ))
+    
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
