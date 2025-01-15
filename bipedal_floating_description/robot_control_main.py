@@ -71,7 +71,7 @@ class UpperLevelController(Node):
         cf_past, sf_past = self.stance_past
         
         #========軌跡規劃========#
-        ref = self.traj.plan(state)
+        ref = self.traj.plan(state, self.frame, self.stance)
 
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, jp, self.ros, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)

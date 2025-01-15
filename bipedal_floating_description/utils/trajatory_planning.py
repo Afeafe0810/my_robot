@@ -15,7 +15,7 @@ class Trajatory:
         #state 30
         self.aliptraj = AlipTraj()
         
-    def plan(self, state):
+    def plan(self, state, frame: RobotFrame, stance):
         if state in [0,1]: #假雙支撐, 真雙支撐
             return self.__bipedalBalanceTraj()
         
@@ -27,7 +27,14 @@ class Trajatory:
             return self.__comMoveTolf(self.leg_lift_time)
         
         elif state == 30: #ALIP規劃
-            pass
+            ref = self.aliptraj.plan(frame, stance, stance, 0)
+            
+            #不確定是否可以用量測的
+            return {
+                'pel': ref['com'] -frame.p_com_in_wf + frame.p_pel_in_wf,
+                'lf': ref['lf'],
+                'rf': ref['lf']
+            }
     
     @staticmethod
     def __bipedalBalanceTraj():
@@ -65,18 +72,18 @@ class AlipTraj:
     
     def plan(self, frame: RobotFrame, stance:list, des_vx_com_in_wf_2T ):
         isJustStarted = ( self.t == 0 )
-        isTimesUp = ( self.t > Config.STEP_TIMELENGTH )
+        isTimesUp = ( self.t - Config.STEP_TIMELENGTH > 1e-8  )
         
         #==========當一步踩完, 時間歸零+主被動腳交換==========#
         if isTimesUp:
-            self.t -= Config.STEP_TIMELENGTH
+            self.t = 0
             stance.reverse()
             
         cf, sf = stance
         
         #==========踩第一步的時候, 拿取初值與預測==========#
         if isJustStarted or isTimesUp:
-            self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipInitialDate(stance)
+            self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
             
             #(側旋角動量Lx須用ref, 不然軌跡極怪)
             self.var0['y'][1,0] = self.__get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾

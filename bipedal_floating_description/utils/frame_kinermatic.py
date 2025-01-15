@@ -79,7 +79,7 @@ class RobotFrame:
         
         return JL, JR
     
-    def get_alipInitialDate(self, stance):
+    def get_alipdata(self, stance):
         """先用wf代替in cf好了"""
         cf, sf = stance
         
@@ -97,7 +97,7 @@ class RobotFrame:
         }
         var0 = {
             'x': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
-            'y': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['x'])),
+            'y': np.vstack(( p0_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
         }
         return list( map( deepcopy, 
             [var0, p0_ftTocom_in_wf, p_ft_in_wf]

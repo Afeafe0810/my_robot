@@ -1,6 +1,6 @@
 #================ import library ========================#
 from std_msgs.msg import Float64MultiArray 
-import numpy as np; np.set_printoptions(precision=2)
+import numpy as np; np.set_printoptions(precision=5)
 import copy
 from scipy.spatial.transform import Rotation as R
 import pinocchio as pin
@@ -27,7 +27,7 @@ class TorqueControl:
             torque = cls.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
             
             torque[sf][4:6] = cls.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = cls.__alip_control(frame, cf, cf_past, frame.p_com_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
+            torque[cf][4:6] = cls.__alip_control(frame, stance, cf_past, frame.p_com_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
             torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
     
@@ -50,9 +50,14 @@ class TorqueControl:
         return torque_ankle_sf
 
     @staticmethod
-    def __alip_control(frame:RobotFrame, cf, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
+    def __alip_control(frame:RobotFrame, stance, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
         
-        #質心相對L frame的位置
+        cf, sf = stance
+        
+        var, *_ = frame.get_alipdata(stance)
+        
+        
+        # 質心相對L frame的位置
         p_ft_in_wf = {
             'lf': p_lf_in_wf,
             'rf': p_rf_in_wf
@@ -65,7 +70,6 @@ class TorqueControl:
         ref_x_cfTOcom_in_wf, ref_y_cfTOcom_in_wf = ( ref_pa_com_in_wf - ref_pa_ft_in_wf[cf] ) [0:2,0]
 
         #計算質心速度(v從世界座標下求出)
-        assert('記得改')
         vx_com_in_wf, vy_com_in_wf = Dsp.FILTER["v_com_in_wf"].filt(
             Dsp.DIFFTER["p_com_in_wf"].diff(p_com_in_wf) 
         ) [0:2,0]
@@ -79,12 +83,17 @@ class TorqueControl:
         ref_wx = np.vstack(( ref_x_cfTOcom_in_wf, 0 ))
         ref_wy = np.vstack(( ref_y_cfTOcom_in_wf, 0 ))
         
+        # print('wx\n',wx.flatten())
+        # print('varx\n', var['x'].flatten())
+        # print('the same\n',wx.flatten()==var['x'].flatten())
+        
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         # Ax = np.array([[1,0.00247],[0.8832,1]])
         # Bx = np.array([[0],[0.01]])
         Kx = np.array([[150,15.0198]])
-            
-        ux = -Kx@(wx - ref_wx) #腳踝pitch控制x方向
+        
+        # ux = -Kx@(wx - ref_wx) #腳踝pitch控制x方向            
+        ux = -Kx@(var['x'] - ref_wx) #腳踝pitch控制x方向
 
         
 
@@ -99,20 +108,18 @@ class TorqueControl:
         # if self.stance_past == 0 and self.stance == 1:
         #     self.mea_y_L[1,0] = copy.deepcopy(self.mea_y_past_R[1,0])
 
-        uy = -Ky@(wy - ref_wy) #腳踝row控制x方向
+        # uy = -Ky@(wy - ref_wy) #腳踝row控制x方向
+        uy = -Ky@(var['y'] - ref_wy) #腳踝row控制x方向
+        
+        # print('wy\n',wy.flatten())s
+        # print('vary\n', var['y'].flatten())
+        print('the same\n',wy.flatten()-var['y'].flatten())
 
         if cf != cf_past:
             ux = uy = 0
 
         #--torque assign
         torque_ankle_cf = - np.vstack(( ux, uy ))
-
-
-        # if stance == 1:
-        #     alip_x_data = np.array([[ref_x_L[0,0]],[ref_x_L[1,0]],[self.ob_x_L[0,0]],[self.ob_x_L[1,0]]])
-        #     alip_y_data = np.array([[ref_y_L[0,0]],[ref_y_L[1,0]],[self.ob_y_L[0,0]],[self.ob_y_L[1,0]]])
-        #     self.alip_x_publisher.publish(Float64MultiArray(data=alip_x_data))
-        #     self.alip_y_publisher.publish(Float64MultiArray(data=alip_y_data))
 
         return torque_ankle_cf
 
