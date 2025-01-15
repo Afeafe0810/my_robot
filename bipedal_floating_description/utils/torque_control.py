@@ -58,36 +58,64 @@ class TorqueControl:
         var, *_ = frame.get_alipdata(stance)
         
         #==========離散的狀態矩陣==========#
+        matA = {
+            'x': np.array([
+                [ 1,      0.00247],
+                [ 0.8832, 1      ]
+            ]),
+            
+            'y': np.array([
+                [  1,     -0.00247],
+                [ -0.8832, 1      ]
+            ])
+        }
         
-        #xc & ly model(m=9 H=0.45 Ts=0.01)
-        # Ax = np.array([[1,0.00247],[0.8832,1]])
-        # Bx = np.array([[0],[0.01]])
-        Kx = np.array([[150,15.0198]])
+        matB = {
+            'x': np.vstack(( 0, 0.01 )),
+            'y': np.vstack(( 0, 0.01 )),
+        }
         
-        # ux = -Kx@(wx - ref_wx) #腳踝pitch控制x方向            
-        ux = -Kx@(var['x'] - ref_var['x']) #腳踝pitch控制x方向
+        matK = {
+            'x': np.array([ [ 150, 15.0198] ]),
+            'y': np.array([ [-150, 15     ] ])
+        }
+
+        matL = {
+            'x': np.array([
+                [ 0.1390, 0.0025],
+                [ 0.8832, 0.2803]
+            ]),
+            
+            'y': np.array([
+                [  0.1288, -0.0026 ],
+                [ -0.8832,  0.1480 ]
+            ])
+        }
+
+        
+        #==========全狀態回授==========#
+        u = {
+            'x': -matK['x'] @ ( var['x']-ref_var['x'] ), #腳踝pitch控制x方向
+            'y': -matK['y'] @ ( var['y']-ref_var['y'] ), #腳踝row控制x方向
+        }
 
         
 
         
 
-        # Ay = np.array([[1,-0.00247],[-0.8832,1]])
-        # By = np.array([[0],[0.01]])
-        Ky = np.array([[-150,15]])
 
         #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
         # if self.stance_past == 0 and self.stance == 1:
         #     self.mea_y_L[1,0] = copy.deepcopy(self.mea_y_past_R[1,0])
 
-        uy = -Ky@(var['y'] - ref_var['y']) #腳踝row控制x方向
         
 
         if stance != stance_past:
-            ux = uy = 0
+            u['x'] = u['y'] = 0
 
         #--torque assign
-        torque_ankle_cf = - np.vstack(( ux, uy ))
+        torque_ankle_cf = - np.vstack(( u['x'], u['y'] ))
 
         return torque_ankle_cf
 
