@@ -1,5 +1,6 @@
 import numpy as np; np.set_printoptions(precision=2)
 from math import cosh, sinh, cos, sin, pi
+from copy import deepcopy
 import csv
 #================ import library ========================#
 from utils.config import Config
@@ -16,25 +17,33 @@ class Trajatory:
         self.aliptraj = AlipTraj()
         
     def plan(self, state, frame: RobotFrame, stance):
-        if state in [0,1]: #假雙支撐, 真雙支撐
-            return self.__bipedalBalanceTraj()
         
+        if state in [0,1]: #假雙支撐, 真雙支撐
+            ref = self.__bipedalBalanceTraj()
+            ref['var'] = self.get_refvar_USING_pel(ref['pel'], ref['lf'])
+            
         elif state == 2: #骨盆移到支撐腳
             if self.leg_lift_time <= 10 * Config.DDT:
                 self.leg_lift_time += Config.TIMER_PERIOD
                 print("DS",self.leg_lift_time)
                 
-            return self.__comMoveTolf(self.leg_lift_time)
+            ref = self.__comMoveTolf(self.leg_lift_time)
+            ref['var'] = self.get_refvar_USING_pel(ref['pel'], ref['lf'])
         
         elif state == 30: #ALIP規劃
             ref = self.aliptraj.plan(frame, stance, stance, 0)
             
-            #不確定是否可以用量測的
-            return {
-                'pel': ref['com'] -frame.p_com_in_wf + frame.p_pel_in_wf,
-                'lf': ref['lf'],
-                'rf': ref['lf']
-            }
+            #不確定是否可以真實的差距推導出ref
+            ref['pel'] = ref['com'] -frame.p_com_in_wf + frame.p_pel_in_wf,
+        
+        return ref
+    
+    @staticmethod
+    def get_refvar_USING_pel(ref_pel, ref_cf):
+        return {
+            'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
+            'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
+        }
     
     @staticmethod
     def __bipedalBalanceTraj():
@@ -90,7 +99,7 @@ class AlipTraj:
             self.ref_xy_swTOcom_in_wf_T = self.__sf_placement(stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
-        ref_p_cfTOcom_in_wf = self.__plan_com(stance)
+        ref_p_cfTOcom_in_wf, ref_var = self.__plan_com(stance)
         ref_p_sfTOcom_in_wf = self.__sf_trajFit(stance)
         
         #==========轉成wf==========#
@@ -98,13 +107,14 @@ class AlipTraj:
         ref_p_sf_in_wf = - ref_p_sfTOcom_in_wf + ref_p_com_in_wf
         
         #==========更新時間==========#
-        self.t +=Config.TIMER_PERIOD
+        self.t += Config.TIMER_PERIOD
         
-        return {
+        return deepcopy({
+            'var': ref_var,
             'com': ref_p_com_in_wf,
                cf: self.p0_ft_in_wf[cf],
-               sf: ref_p_sf_in_wf
-        }
+               sf: ref_p_sf_in_wf,
+        })
     
     #==========主要演算法==========# 
     def __plan_com(self, stance):
@@ -117,12 +127,12 @@ class AlipTraj:
         A = self.__get_alipMatA(self.t)
         
         #==========狀態方程==========#
-        var = {
+        ref_var = {
             'x': A['x'] @ self.var0['x'],
             'y': A['y'] @ self.var0['y'],
         }
         
-        return np.vstack(( var['x'][0,0], var['y'][0,0], H ))
+        return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
        
     def __sf_placement(self, stance, des_vx_com_in_wf_2T):
         cf, sf = stance

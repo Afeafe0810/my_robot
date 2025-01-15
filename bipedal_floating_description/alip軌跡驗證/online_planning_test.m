@@ -16,7 +16,7 @@ function online_planning_dynamic()
     contact_t = 0:0.01:0.5; % 支撐狀態運行時間
     P_cf_wf = [0; 0.1; 0]; % 支撐腳在地面座標系中的位置
     X0 = [0.0; 0]; % x方向初始狀態 (xc(0), ly(0))
-    Y0 = [-0.1; -(0.5 * m * H * W) * (l * sinh(l * T)) / (1 + cosh(l * T))]; % y方向初始狀態 (yc(0), lx(0))
+    Y0 = [-0.1; -1.5] % y方向初始狀態 (yc(0), lx(0))
     P_Psw2com_0 = [0.0; 0.1]; % 擺動腳初始相對於質心的位置
 
     
@@ -51,7 +51,7 @@ function online_planning_dynamic()
 
     for t = contact_t
         % ALIP 模型動態
-        input('go')
+        % input('go')
         ALIP_x = [cosh(l * t), sinh(l * t) / (m * H * l);
                   m * H * l * sinh(l * t), cosh(l * t)];
         ALIP_y = [cosh(l * t), -sinh(l * t) / (m * H * l);
