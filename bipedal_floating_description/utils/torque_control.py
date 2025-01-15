@@ -27,7 +27,7 @@ class TorqueControl:
             torque = cls.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
             
             torque[sf][4:6] = cls.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = cls.__alip_control(frame, stance, cf_past, frame.p_com_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
+            torque[cf][4:6] = cls.__alip_control(frame, stance, cf_past, ref_pa_pel_in_wf, ref_pa_lf_in_wf,ref_pa_rf_in_wf)
             torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
     
@@ -50,7 +50,7 @@ class TorqueControl:
         return torque_ankle_sf
 
     @staticmethod
-    def __alip_control(frame:RobotFrame, stance, cf_past, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
+    def __alip_control(frame:RobotFrame, stance, cf_past, ref_pa_com_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
         
         cf, sf = stance
         
@@ -58,34 +58,18 @@ class TorqueControl:
         
         
         # 質心相對L frame的位置
-        p_ft_in_wf = {
-            'lf': p_lf_in_wf,
-            'rf': p_rf_in_wf
-        }
         ref_pa_ft_in_wf = {
             'lf': ref_pa_lf_in_wf,
             'rf': ref_pa_rf_in_wf
         }
-        x_cfTOcom_in_wf, y_cfTOcom_in_wf = ( p_com_in_wf - p_ft_in_wf[cf] ) [0:2,0]
         ref_x_cfTOcom_in_wf, ref_y_cfTOcom_in_wf = ( ref_pa_com_in_wf - ref_pa_ft_in_wf[cf] ) [0:2,0]
 
         #計算質心速度(v從世界座標下求出)
-        vx_com_in_wf, vy_com_in_wf = Dsp.FILTER["v_com_in_wf"].filt(
-            Dsp.DIFFTER["p_com_in_wf"].diff(p_com_in_wf) 
-        ) [0:2,0]
         
-        Ly_com_in_wf =  9 * vx_com_in_wf * 0.45
-        Lx_com_in_wf = -9 * vy_com_in_wf * 0.45
         
-        wx = np.vstack(( x_cfTOcom_in_wf, Ly_com_in_wf ))
-        wy = np.vstack(( y_cfTOcom_in_wf, Lx_com_in_wf ))
         
         ref_wx = np.vstack(( ref_x_cfTOcom_in_wf, 0 ))
         ref_wy = np.vstack(( ref_y_cfTOcom_in_wf, 0 ))
-        
-        # print('wx\n',wx.flatten())
-        # print('varx\n', var['x'].flatten())
-        # print('the same\n',wx.flatten()==var['x'].flatten())
         
         #xc & ly model(m=9 H=0.45 Ts=0.01)
         # Ax = np.array([[1,0.00247],[0.8832,1]])
@@ -111,9 +95,6 @@ class TorqueControl:
         # uy = -Ky@(wy - ref_wy) #腳踝row控制x方向
         uy = -Ky@(var['y'] - ref_wy) #腳踝row控制x方向
         
-        # print('wy\n',wy.flatten())s
-        # print('vary\n', var['y'].flatten())
-        print('the same\n',wy.flatten()-var['y'].flatten())
 
         if cf != cf_past:
             ux = uy = 0
