@@ -12,9 +12,10 @@ from utils.config import Config
 from utils.signal_process import Dsp
 
 class TorqueControl:
-    
-    @classmethod
-    def update_torque(cls, frame: RobotFrame, jp, ros, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
+    def __init__(self):
+        self.alip = AlipControl()
+        
+    def update_torque(self, frame: RobotFrame, jp, ros, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
         cf, sf = stance
         cf_past, sf_past = stance_past
         JLL, JRR = frame.left_leg_jacobian()
@@ -24,10 +25,10 @@ class TorqueControl:
         if state == 0:
             torque = Innerloop.balance(jp, ros, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
         if state in [1, 2]:
-            torque = cls.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
+            torque = self.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
             
-            torque[sf][4:6] = cls.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = cls.__alip_control(frame, stance, stance_past, ref['var'])
+            torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
+            torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref['var'])
             torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
     
@@ -49,13 +50,52 @@ class TorqueControl:
         
         return torque_ankle_sf
 
-    @staticmethod
-    def __alip_control(frame:RobotFrame, stance, stance_past, ref_var):
+class AlipControl:
+    def __init__(self):
+        #(k-1)的輸入
+        self.u_p_lf : dict[str, float] = {
+            'x' : 0.,
+            'y' : 0.
+        }
+        self.u_p_rf : dict[str, float] = {
+            'x' : 0.,
+            'y' : 0.
+        }
+        
+        #(k-1)的估測值
+        self.var_e_p_lf : dict[str, np.ndarray] = {
+            'x': np.zeros((2,1)),
+            'y': np.zeros((2,1))
+        }
+        self.var_e_p_rf : dict[str, np.ndarray] = {
+            'x': np.zeros((2,1)),
+            'y': np.zeros((2,1))
+        }
+        
+        #(k-1)的量測值
+        self.var_p_lf : dict[str, np.ndarray] = {
+            'x': np.zeros((2,1)),
+            'y': np.zeros((2,1))
+        }
+        self.var_p_rf : dict[str, np.ndarray] = {
+            'x': np.zeros((2,1)),
+            'y': np.zeros((2,1))
+        }
+        
+        
+    def ctrl(self, frame:RobotFrame, stance, stance_past, ref_var):
         
         cf, sf = stance
         
         #==========量測的狀態變數==========#
-        var, *_ = frame.get_alipdata(stance)
+        var_cf, *_ = frame.get_alipdata(stance)
+        
+        #==========過去的變數==========#
+        u_p = {'lf': self.u_p_lf, 'rf': self.u_p_rf}
+        var_e_p = {'lf': self.var_e_p_lf, 'rf': self.var_e_p_rf}
+        var_p = {'lf': self.var_p_lf, 'rf': self.var_p_rf}
+        
+        u_p_cf, var_e_p_cf, var_p_cf = u_p[cf], var_e_p[cf], var_p[cf]
         
         #==========離散的狀態矩陣==========#
         matA = {
@@ -92,13 +132,23 @@ class TorqueControl:
             ])
         }
 
+        #==========估測器補償==========#
+        var_e_cf = {
+            'x': matA['x'] @ var_e_p_cf['x'] + matB['x'] * u_p_cf['x'] + matL['x'] @ (var_p_cf['x'] - var_e_p_cf['x']),
+            'y': matA['y'] @ var_e_p_cf['y'] + matB['y'] * u_p_cf['y'] + matL['y'] @ (var_p_cf['y'] - var_e_p_cf['y']),
+        }
         
         #==========全狀態回授==========#
-        u = {
-            'x': -matK['x'] @ ( var['x']-ref_var['x'] ), #腳踝pitch控制x方向
-            'y': -matK['y'] @ ( var['y']-ref_var['y'] ), #腳踝row控制x方向
+        u_cf = {
+            'x': -matK['x'] @ ( var_e_cf['x']-ref_var['x'] ), #腳踝pitch控制x方向
+            'y': -matK['y'] @ ( var_e_cf['y']-ref_var['y'] ), #腳踝row控制x方向
         }
-
+        
+        # u = {
+        #     'x': -matK['x'] @ ( var['x']-ref_var['x'] ), #腳踝pitch控制x方向
+        #     'y': -matK['y'] @ ( var['y']-ref_var['y'] ), #腳踝row控制x方向
+        # }
+        
         
 
         
@@ -112,13 +162,18 @@ class TorqueControl:
         
 
         if stance != stance_past:
-            u['x'] = u['y'] = 0
+            u_cf['x'] = u_cf['y'] = 0
 
         #--torque assign
-        torque_ankle_cf = - np.vstack(( u['x'], u['y'] ))
+        torque_ankle_cf = - np.vstack(( u_cf['x'], u_cf['y'] ))
+        
+        #==========更新值==========#
+        var_e_p[cf].update(var_e_cf)
+        var_p[cf].update(var_cf)
 
         return torque_ankle_cf
 
+    # def update_initialValue(self)
     
 class Outterloop:
     

@@ -115,7 +115,7 @@ class AlipTraj:
                cf: self.p0_ft_in_wf[cf],
                sf: ref_p_sf_in_wf,
         })
-    
+        
     #==========主要演算法==========# 
     def __plan_com(self, stance):
         cf, sf = stance
