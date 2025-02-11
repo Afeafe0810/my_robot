@@ -87,6 +87,9 @@ class AlipControl:
         
         cf, sf = stance
         
+        if stance != stance_past:
+            self.update_initialValue(stance)
+            
         #==========量測的狀態變數==========#
         var_cf, *_ = frame.get_alipdata(stance)
         
@@ -173,7 +176,23 @@ class AlipControl:
 
         return torque_ankle_cf
 
-    # def update_initialValue(self)
+    def update_initialValue(self, stance):
+        cf, sf = stance
+        #==========過去的變數==========#
+        u_p = {'lf': self.u_p_lf, 'rf': self.u_p_rf}
+        var_e_p = {'lf': self.var_e_p_lf, 'rf': self.var_e_p_rf}
+        var_p = {'lf': self.var_p_lf, 'rf': self.var_p_rf}
+        
+        #切換瞬間扭矩舊值為0
+        u_p[cf].update({ key: 0.0 for key in u_p})
+        
+        #切換瞬間量測的角動量一樣
+        var_e_p[cf]['x'][1] = var_e_p[sf]['x'][1]
+        var_e_p[cf]['y'][1] = var_e_p[sf]['y'][1]
+        
+        #切換瞬間量測值和估測值相同
+        var_e_p[cf].update(var_p[cf])
+            
     
 class Outterloop:
     
