@@ -31,11 +31,12 @@ class Trajatory:
             ref['var'] = self.get_refvar_USING_pel(ref['pel'], ref['lf'])
         
         elif state == 30: #ALIP規劃
-            ref = self.aliptraj.plan(frame, stance, stance, 0)
-            
+            ref = self.aliptraj.plan(frame, stance, 0)
             #不確定是否可以真實的差距推導出ref
-            ref['pel'] = ref['com'] -frame.p_com_in_wf + frame.p_pel_in_wf,
-        
+            ref['pel'] = np.vstack((
+                ref['com'][:3] -frame.p_com_in_wf + frame.p_pel_in_wf,
+                np.zeros((3,1))
+            ))
         return ref
     
     @staticmethod
@@ -111,9 +112,9 @@ class AlipTraj:
         
         return deepcopy({
             'var': ref_var,
-            'com': ref_p_com_in_wf,
-               cf: self.p0_ft_in_wf[cf],
-               sf: ref_p_sf_in_wf,
+            'com': np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
+               cf: np.vstack(( self.p0_ft_in_wf[cf], np.zeros((3,1)))),
+               sf: np.vstack(( ref_p_sf_in_wf, np.zeros((3,1)))),
         })
         
     #==========主要演算法==========# 

@@ -24,7 +24,7 @@ class TorqueControl:
         
         if state == 0:
             torque = Innerloop.balance(jp, ros, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
-        if state in [1, 2]:
+        if state in [1, 2, 30]:
             torque = self.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
             
             torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
@@ -254,7 +254,7 @@ class Outterloop:
             'rf': JRR
         }
         
-        if state == 0 or state == 2 :
+        if state == 0 or state == 2 or state == 30:
             cmd_jv = {
                 'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
                 'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
@@ -393,7 +393,7 @@ class Innerloop:
             kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
         
-        if state == 2:
+        if state == 2 or state == 30:
             kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             
