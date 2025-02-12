@@ -199,10 +199,10 @@ class AlipControl:
         u_p[cf].update({ key: 0.0 for key in u_p})
         
         #切換瞬間量測的角動量一樣
-        var_e_p[cf]['x'][1] = var_e_p[sf]['x'][1]
-        var_e_p[cf]['y'][1] = var_e_p[sf]['y'][1]
+        var_p[cf]['x'][1] = var_p[sf]['x'][1]
+        var_p[cf]['y'][1] = var_p[sf]['y'][1]
         
-        #切換瞬間量測值和估測值相同
+        #切換瞬間估測值代入量測值
         var_e_p[cf].update(var_p[cf])
             
     
