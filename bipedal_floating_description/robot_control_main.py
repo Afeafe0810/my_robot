@@ -33,17 +33,12 @@ class UpperLevelController(Node):
         #============機器人的重要參數=====================#     
         
         #機器人的模式
-        self.state = 0
-        self.state_past = 0
+        self.state : int = 0
+        self.state_past :int = 0
         
         #主被動腳
-        self.stance = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
-        self.stance_past = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
-        
-    def stance_change(self, state):
-        self.stance = ['lf', 'rf'] if state == 0 else\
-                      ['lf', 'rf'] if state == 1 else\
-                    self.stance #先不變
+        self.stance : list[str] = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
+        self.stance_past : list[str] = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
@@ -66,7 +61,7 @@ class UpperLevelController(Node):
         contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
-        self.stance_change(state)
+        self._setStance(state)
         cf, sf = self.stance
         cf_past, sf_past = self.stance_past
         
@@ -79,6 +74,12 @@ class UpperLevelController(Node):
         
         self.state_past, self.stance_past = self.state, self.stance
 
+    def _setStance(self, state):
+        """掌管state 0, 1, 2的支撐腳邏輯"""
+        if state in [0, 1, 2]:
+            #(這邊不能用return寫，否則state30會是None)
+            self.stance = ['lf', 'rf']
+            
 def main(args=None):
     rclpy.init(args=args)
 

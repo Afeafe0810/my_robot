@@ -241,6 +241,7 @@ class RobotFrame:
         pin.centerOfMass(
             ros.bipedal_floating_model, ros.bipedal_floating_data, jp
         )
+        #TODO: 傳機器人資料就好了，不用傳ros
         p_com_in_pf = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
         return p_com_in_pf
         
