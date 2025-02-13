@@ -8,7 +8,7 @@ import pinocchio as pin
 from itertools import accumulate
 #================ import other code =====================#
 from utils.config import Config
-from utils.ros_interfaces import ROSInterfaces
+from utils.ros_interfaces import RobotModel
 from utils.signal_process import Dsp
 #========================================================#
 
@@ -17,11 +17,11 @@ class RobotFrame:
         pass
     
     #=======================對外的接口=================================#
-    def updateFrame(self, ros: ROSInterfaces, config: pink.Configuration, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray, jp: np.ndarray):
+    def updateFrame(self, robot: RobotModel, config: pink.Configuration, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray, jp: np.ndarray):
         '''更新所有frame下的座標'''
         
         #透過機器人的meshcat的config來更新pink frame下的座標
-        self.__update_pfFrame(config, ros, jp)
+        self.__update_pfFrame(config, robot, jp)
         
         #透過pink的座標, 以及訂閱到的base_in_wf, 可以用運動學得到其他部位in_wf (事後發現, 其實pink frame就是base)
         self.__update_wfFrame(p_base_in_wf, r_base_to_wf)
@@ -105,7 +105,7 @@ class RobotFrame:
     
     #=======================封裝主要的部份================================#
     
-    def __update_pfFrame(self, config: pink.Configuration, ros: ROSInterfaces, jp: np.ndarray):
+    def __update_pfFrame(self, config: pink.Configuration, robot: RobotModel, jp: np.ndarray):
         '''可以得到各部位在pink frame下的資訊'''
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
         self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1")
@@ -123,7 +123,7 @@ class RobotFrame:
         self.p_RankX_in_pf,  self.r_RankX_to_pf  = self.__getOneInPf(config, "r_foot_1")
         self.p_rf_in_pf,     self.r_rf_to_pf     = self.__getOneInPf(config, "r_foot")
         
-        self.p_com_in_pf = self.__get_comInPf(ros, jp)
+        self.p_com_in_pf = self.__get_comInPf(robot, jp)
         
         self.pa_pel_in_pf = np.vstack(( self.p_pel_in_pf, self.__rotMat_to_euler(self.r_pel_to_pf) ))
         self.pa_lf_in_pf  = np.vstack(( self.p_lf_in_pf , self.__rotMat_to_euler(self.r_lf_to_pf)  ))
@@ -236,13 +236,13 @@ class RobotFrame:
         r_to_pf = np.reshape( htm.rotation, (3,3) )
         return p_in_pf, r_to_pf 
     
-    def __get_comInPf(self, ros: ROSInterfaces, jp: np.ndarray):
+    def __get_comInPf(self, robot: RobotModel, jp: np.ndarray):
         
         pin.centerOfMass(
-            ros.bipedal_floating_model, ros.bipedal_floating_data, jp
+            robot.bipedal_floating.model, robot.bipedal_floating.data, jp
         )
-        #TODO: 傳機器人資料就好了，不用傳ros
-        p_com_in_pf = np.reshape(ros.bipedal_floating_data.com[0],(3,1))
+        
+        p_com_in_pf = np.reshape(robot.bipedal_floating.data.com[0],(3,1))
         return p_com_in_pf
         
     @staticmethod

@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation as R
 import pinocchio as pin
 
 #================ import library ========================#
-from utils.ros_interfaces import ROSInterfaces
+from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from utils.config import Config
 from utils.signal_process import Dsp
@@ -15,7 +15,7 @@ class TorqueControl:
     def __init__(self):
         self.alip = AlipControl()
         
-    def update_torque(self, frame: RobotFrame, jp, ros, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
+    def update_torque(self, frame: RobotFrame, jp, robot: RobotModel, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
         cf, sf = stance
         cf_past, sf_past = stance_past
         JLL, JRR = frame.left_leg_jacobian()
@@ -23,9 +23,9 @@ class TorqueControl:
         
         
         if state == 0:
-            torque = Innerloop.balance(jp, ros, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
+            torque = Innerloop.balance(jp, robot, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
         if state in [1, 2, 30]:
-            torque = self.__kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
+            torque = self.__kneecontrol(frame, robot, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
             
             torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
             torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref['var'])
@@ -33,9 +33,9 @@ class TorqueControl:
         return torque
     
     @staticmethod
-    def __kneecontrol(frame, ros, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
+    def __kneecontrol(frame, robot: RobotModel, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
         VL, VR = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
-        return Innerloop.innerloopDynamics(jv, VL, VR, ros, jp, stance, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
+        return Innerloop.innerloopDynamics(jv, VL, VR, robot, jp, stance, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
     
     @staticmethod
     def __swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
@@ -281,12 +281,12 @@ class Outterloop:
 class Innerloop:
     
     @classmethod
-    def balance(cls, jp, ros, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
+    def balance(cls, jp, robot:RobotModel, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
         #balance the robot to initial state by p_control
         ref_jp = np.zeros((12,1))
         kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
         
-        l_leg_gravity, r_leg_gravity, *_ = cls.__calculateGravity(ros, jp, px_in_lf, px_in_rf)
+        l_leg_gravity, r_leg_gravity, *_ = cls.__calculateGravity(robot, jp, px_in_lf, px_in_rf)
         gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
         
         torque = kp * (ref_jp-jp) + gravity
@@ -294,9 +294,9 @@ class Innerloop:
         return torque
     
     @classmethod
-    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, ros: ROSInterfaces, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
+    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, robot: RobotModel, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
         cmd_v = np.vstack(( vl_cmd, vr_cmd ))
-        l_leg_gravity, r_leg_gravity = cls.__calculateGravity(ros, joint_position, px_in_lf, px_in_rf)
+        l_leg_gravity, r_leg_gravity = cls.__calculateGravity(robot, joint_position, px_in_lf, px_in_rf)
         kl, kr  = cls.__determineK(state, stance)
         
         gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
@@ -310,7 +310,7 @@ class Innerloop:
         }
     
     @staticmethod
-    def __calculateGravity(ros: ROSInterfaces, joint_position, px_in_lf, px_in_rf):
+    def __calculateGravity(robot: RobotModel, joint_position, px_in_lf, px_in_rf):
 
         jp = {
             'lf': joint_position[:6],
@@ -325,15 +325,15 @@ class Innerloop:
         
         #==========半邊單腳模型==========#
         _gravity_single_ft = {
-            'lf': -pin.rnea(ros.stance_l_model, ros.stance_l_data, -jp['lf'][::-1], jv_single, (ja_single))[::-1],
-            'rf': -pin.rnea(ros.stance_r_model, ros.stance_r_data, -jp['rf'][::-1], jv_single, (ja_single))[::-1]
+            'lf': -pin.rnea(robot.stance_l.model, robot.stance_l.data, -jp['lf'][::-1], jv_single, (ja_single))[::-1],
+            'rf': -pin.rnea(robot.stance_r.model, robot.stance_r.data, -jp['rf'][::-1], jv_single, (ja_single))[::-1]
         }
         gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
         
         #==========腳底建起的模型==========#
         _gravity_from_ft = {
-            'lf': pin.rnea(ros.bipedal_l_model, ros.bipedal_l_data, jp_from_ft['lf'], jv_double, (ja_double)),
-            'rf': pin.rnea(ros.bipedal_r_model, ros.bipedal_r_data, jp_from_ft['rf'], jv_double, (ja_double)),
+            'lf': pin.rnea(robot.bipedal_l.model, robot.bipedal_l.data, jp_from_ft['lf'], jv_double, (ja_double)),
+            'rf': pin.rnea(robot.bipedal_r.model, robot.bipedal_r.data, jp_from_ft['rf'], jv_double, (ja_double)),
         }
         gravity_from_ft = {
             'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),

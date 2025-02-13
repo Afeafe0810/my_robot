@@ -6,7 +6,7 @@ import numpy as np; np.set_printoptions(precision=2)
 
 #================ import other code =====================#
 from utils.config import Config
-from utils.ros_interfaces import ROSInterfaces
+from utils.ros_interfaces import ROSInterfaces, RobotModel
 from utils.frame_kinermatic import RobotFrame
 from utils.trajatory_planning import *
 from utils.torque_control import *
@@ -18,9 +18,12 @@ class UpperLevelController(Node):
         #建立ROS的node
         super().__init__('upper_level_controllers')
         
-        #負責模型與ROS的功能
+        #負責ROS的功能
         self.ros = ROSInterfaces(self, self.main_controller_callback)
         
+        #機器人的模型
+        self.robot = RobotModel()
+                
         #負責量測各部位的位置與姿態
         self.frame = RobotFrame()
         
@@ -42,13 +45,13 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp, jv = self.ros.updateSubData()
+        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp, jv = self.ros.returnSubData()
         
         #==========更新可視化的機器人==========#
-        config = self.ros.update_VizAndMesh(jp)
+        config = self.robot.update_VizAndMesh(jp)
         
         #==========更新frame==========#
-        self.frame.updateFrame(self.ros, config, p_base_in_wf, r_base_to_wf, jp)
+        self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)
 
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
@@ -69,7 +72,7 @@ class UpperLevelController(Node):
         ref = self.traj.plan(state, self.frame, self.stance)
 
         #========扭矩控制========#
-        torque = self.ctrl.update_torque(self.frame, jp, self.ros, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
+        torque = self.ctrl.update_torque(self.frame, jp, self.robot, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.state_past, self.stance_past = self.state, self.stance
