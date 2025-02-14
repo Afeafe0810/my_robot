@@ -38,7 +38,7 @@ class ROSInterfaces:
         
         #=========初始化===========#
         self._p_base_in_wf = self._r_base_to_wf = self._jp = None
-        self._state = 0
+        self._state = 0.0
         self._contact_lf = self._contact_rf = True
         
         self._callback_count = 0 #每5次會呼叫一次maincallback
@@ -50,7 +50,7 @@ class ROSInterfaces:
         self.subscriber = self._createSubscribers(node)
     
     #=========對外主要接口===========#
-    def returnSubData(self):
+    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, bool, bool, np.ndarray, np.ndarray]:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波

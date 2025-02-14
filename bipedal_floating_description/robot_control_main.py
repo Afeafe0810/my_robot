@@ -35,10 +35,6 @@ class UpperLevelController(Node):
         
         #============機器人的重要參數=====================#     
         
-        #機器人的模式
-        self.state : int = 0
-        self.state_past :int = 0
-        
         #主被動腳
         self.stance : list[str] = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
         self.stance_past : list[str] = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
@@ -75,7 +71,7 @@ class UpperLevelController(Node):
         torque = self.ctrl.update_torque(self.frame, jp, self.robot, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
-        self.state_past, self.stance_past = self.state, self.stance
+        self.stance_past = self.stance
 
     def _setStance(self, state):
         """掌管state 0, 1, 2的支撐腳邏輯"""
