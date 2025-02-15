@@ -47,19 +47,15 @@ class UpperLevelController(Node):
         config = self.robot.update_VizAndMesh(jp)
         
         #==========更新frame==========#
-        self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)
-
-        #TODO 移到torqueControl裡
-        px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
+        self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)        
         
-        
-        #========接觸判斷========#
-        contact = {
-            'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
-            'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
-        }
-        #TODO contact移到torque內
-        contact_lf, contact_rf = contact['lf'], contact['rf']
+        # #========接觸判斷========#
+        # contact = {
+        #     'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
+        #     'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
+        # }
+        # #TODO contact移到torque內
+        # contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
         self._setStance(state)
@@ -68,8 +64,7 @@ class UpperLevelController(Node):
         ref = self.traj.plan(state, self.frame, self.stance)
 
         #========扭矩控制========#
-        #TODO 順序要調整
-        torque = self.ctrl.update_torque(self.frame, jp, self.robot, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
+        torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, jp, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.stance_past = self.stance

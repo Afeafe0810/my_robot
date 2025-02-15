@@ -11,37 +11,43 @@ from utils.frame_kinermatic import RobotFrame
 from utils.motion_planning import Ref
 from utils.config import Config
 
-# TODO    - 如何給初速
-#           - 腳踝給一個pulse
-#           - 要確定方向正確
-#           - 限制腳踝扭矩大小
-#         - 碰撞偵測
-#            - 正常的力 - 碰撞的力，再經過低通濾波器
+# TODO    
+# - 如何給初速
+#   - 腳踝給一個pulse
+#   - 要確定方向正確
+#   - 限制腳踝扭矩大小
+# - 碰撞偵測
+#    - 正常的力 - 碰撞的力，再經過低通濾波器
+
 class TorqueControl:
     def __init__(self):
+        self.knee = KneeLoop()
         self.alip = AlipControl()
         
-    def update_torque(self, frame: RobotFrame, jp, robot: RobotModel, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref: Ref, jv):
+    def update_torque(self, 
+        frame: RobotFrame, 
+        robot: RobotModel, 
+        ref: Ref, 
+        state: float, 
+        stance: list[str], 
+        stance_past: list[str],
+        jp: np.ndarray, 
+        jv: np.ndarray
+    ) -> np.ndarray:
+        
         cf, sf = stance
-        cf_past, sf_past = stance_past
-        JLL, JRR = frame.left_leg_jacobian()
         
         
-        if state == 0:
-            torque = Innerloop.balance(jp, robot, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
-        if state in [1, 2, 30]:
-            torque = self.__kneecontrol(frame, robot, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref, jv, stance, state, JLL, JRR)
-            
-            torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
-            torque = np.vstack(( torque['lf'], torque['rf'] ))
+        match state:
+            case 0:
+                return balance_ctrl(frame, robot, jp)
+            case 1 | 2 | 30:
+                torque = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance)
+                
+                torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
+                torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
+                torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
-    
-    @staticmethod
-    def __kneecontrol(frame, robot: RobotModel, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref: Ref, jv, stance, state, JLL, JRR):
-        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = ref.pel, ref.lf , ref.rf
-        VL, VR = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
-        return Innerloop.innerloopDynamics(jv, VL, VR, robot, jp, stance, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
     
     @staticmethod
     def __swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
@@ -201,25 +207,40 @@ class AlipControl:
     #     #切換瞬間估測值代入量測值
     #     var_e_p[cf].update(var_p[cf])
             
+class KneeLoop:
+    def __init__(self):
+        pass
     
-class Outterloop:
-    
-    @classmethod
-    def get_jv_cmd(cls, frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv_f, stance, state, JLL, JRR):
+    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str]):
         
-        Le_2, Re_2 = cls.__endErr_to_endVel(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf)
+        #==========外環==========#
+        endVel: dict[str, np.ndarray] = self._endErr_to_endVel(frame, ref)
+        cmd_jv: dict[str, np.ndarray] = self._endVel_to_jv(frame, endVel, jv, state, stance)
+        cmd_jv_ : np.ndarray = np.vstack(( cmd_jv['lf'], cmd_jv['rf'] ))
         
-        return cls.__endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR)
+        #==========內環==========#
+        tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
+        kl, kr  = self._determineK(state, stance)
+        
+        tauG = np.vstack(( tauG_lf, tauG_rf ))
+        kp = np.vstack(( kl,kr ))
+
+        torque = kp * (cmd_jv_ - jv) + tauG
+
+        return {
+            'lf': torque[:6],
+            'rf': torque[6:]
+        }
 
     @staticmethod           
-    def __endErr_to_endVel(frame: RobotFrame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf):
+    def _endErr_to_endVel(frame: RobotFrame, ref: Ref) -> dict[str,np.ndarray] :
         pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf = frame.pa_pel_in_pf, frame.pa_lf_in_pf , frame.pa_rf_in_pf
         #========求相對骨盆的向量========#
-        ref_pa_pelTOlf_in_pf = ref_pa_lf_in_wf -ref_pa_pel_in_wf
-        ref_pa_pelTOrf_in_pf = ref_pa_rf_in_wf -ref_pa_pel_in_wf
+        ref_pa_pelTOlf_in_pf = ref.lf - ref.pel
+        ref_pa_pelTOrf_in_pf = ref.rf - ref.pel
         
-        pa_pelTOlf_in_pf = pa_lf_in_pf -pa_pel_in_pf
-        pa_pelTOrf_in_pf = pa_rf_in_pf -pa_pel_in_pf
+        pa_pelTOlf_in_pf = pa_lf_in_pf - pa_pel_in_pf
+        pa_pelTOrf_in_pf = pa_rf_in_pf - pa_pel_in_pf
         
         #========經加法器算誤差========#
         err_pa_pelTOlf_in_pf = ref_pa_pelTOlf_in_pf - pa_pelTOlf_in_pf
@@ -236,131 +257,61 @@ class Outterloop:
         vw_pelTOlf_in_pf = np.vstack(( derr_pa_pelTOlf_in_pf[:3], w_pelTOlf_in_pf ))
         vw_pelTOrf_in_pf = np.vstack(( derr_pa_pelTOrf_in_pf[:3], w_pelTOrf_in_pf ))
 
-        return vw_pelTOlf_in_pf, vw_pelTOrf_in_pf
+        return {
+            'lf': vw_pelTOlf_in_pf,
+            'rf': vw_pelTOrf_in_pf
+        }
 
     @staticmethod
-    def __endVel_to_jv(Le_2, Re_2, jv_f, stance, state, JLL, JRR):
+    def _endVel_to_jv(frame: RobotFrame, endVel: dict[str, np.ndarray], jv: np.ndarray, state: float, stance: list[str] ) -> dict[str, np.ndarray]: 
         cf, sf = stance
         
-        endVel = {'lf': Le_2, 'rf': Re_2}
-        jv = {'lf': jv_f[:6], 'rf': jv_f[6:]}
-        jv_ankle = {'lf': jv['lf'][-2:], 'rf': jv['rf'][-2:]}
+        jv_ = {'lf': jv[:6], 'rf': jv[6:]}
+        jv_ankle = {'lf': jv_['lf'][-2:], 'rf': jv_['rf'][-2:]}
+        
+        JL, JR = frame.left_leg_jacobian()
         J = {
-            'lf': JLL,
-            'rf': JRR
+            'lf': JL,
+            'rf': JR
         }
         
-        if state == 0 or state == 2 or state == 30:
-            cmd_jv = {
-                'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
-                'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
-            }
-            
-        elif state == 1: #or state == 2 :#真雙支撐
-            #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
-            #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
-            ctrlVel = {
-                cf: endVel[cf][2:],
-                sf: endVel[sf][[0,1,2,5]]
-            }
-            J_ankle_to_ctrlVel = {
-                cf: J[cf][2:, 4:],
-                sf: J[sf][[0,1,2,-1], 4:]
-            }
-            
-            J_knee_to_ctrlVel = {
-                cf: J[cf][2:, :4],
-                sf: J[sf][[0,1,2,-1], :4]
-            }
-            
-            cmd_jv_knee = {
-                cf: np.linalg.pinv(J_knee_to_ctrlVel[cf]) @ ( ctrlVel[cf] - J_ankle_to_ctrlVel[cf] @ jv_ankle[cf] ),
-                sf: np.linalg.pinv(J_knee_to_ctrlVel[sf]) @ ( ctrlVel[sf] - J_ankle_to_ctrlVel[sf] @ jv_ankle[sf] )
-            }
-            cmd_jv = {
-                cf: np.vstack(( cmd_jv_knee[cf], 0, 0 )),
-                sf: np.vstack(( cmd_jv_knee[sf], 0, 0 ))
-            }
-        
-        return cmd_jv['lf'], cmd_jv['rf']
-    
-class Innerloop:
-    
-    @classmethod
-    def balance(cls, jp, robot:RobotModel, cf, px_in_lf, px_in_rf, l_contact, r_contact, state):
-        #balance the robot to initial state by p_control
-        ref_jp = np.zeros((12,1))
-        kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
-        
-        l_leg_gravity, r_leg_gravity, *_ = cls.__calculateGravity(robot, jp, px_in_lf, px_in_rf)
-        gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
-        
-        torque = kp * (ref_jp-jp) + gravity
-        
-        return torque
-    
-    @classmethod
-    def innerloopDynamics(cls, jv, vl_cmd, vr_cmd, robot: RobotModel, joint_position, stance, px_in_lf, px_in_rf, l_contact, r_contact, state):
-        cmd_v = np.vstack(( vl_cmd, vr_cmd ))
-        l_leg_gravity, r_leg_gravity = cls.__calculateGravity(robot, joint_position, px_in_lf, px_in_rf)
-        kl, kr  = cls.__determineK(state, stance)
-        
-        gravity = np.vstack(( l_leg_gravity, r_leg_gravity ))
-        kp = np.vstack(( kl,kr ))
+        match state:
+            case 2 | 30:
+                cmd_jv = {
+                    'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
+                    'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
+                }
 
-        torque = kp * (cmd_v - jv) + gravity
+            case 1:
+                #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
+                #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
+                ctrlVel = {
+                    cf: endVel[cf][2:],
+                    sf: endVel[sf][[0,1,2,5]]
+                }
+                J_ankle_to_ctrlVel = {
+                    cf: J[cf][2:, 4:],
+                    sf: J[sf][[0,1,2,-1], 4:]
+                }
 
-        return {
-            'lf': torque[:6],
-            'rf': torque[6:]
-        }
-    
+                J_knee_to_ctrlVel = {
+                    cf: J[cf][2:, :4],
+                    sf: J[sf][[0,1,2,-1], :4]
+                }
+
+                cmd_jv_knee = {
+                    cf: np.linalg.pinv(J_knee_to_ctrlVel[cf]) @ ( ctrlVel[cf] - J_ankle_to_ctrlVel[cf] @ jv_ankle[cf] ),
+                    sf: np.linalg.pinv(J_knee_to_ctrlVel[sf]) @ ( ctrlVel[sf] - J_ankle_to_ctrlVel[sf] @ jv_ankle[sf] )
+                }
+                cmd_jv = {
+                    cf: np.vstack(( cmd_jv_knee[cf], 0, 0 )),
+                    sf: np.vstack(( cmd_jv_knee[sf], 0, 0 ))
+                }
+        
+        return cmd_jv
+   
     @staticmethod
-    def __calculateGravity(robot: RobotModel, joint_position, px_in_lf, px_in_rf):
-
-        jp = {
-            'lf': joint_position[:6],
-            'rf': joint_position[6:]
-        }
-        jp_from_ft = {
-            'lf': np.vstack(( -jp['lf'][::-1], jp['rf'] )),
-            'rf': np.vstack(( -jp['rf'][::-1], jp['lf'] ))
-        }
-        jv_single = ja_single = np.zeros(( 6,1))
-        jv_double = ja_double = np.zeros((12,1))
-        
-        #==========半邊單腳模型==========#
-        _gravity_single_ft = {
-            'lf': -pin.rnea(robot.stance_l.model, robot.stance_l.data, -jp['lf'][::-1], jv_single, (ja_single))[::-1],
-            'rf': -pin.rnea(robot.stance_r.model, robot.stance_r.data, -jp['rf'][::-1], jv_single, (ja_single))[::-1]
-        }
-        gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
-        
-        #==========腳底建起的模型==========#
-        _gravity_from_ft = {
-            'lf': pin.rnea(robot.bipedal_l.model, robot.bipedal_l.data, jp_from_ft['lf'], jv_double, (ja_double)),
-            'rf': pin.rnea(robot.bipedal_r.model, robot.bipedal_r.data, jp_from_ft['rf'], jv_double, (ja_double)),
-        }
-        gravity_from_ft = {
-            'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),
-            'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
-        }
-        
-        #==========加權==========#
-        weighted = lambda x, x0, x1, g0, g1 :\
-            g0 +(g1-g0)/(x1-x0)*(x-x0)
-        
-        Leg_gravity = weighted(px_in_lf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
-                      weighted(px_in_rf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
-                      gravity_single
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        return l_leg_gravity,r_leg_gravity
-    
-    @staticmethod
-    def __determineK(state, stance):
+    def _determineK(state: float, stance: list[str]) -> tuple[np.ndarray]:
         cf, sf = stance
         # if cf == 'rf':
         #     if r_contact == 1:
@@ -394,3 +345,16 @@ class Innerloop:
             kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
             
         return kl, kr
+
+def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray):
+    #balance the robot to initial state by p_control
+    ref_jp = np.zeros((12,1))
+    kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
+    
+    tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
+    
+    tauG = np.vstack(( tauG_lf, tauG_rf ))
+    
+    torque = kp * (ref_jp-jp) + tauG
+    
+    return torque

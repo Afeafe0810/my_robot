@@ -25,7 +25,7 @@ class Trajatory:
     def plan(self, state: float, frame: RobotFrame, stance: list[str]) -> Ref:
         match state:          
             case 0 | 1 : #雙支撐
-                return bipedalBalanceTraj()
+                return bipedalBalance_plan()
 
             case 2: #左腳站立
                 return self.lf_stand.plan()
@@ -222,7 +222,7 @@ class LeftLegBalance:
             var  = _get_ref_pelVar(pel, lf)
         )
 
-def bipedalBalanceTraj():
+def bipedalBalance_plan():
     """回傳雙腳支撐時的參考值"""
     return Ref(
         pel := np.vstack(( 0,    0, 0.57, 0, 0, 0 )),

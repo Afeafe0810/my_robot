@@ -38,11 +38,10 @@ class RobotFrame:
             'rf': self.__eularToGeometry(self.pa_rf_in_pf[3:])
         }
     
-    @staticmethod
-    def get_posture(pa_pel_in_pf, pa_lf_in_pf, pa_rf_in_pf):
+    def get_posture(self) -> tuple[np.ndarray] :
         
-        pa_lfTOpel_in_pf = pa_pel_in_pf - pa_lf_in_pf #骨盆中心相對於左腳
-        pa_rfTOpel_in_pf = pa_pel_in_pf - pa_rf_in_pf #骨盆中心相對於右腳
+        pa_lfTOpel_in_pf = self.pa_pel_in_pf - self.pa_lf_in_pf #骨盆中心相對於左腳
+        pa_rfTOpel_in_pf = self.pa_pel_in_pf - self.pa_rf_in_pf #骨盆中心相對於右腳
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
  
@@ -81,7 +80,7 @@ class RobotFrame:
     
     def get_alipdata(self, stance: list[str]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
         """
-        得到ALIP需要的資訊(先用wf代替in cf好了) #TODO 之後可能要改用cf
+        得到ALIP需要的資訊(先用wf代替in cf好了) #HACK 之後可能要改用cf
         - RETURN
             - var0
             - p0_ftTocom_in_wf
@@ -108,6 +107,51 @@ class RobotFrame:
         return list( map( deepcopy, 
             [var0, p0_ftTocom_in_wf, p_ft_in_wf]
         ))
+    
+    def calculate_gravity(self, robot: RobotModel, jp: np.ndarray) -> tuple[np.ndarray] :
+
+        jp_ = {
+            'lf': jp[:6],
+            'rf': jp[6:]
+        }
+        jp_from_ft = {
+            'lf': np.vstack(( -jp_['lf'][::-1], jp_['rf'] )),
+            'rf': np.vstack(( -jp_['rf'][::-1], jp_['lf'] ))
+        }
+        jv_single = ja_single = np.zeros(( 6,1))
+        jv_double = ja_double = np.zeros((12,1))
+        
+        #==========半邊單腳模型==========#
+        _gravity_single_ft = {
+            'lf': -pin.rnea(robot.stance_l.model, robot.stance_l.data, -jp_['lf'][::-1], jv_single, (ja_single))[::-1],
+            'rf': -pin.rnea(robot.stance_r.model, robot.stance_r.data, -jp_['rf'][::-1], jv_single, (ja_single))[::-1]
+        }
+        gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
+        
+        #==========腳底建起的模型==========#
+        _gravity_from_ft = {
+            'lf': pin.rnea(robot.bipedal_l.model, robot.bipedal_l.data, jp_from_ft['lf'], jv_double, (ja_double)),
+            'rf': pin.rnea(robot.bipedal_r.model, robot.bipedal_r.data, jp_from_ft['rf'], jv_double, (ja_double)),
+        }
+        gravity_from_ft = {
+            'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),
+            'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
+        }
+        
+        #==========加權==========#
+        weighted = lambda x, x0, x1, g0, g1 :\
+            g0 +(g1-g0)/(x1-x0)*(x-x0)
+        
+        px_in_lf,px_in_rf = self.get_posture()
+        
+        Leg_gravity = weighted(px_in_lf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+                      weighted(px_in_rf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+                      gravity_single
+
+        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
+        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
+
+        return l_leg_gravity, r_leg_gravity
     
     #=======================封裝主要的部份================================#
     
