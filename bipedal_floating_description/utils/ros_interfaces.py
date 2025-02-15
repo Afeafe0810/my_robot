@@ -54,8 +54,8 @@ class ROSInterfaces:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波
-        _jv = np.clip( Dsp.DIFFTER["jp"].diff(self._jp), -0.75, 0.75)
-        jv = Dsp.FILTER["jv"].filt(_jv)
+        _jv = np.clip( Dsp.DIFFTER_JP.diff(self._jp), -0.75, 0.75)
+        jv = Dsp.FILTER_JV.filt(_jv)
         
         return list( map( deepcopy,
             [ self._p_base_in_wf, self._r_base_to_wf, self._state, self._contact_lf, self._contact_rf, self._jp, jv ]

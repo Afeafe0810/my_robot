@@ -211,8 +211,8 @@ class RobotFrame:
         m = Config.MASS
         H = Config.IDEAL_Z_COM_IN_WF
         
-        _v_com_in_wf = Dsp.DIFFTER_p_com_in_wf.diff(self.p_com_in_wf)
-        self.v_com_in_wf = Dsp.FILTER_v_com_in_wf.filt(_v_com_in_wf)
+        _v_com_in_wf = Dsp.DIFFTER_P_COM_IN_WF.diff(self.p_com_in_wf)
+        self.v_com_in_wf = Dsp.FILTER_V_COM_IN_WF.filt(_v_com_in_wf)
         
         p0_ftTocom_in_wf = {
             'lf': self.p_com_in_wf - self.p_lf_in_wf,

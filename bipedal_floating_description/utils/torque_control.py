@@ -9,7 +9,6 @@ import pinocchio as pin
 from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from utils.config import Config
-from utils.signal_process import Dsp
 
 class TorqueControl:
     def __init__(self):
