@@ -8,31 +8,38 @@ import pinocchio as pin
 #================ import library ========================#
 from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
+from utils.motion_planning import Ref
 from utils.config import Config
 
+# TODO    - 如何給初速
+#           - 腳踝給一個pulse
+#           - 要確定方向正確
+#           - 限制腳踝扭矩大小
+#         - 碰撞偵測
+#            - 正常的力 - 碰撞的力，再經過低通濾波器
 class TorqueControl:
     def __init__(self):
         self.alip = AlipControl()
         
-    def update_torque(self, frame: RobotFrame, jp, robot: RobotModel, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref, jv):
+    def update_torque(self, frame: RobotFrame, jp, robot: RobotModel, stance, stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf, state, ref: Ref, jv):
         cf, sf = stance
         cf_past, sf_past = stance_past
         JLL, JRR = frame.left_leg_jacobian()
-        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = ref['pel'], ref['lf'], ref['rf']
         
         
         if state == 0:
             torque = Innerloop.balance(jp, robot, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
         if state in [1, 2, 30]:
-            torque = self.__kneecontrol(frame, robot, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
+            torque = self.__kneecontrol(frame, robot, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref, jv, stance, state, JLL, JRR)
             
             torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
-            torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref['var'])
+            torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
             torque = np.vstack(( torque['lf'], torque['rf'] ))
         return torque
     
     @staticmethod
-    def __kneecontrol(frame, robot: RobotModel, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR):
+    def __kneecontrol(frame, robot: RobotModel, jp, cf, px_in_lf, px_in_rf, contact_lf, contact_rf, ref: Ref, jv, stance, state, JLL, JRR):
+        ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf = ref.pel, ref.lf , ref.rf
         VL, VR = Outterloop.get_jv_cmd(frame, ref_pa_pel_in_wf, ref_pa_lf_in_wf, ref_pa_rf_in_wf, jv, stance, state, JLL, JRR)
         return Innerloop.innerloopDynamics(jv, VL, VR, robot, jp, stance, px_in_lf, px_in_rf, contact_lf, contact_rf, state)
     

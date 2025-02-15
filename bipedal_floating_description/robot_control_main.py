@@ -8,7 +8,7 @@ import numpy as np; np.set_printoptions(precision=2)
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces, RobotModel
 from utils.frame_kinermatic import RobotFrame
-from utils.trajatory_planning import *
+from utils.motion_planning import *
 from utils.torque_control import *
 #========================================================#
 
@@ -41,7 +41,7 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, contact_lf, contact_rf, jp, jv = self.ros.returnSubData()
+        p_base_in_wf, r_base_to_wf, state, _, _, jp, jv = self.ros.returnSubData()
         
         #==========更新可視化的機器人==========#
         config = self.robot.update_VizAndMesh(jp)
@@ -49,6 +49,7 @@ class UpperLevelController(Node):
         #==========更新frame==========#
         self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)
 
+        #TODO 移到torqueControl裡
         px_in_lf,px_in_rf = self.frame.get_posture(self.frame.pa_pel_in_pf, self.frame.pa_lf_in_pf, self.frame.pa_rf_in_pf)
         
         
@@ -57,17 +58,17 @@ class UpperLevelController(Node):
             'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
             'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
         }
+        #TODO contact移到torque內
         contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#
         self._setStance(state)
-        cf, sf = self.stance
-        cf_past, sf_past = self.stance_past
         
         #========軌跡規劃========#
         ref = self.traj.plan(state, self.frame, self.stance)
 
         #========扭矩控制========#
+        #TODO 順序要調整
         torque = self.ctrl.update_torque(self.frame, jp, self.robot, self.stance, self.stance_past, px_in_lf, px_in_rf, contact_lf, contact_rf , state, ref, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         

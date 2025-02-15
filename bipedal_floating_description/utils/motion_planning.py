@@ -1,86 +1,49 @@
 import numpy as np; np.set_printoptions(precision=2)
 from math import cosh, sinh, cos, sin, pi
 from copy import deepcopy
-import csv
 #================ import library ========================#
 from utils.config import Config
 from utils.frame_kinermatic import RobotFrame
+from dataclasses import dataclass
 #========================================================#
 
+@dataclass
+class Ref:
+    pel : np.ndarray
+    lf  : np.ndarray
+    rf  : np.ndarray
+    var : dict[str, np.ndarray]
+    com : np.ndarray = None #沒有這麼重要
+    
 class Trajatory:
     def __init__(self):
-        
-        #state 2, 單腳舉起的時間
-        self.leg_lift_time = 0
-        
+        #state 2
+        self.lf_stand = LeftLegBalance()
         #state 30
         self.aliptraj = AlipTraj()
-        
-    def plan(self, state, frame: RobotFrame, stance):
-        
-        if state in [0,1]: #假雙支撐, 真雙支撐
-            ref = self.__bipedalBalanceTraj()
-            ref['var'] = self.get_refvar_USING_pel(ref['pel'], ref['lf'])
-            
-        elif state == 2: #骨盆移到支撐腳
-            if self.leg_lift_time <= 10 * Config.DDT:
-                self.leg_lift_time += Config.TIMER_PERIOD
-                print("DS",self.leg_lift_time)
-                
-            ref = self.__comMoveTolf(self.leg_lift_time)
-            ref['var'] = self.get_refvar_USING_pel(ref['pel'], ref['lf'])
-        
-        elif state == 30: #ALIP規劃
-            ref = self.aliptraj.plan(frame, stance, 0)
-            #不確定是否可以真實的差距推導出ref
-            ref['pel'] = np.vstack((
-                ref['com'][:3] -frame.p_com_in_wf + frame.p_pel_in_wf,
-                np.zeros((3,1))
-            ))
-        return ref
     
-    @staticmethod
-    def get_refvar_USING_pel(ref_pel, ref_cf):
-        return {
-            'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
-            'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
-        }
-    
-    @staticmethod
-    def __bipedalBalanceTraj():
-        return {
-            'pel': np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
-            'lf' : np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
-            'rf' : np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
-        }
-    
-    @staticmethod
-    def __comMoveTolf(t):
-        T = Config.DDT
+    def plan(self, state: float, frame: RobotFrame, stance: list[str]) -> Ref:
+        match state:          
+            case 0 | 1 : #雙支撐
+                return bipedalBalanceTraj()
 
-        #==========線性移動==========#
-        linearMove = lambda t, x0, x1, t0, t1:\
-            np.clip(x0 + (x1-x0) * (t-t0)/(t1-t0), x0, x1 )
-            
-        y_pel = linearMove(t, *[0, 0.09], *[0*T, 0.5*T])
-        z_sf  = linearMove(t, *[0, 0.05], *[1*T, 1.1*T])
-        
-        return {
-            'pel': np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
-            'lf' : np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
-            'rf' : np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
-        }
+            case 2: #左腳站立
+                return self.lf_stand.plan()
+                     
+            case 30:#步行
+                return self.aliptraj.plan(frame, stance, 0)
 
 class AlipTraj:
     def __init__(self):
-        self.t = 0.0
+        self.t : float = 0.0
         
         #初值
-        self.var0 = None
-        self.p0_ftTocom_in_wf = None
-        self.p0_ft_in_wf = None
+        self.var0 : dict[str, np.ndarray] = None
+        self.p0_ftTocom_in_wf : dict[str, np.ndarray] = None
+        self.p0_ft_in_wf : dict[str, np.ndarray] = None
+        self.ref_xy_swTOcom_in_wf_T : np.ndarray = None
     
-    def plan(self, frame: RobotFrame, stance:list, des_vx_com_in_wf_2T ):
+    def plan(self, frame: RobotFrame, stance:list[str], des_vx_com_in_wf_2T: float ) -> Ref:
         isJustStarted = ( self.t == 0 )
         isTimesUp = ( self.t - Config.STEP_TIMELENGTH > 1e-8  )
         
@@ -96,12 +59,12 @@ class AlipTraj:
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
             
             #(側旋角動量Lx須用ref, 不然軌跡極怪)
-            self.var0['y'][1,0] = self.__get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
-            self.ref_xy_swTOcom_in_wf_T = self.__sf_placement(stance, des_vx_com_in_wf_2T)
+            self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
-        ref_p_cfTOcom_in_wf, ref_var = self.__plan_com(stance)
-        ref_p_sfTOcom_in_wf = self.__sf_trajFit(stance)
+        ref_p_cfTOcom_in_wf, ref_var = self._plan_com(stance)
+        ref_p_sfTOcom_in_wf = self._sf_trajFit(stance)
         
         #==========轉成wf==========#
         ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_ft_in_wf[cf]
@@ -110,22 +73,32 @@ class AlipTraj:
         #==========更新時間==========#
         self.t += Config.TIMER_PERIOD
         
-        return deepcopy({
-            'var': ref_var,
-            'com': np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
-               cf: np.vstack(( self.p0_ft_in_wf[cf], np.zeros((3,1)))),
-               sf: np.vstack(( ref_p_sf_in_wf, np.zeros((3,1)))),
-        })
+        ref_ft = {
+            cf: self.p0_ft_in_wf[cf],
+            sf: ref_p_sf_in_wf
+        }
+        
+        return Ref(
+            com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
+            lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
+            rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
+            var = ref_var,
+            pel = np.vstack((
+                    ref_p_com_in_wf - frame.p_com_in_wf + frame.p_pel_in_wf,
+                    np.zeros((3,1))
+                ))
+        )
         
     #==========主要演算法==========# 
-    def __plan_com(self, stance):
+    def _plan_com(self, stance: list[str]) -> tuple[np.ndarray, dict[str, np.ndarray]] :
+        """回傳ref_com與ref_var"""
         cf, sf = stance
         
         #==========參數==========#
         H = Config.IDEAL_Z_COM_IN_WF
         
         #==========狀態轉移矩陣==========#
-        A = self.__get_alipMatA(self.t)
+        A = self._get_alipMatA(self.t)
         
         #==========狀態方程==========#
         ref_var = {
@@ -135,7 +108,8 @@ class AlipTraj:
         
         return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
        
-    def __sf_placement(self, stance, des_vx_com_in_wf_2T):
+    def _sf_placement(self, stance: list[str], des_vx_com_in_wf_2T: float) -> np.ndarray:
+        """回傳擺動腳到質心的落點向量"""
         cf, sf = stance
         
         #==========機器人參數==========#
@@ -149,11 +123,11 @@ class AlipTraj:
         #==========下兩步的理想角動量(那時的支撐腳是現在的擺動腳)==========#
         des_L_com_2T = {
             'y': m * des_vx_com_in_wf_2T * H,
-            'x': self.__get_ref_timesUp_Lx(sf)
+            'x': self._get_ref_timesUp_Lx(sf)
         }
         
         #==========下步落地的角動量==========#
-        A = self.__get_alipMatA(T)
+        A = self._get_alipMatA(T)
         ref_L_com_1T = {
             'y': ( A['x'] @ self.var0['x'] ) [1,0],
             'x': ( A['y'] @ self.var0['y'] ) [1,0]
@@ -167,7 +141,12 @@ class AlipTraj:
         
         return ref_xy_swTOcom_in_wf_T
 
-    def __sf_trajFit(self, stance):
+    def _sf_trajFit(self, stance: list[str]) -> np.ndarray:
+        """
+        擬合擺動腳的軌跡
+            - xy方向用三角函數模擬簡諧
+            - z方向用拋物線模擬重力
+        """
         cf, sf = stance
         
         h = Config.STEP_HEIGHT
@@ -188,7 +167,7 @@ class AlipTraj:
 
     #==========工具function==========#
     @staticmethod
-    def __get_alipMatA(t):
+    def _get_alipMatA(t):
         m = Config.MASS
         H = Config.IDEAL_Z_COM_IN_WF
         w = Config.OMEGA
@@ -204,7 +183,7 @@ class AlipTraj:
         }
     
     @staticmethod
-    def __get_ref_timesUp_Lx(cf):
+    def _get_ref_timesUp_Lx(cf:str) -> float:
         """給定支撐腳, 會回傳踏步(過T秒)瞬間的角動量"""
         
         m = Config.MASS
@@ -216,3 +195,46 @@ class AlipTraj:
         sign_Lx = 1 if cf =='lf' else\
                  -1 #if cf == 'rf'
         return sign_Lx * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) )
+
+class LeftLegBalance:
+    """回傳左腳支撐時的參考值"""
+    def __init__(self):
+        self.t : float = 0.0
+        
+    def plan(self):
+        T = Config.DDT
+                
+        #==========線性移動==========#
+        linearMove = lambda x0, x1, t0, t1:\
+            np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
+            
+        y_pel = linearMove(*[0, 0.09], *[0*T, 0.5*T])
+        z_sf  = linearMove(*[0, 0.05], *[1*T, 1.1*T])
+        
+        if self.t < 2 * Config.DDT:
+            print("LeftLegBalance.t = ",self.t)
+            self.t += Config.TIMER_PERIOD            
+
+        return Ref(
+            pel := np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
+            lf  := np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
+            rf   = np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
+            var  = _get_ref_pelVar(pel, lf)
+        )
+
+def bipedalBalanceTraj():
+    """回傳雙腳支撐時的參考值"""
+    return Ref(
+        pel := np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
+        lf  := np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
+        rf   = np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
+        var  = _get_ref_pelVar(pel, lf)
+    )
+
+def _get_ref_pelVar(ref_pel: np.ndarray, ref_cf: np.ndarray) -> dict[str, np.ndarray] :
+    """平衡(不管是單腳還是雙腳平衡)時, 用pel代替com, 角動量ref皆設0"""
+    return {
+        'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
+        'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
+    }
+    

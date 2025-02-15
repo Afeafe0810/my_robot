@@ -76,13 +76,13 @@ class Dsp:
     DIFFTER_JP = Diffter()
     DIFFTER_P_COM_IN_WF = Diffter()
     
-    # DIFFTER_P_PEL_IN_LF = Diffter(),
-    # DIFFTER_P_PEL_IN_RF = Diffter(),
+    # DIFFTER_P_PEL_IN_LF = Diffter()
+    # DIFFTER_P_PEL_IN_RF = Diffter()
     
     #====================濾波器====================#
-    # FILTER_JP = Filter([0, 0.1453, 0.1078],[1, -1.1580, 0.4112]), #10Hz
-    FILTER_JV = Filter([0, 1.014, -0.008067],[1, -0.0063, 0.0001383]), #100Hz
+    # FILTER_JP = Filter([0, 0.1453, 0.1078],[1, -1.1580, 0.4112]) #10Hz
+    FILTER_JV = Filter([0, 1.014, -0.008067],[1, -0.0063, 0.0001383]) #100Hz
     FILTER_V_COM_IN_WF = Filter([0, 0.2592], [1, -0.7408])
     
-    # FILTER_V_PEL_IN_LF = Filter([0, 0.2592], [1, -0.7408]),
-    # FILTER_V_PEL_IN_RF = Filter([0, 0.2592], [1, -0.7408]),
+    # FILTER_V_PEL_IN_LF = Filter([0, 0.2592], [1, -0.7408])
+    # FILTER_V_PEL_IN_RF = Filter([0, 0.2592], [1, -0.7408])

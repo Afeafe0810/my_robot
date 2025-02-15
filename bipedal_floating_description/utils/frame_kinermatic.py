@@ -79,8 +79,14 @@ class RobotFrame:
         
         return JL, JR
     
-    def get_alipdata(self, stance):
-        """先用wf代替in cf好了"""
+    def get_alipdata(self, stance: list[str]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
+        """
+        得到ALIP需要的資訊(先用wf代替in cf好了) #TODO 之後可能要改用cf
+        - RETURN
+            - var0
+            - p0_ftTocom_in_wf
+            - p_ft_in_wf
+        """
         cf, sf = stance
         
         p_ft_in_wf = {
