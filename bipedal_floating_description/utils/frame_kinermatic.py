@@ -153,6 +153,13 @@ class RobotFrame:
 
         return l_leg_gravity, r_leg_gravity
     
+    @staticmethod
+    def rotMat_to_euler(r_to_frame: np.ndarray) -> np.ndarray:
+        """ 回傳a_in_frame, 以roll, pitch, yaw的順序(x,y,z), 以column vector"""
+        return np.vstack((
+            R.from_matrix(r_to_frame).as_euler('zyx', degrees=False)[::-1]
+        ))
+        
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, robot: RobotModel, jp: np.ndarray):
@@ -175,9 +182,9 @@ class RobotFrame:
         
         self.p_com_in_pf = self.__get_comInPf(robot, jp)
         
-        self.pa_pel_in_pf = np.vstack(( self.p_pel_in_pf, self.__rotMat_to_euler(self.r_pel_to_pf) ))
-        self.pa_lf_in_pf  = np.vstack(( self.p_lf_in_pf , self.__rotMat_to_euler(self.r_lf_to_pf)  ))
-        self.pa_rf_in_pf  = np.vstack(( self.p_rf_in_pf , self.__rotMat_to_euler(self.r_rf_to_pf)  ))
+        self.pa_pel_in_pf = np.vstack(( self.p_pel_in_pf, self.rotMat_to_euler(self.r_pel_to_pf) ))
+        self.pa_lf_in_pf  = np.vstack(( self.p_lf_in_pf , self.rotMat_to_euler(self.r_lf_to_pf)  ))
+        self.pa_rf_in_pf  = np.vstack(( self.p_rf_in_pf , self.rotMat_to_euler(self.r_rf_to_pf)  ))
               
     def __update_wfFrame(self, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray):
         '''得到各點在world frame下的資訊'''
@@ -294,13 +301,6 @@ class RobotFrame:
         
         p_com_in_pf = np.reshape(robot.bipedal_floating.data.com[0],(3,1))
         return p_com_in_pf
-        
-    @staticmethod
-    def __rotMat_to_euler(r_to_frame: np.ndarray)->np.ndarray:
-        """ 回傳a_in_frame, 以roll, pitch, yaw的順序(x,y,z), 以column vector"""
-        return np.vstack((
-            R.from_matrix(r_to_frame).as_euler('zyx', degrees=False)[::-1]
-        ))
     
     @staticmethod
     def __get_axis_rotMat(axis: str, theta:float)->np.ndarray:

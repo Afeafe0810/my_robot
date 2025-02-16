@@ -212,7 +212,7 @@ class LeftLegBalance:
         z_sf  = linearMove(*[0, 0.05], *[1*T, 1.1*T])
         
         if self.t < 2 * Config.DDT:
-            print("LeftLegBalance.t = ",self.t)
+            print(f"LeftLegBalance.t = {self.t:.2f}")
             self.t += Config.TIMER_PERIOD            
 
         return Ref(

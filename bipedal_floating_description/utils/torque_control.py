@@ -1,15 +1,10 @@
 #================ import library ========================#
-from std_msgs.msg import Float64MultiArray 
 import numpy as np; np.set_printoptions(precision=5)
-import copy
-from scipy.spatial.transform import Rotation as R
-import pinocchio as pin
 
 #================ import library ========================#
 from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from utils.motion_planning import Ref
-from utils.config import Config
 
 # TODO    
 # - 如何給初速
@@ -20,49 +15,49 @@ from utils.config import Config
 #    - 正常的力 - 碰撞的力，再經過低通濾波器
 
 class TorqueControl:
+    """TorqueControl 類別負責處理機器人扭矩對state的pattern matching邏輯。"""
+    
     def __init__(self):
         self.knee = KneeLoop()
         self.alip = AlipControl()
         
-    def update_torque(self, 
-        frame: RobotFrame, 
-        robot: RobotModel, 
-        ref: Ref, 
-        state: float, 
-        stance: list[str], 
-        stance_past: list[str],
-        jp: np.ndarray, 
-        jv: np.ndarray
-    ) -> np.ndarray:
+    def update_torque(self, frame: RobotFrame, robot: RobotModel, ref: Ref, state: float,
+                      stance: list[str], stance_past: list[str],jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
         
         cf, sf = stance
-        
         
         match state:
             case 0:
                 return balance_ctrl(frame, robot, jp)
             case 1 | 2 | 30:
+                #雙腳膝蓋
                 torque = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance)
                 
-                torque[sf][4:6] = self.__swingAnkle_PDcontrol(sf, frame.r_lf_to_wf, frame.r_rf_to_wf)
+                #擺動腳腳踝
+                torque[sf][4:6] = anklePD_ctrl(frame, sf)
+                
+                #支撐腳腳踝
                 torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
-                torque = np.vstack(( torque['lf'], torque['rf'] ))
-        return torque
+                
+                return np.vstack(( torque['lf'], torque['rf'] ))
     
-    @staticmethod
-    def __swingAnkle_PDcontrol(sf, r_lf_to_wf, r_rf_to_wf):
-        r_ft_to_wf = {
-            'lf': r_lf_to_wf,
-            'rf': r_rf_to_wf
-        }
-        _, *ayx_sf_in_wf = np.vstack(( R.from_matrix(r_ft_to_wf[sf]).as_euler('zyx', degrees=False) ))
-        
-        ref_jp = np.zeros((2,1))
-        torque_ankle_sf = 0.1 * ( ref_jp - ayx_sf_in_wf )
-        
-        return torque_ankle_sf
+def anklePD_ctrl(frame: RobotFrame, sf: str):
+    """支撐腳腳踝的PD控制"""
+    ref_jp = np.zeros((2,1))
+
+    r_ft_to_wf = {
+        'lf': frame.r_lf_to_wf,
+        'rf': frame.r_rf_to_wf
+    }
+    ayx_sf_in_wf = frame.rotMat_to_euler(r_ft_to_wf[sf]) [1:]
+    
+    torque_ankle_sf = 0.1 * ( ref_jp - ayx_sf_in_wf ) # HACK 現在只用P control
+    
+    return torque_ankle_sf
 
 class AlipControl:
+    """AlipControl 類別負責支撐腳腳踝用ALIP的狀態控制"""
+    
     def __init__(self):
         # #(k-1)的輸入
         # self.u_p_lf : dict[str, float] = {
@@ -95,8 +90,8 @@ class AlipControl:
         # }
         pass
         
-    def ctrl(self, frame:RobotFrame, stance, stance_past, ref_var):
-        
+    def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[np.ndarray]) -> np.ndarray:
+        """回傳支撐腳腳踝扭矩"""
         cf, sf = stance
         
         # if stance != stance_past:
@@ -208,10 +203,11 @@ class AlipControl:
     #     var_e_p[cf].update(var_p[cf])
             
 class KneeLoop:
+    """KneeLoop 類別負責雙腳膝蓋的扭矩控制"""
     def __init__(self):
         pass
     
-    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str]):
+    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str]) -> dict[str, np.ndarray]:
         
         #==========外環==========#
         endVel: dict[str, np.ndarray] = self._endErr_to_endVel(frame, ref)
@@ -220,7 +216,7 @@ class KneeLoop:
         
         #==========內環==========#
         tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
-        kl, kr  = self._determineK(state, stance)
+        kl, kr  = self._get_innerloop_K(state, stance)
         
         tauG = np.vstack(( tauG_lf, tauG_rf ))
         kp = np.vstack(( kl,kr ))
@@ -234,6 +230,7 @@ class KneeLoop:
 
     @staticmethod           
     def _endErr_to_endVel(frame: RobotFrame, ref: Ref) -> dict[str,np.ndarray] :
+        """端末位置經過減法器 + P control + 方向矩陣，轉成端末速度"""
         pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf = frame.pa_pel_in_pf, frame.pa_lf_in_pf , frame.pa_rf_in_pf
         #========求相對骨盆的向量========#
         ref_pa_pelTOlf_in_pf = ref.lf - ref.pel
@@ -263,7 +260,8 @@ class KneeLoop:
         }
 
     @staticmethod
-    def _endVel_to_jv(frame: RobotFrame, endVel: dict[str, np.ndarray], jv: np.ndarray, state: float, stance: list[str] ) -> dict[str, np.ndarray]: 
+    def _endVel_to_jv(frame: RobotFrame, endVel: dict[str, np.ndarray], jv: np.ndarray, state: float, stance: list[str] ) -> dict[str, np.ndarray]:
+        """端末速度映射到關節速度"""
         cf, sf = stance
         
         jv_ = {'lf': jv[:6], 'rf': jv[6:]}
@@ -276,15 +274,14 @@ class KneeLoop:
         }
         
         match state:
-            case 2 | 30:
+            case 2 | 30: #HACK 之後改成case 1一樣的，現在還沒排除干擾
                 cmd_jv = {
                     'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
                     'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
                 }
 
             case 1:
-                #===========================支撐腳膝上四關節: 控骨盆z, axyz==================================#
-                #===========================擺動腳膝上四關節: 控落點xyz, az==================================#
+                # 支撐腳膝上四關節: 控骨盆z, axyz  ；  擺動腳膝上四關節: 控落點xyz, az
                 ctrlVel = {
                     cf: endVel[cf][2:],
                     sf: endVel[sf][[0,1,2,5]]
@@ -311,7 +308,8 @@ class KneeLoop:
         return cmd_jv
    
     @staticmethod
-    def _determineK(state: float, stance: list[str]) -> tuple[np.ndarray]:
+    def _get_innerloop_K(state: float, stance: list[str]) -> tuple[np.ndarray]:
+        # HACK 之後gain要改
         cf, sf = stance
         # if cf == 'rf':
         #     if r_contact == 1:
@@ -346,12 +344,12 @@ class KneeLoop:
             
         return kl, kr
 
-def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray):
-    #balance the robot to initial state by p_control
+def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray) -> np.ndarray:
+    """在剛開機狀態直接用關節角度的 單環 來平衡"""
     ref_jp = np.zeros((12,1))
     kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
     
-    tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
+    tauG_lf, tauG_rf = frame.calculate_gravity(robot, jp)
     
     tauG = np.vstack(( tauG_lf, tauG_rf ))
     
