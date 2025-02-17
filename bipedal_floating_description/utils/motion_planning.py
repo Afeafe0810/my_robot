@@ -33,6 +33,44 @@ class Trajatory:
             case 30:#步行
                 return self.aliptraj.plan(frame, stance, 0)
 
+# state 0, 1
+def bipedalBalance_plan():
+    """回傳雙腳支撐時的參考值"""
+    return Ref(
+        pel := np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
+        lf  := np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
+        rf   = np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
+        var  = _get_ref_pelVar(pel, lf)
+    )
+
+# state 2
+class LeftLegBalance:
+    """回傳左腳支撐時的參考值"""
+    def __init__(self):
+        self.t : float = 0.0
+        
+    def plan(self):
+        T = Config.DDT
+                
+        #==========線性移動==========#
+        linearMove = lambda x0, x1, t0, t1:\
+            np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
+            
+        y_pel = linearMove(*[0, 0.09], *[0*T, 0.5*T])
+        z_sf  = linearMove(*[0, Config.STEP_HEIGHT], *[1*T, 1.1*T])
+        
+        if self.t < 2 * Config.DDT:
+            print(f"LeftLegBalance.t = {self.t:.2f}")
+            self.t += Config.TIMER_PERIOD            
+
+        return Ref(
+            pel := np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
+            lf  := np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
+            rf   = np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
+            var  = _get_ref_pelVar(pel, lf)
+        )
+
+# state 30
 class AlipTraj:
     def __init__(self):
         self.t : float = 0.0
@@ -164,7 +202,7 @@ class AlipTraj:
         
         #z方向用拋物線, 最高點在h
         # ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
-        ref_z_sf_in_wf = parabolic(self.t, h0, h)
+        ref_z_sf_in_wf = self._parabolic_fit(self.t, h0, h)
         # return np.vstack(( ref_xy_sfTOcom_in_wf, ref_z_sfTOcom_in_wf ))
         return ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf
     #==========工具function==========#
@@ -198,54 +236,21 @@ class AlipTraj:
                  -1 #if cf == 'rf'
         return sign_Lx * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) )
 
-class LeftLegBalance:
-    """回傳左腳支撐時的參考值"""
-    def __init__(self):
-        self.t : float = 0.0
+    @staticmethod
+    def _parabolic_fit(t: float, h0: float, hmax: float) -> float:
+        h0, hmax = sorted([h0, hmax])
+        T = Config.STEP_TIMELENGTH
         
-    def plan(self):
-        T = Config.DDT
-                
-        #==========線性移動==========#
-        linearMove = lambda x0, x1, t0, t1:\
-            np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
-            
-        y_pel = linearMove(*[0, 0.09], *[0*T, 0.5*T])
-        z_sf  = linearMove(*[0, Config.STEP_HEIGHT], *[1*T, 1.1*T])
+        a = - ( 2*T*hmax - T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**3)
+        b = ( 2*T*hmax - 2*T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**2)
+        c = h0
         
-        if self.t < 2 * Config.DDT:
-            print(f"LeftLegBalance.t = {self.t:.2f}")
-            self.t += Config.TIMER_PERIOD            
-
-        return Ref(
-            pel := np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
-            lf  := np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
-            rf   = np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
-            var  = _get_ref_pelVar(pel, lf)
-        )
-
-def bipedalBalance_plan():
-    """回傳雙腳支撐時的參考值"""
-    return Ref(
-        pel := np.vstack(( 0,    0, 0.57, 0, 0, 0 )),
-        lf  := np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
-        rf   = np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
-        var  = _get_ref_pelVar(pel, lf)
-    )
-
+        return a * t**2 + b*t + c
+    
+#==========toolbox==========#
 def _get_ref_pelVar(ref_pel: np.ndarray, ref_cf: np.ndarray) -> dict[str, np.ndarray] :
     """平衡(不管是單腳還是雙腳平衡)時, 用pel代替com, 角動量ref皆設0"""
     return {
         'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
         'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
     }
-    
-def parabolic(t: float, h0: float, hmax: float) -> float:
-    h0, hmax = sorted([h0, hmax])
-    T = Config.STEP_TIMELENGTH
-    
-    a = - ( 2*T*hmax - T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**3)
-    b = ( 2*T*hmax - 2*T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**2)
-    c = h0
-    
-    return a * t**2 + b*t + c
