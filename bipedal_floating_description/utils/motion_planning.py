@@ -59,16 +59,17 @@ class AlipTraj:
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
             
             #(側旋角動量Lx須用ref, 不然軌跡極怪)
-            self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
+            # self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
+            self.var0['y'][1,0] = 0 #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
         ref_p_cfTOcom_in_wf, ref_var = self._plan_com(stance)
-        ref_p_sfTOcom_in_wf = self._sf_trajFit(stance)
+        ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf = self._sf_trajFit(stance, self.p0_ft_in_wf[sf][2])
         
         #==========轉成wf==========#
         ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_ft_in_wf[cf]
-        ref_p_sf_in_wf = - ref_p_sfTOcom_in_wf + ref_p_com_in_wf
+        ref_xy_sf_in_wf = - ref_xy_sfTOcom_in_wf + ref_p_com_in_wf[:2]
         
         #==========更新時間==========#
         print(f"Walk.t = {self.t:.2f}")
@@ -76,7 +77,7 @@ class AlipTraj:
         
         ref_ft = {
             cf: self.p0_ft_in_wf[cf],
-            sf: ref_p_sf_in_wf
+            sf: np.vstack((ref_xy_sf_in_wf, ref_z_sf_in_wf))
         }
         
         return Ref(
@@ -142,7 +143,7 @@ class AlipTraj:
         
         return ref_xy_swTOcom_in_wf_T
 
-    def _sf_trajFit(self, stance: list[str]) -> np.ndarray:
+    def _sf_trajFit(self, stance: list[str], h0: float) -> tuple[np.ndarray, float]:
         """
         擬合擺動腳的軌跡
             - xy方向用三角函數模擬簡諧
@@ -162,10 +163,10 @@ class AlipTraj:
         ref_xy_sfTOcom_in_wf = xy0_sfTocom_in_wf + (xy1_sfTocom_in_wf - xy0_sfTocom_in_wf)/(-2) * ( cos(pi*ratioT)-1 )
         
         #z方向用拋物線, 最高點在h
-        ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
-        
-        return np.vstack(( ref_xy_sfTOcom_in_wf, ref_z_sfTOcom_in_wf ))
-
+        # ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
+        ref_z_sf_in_wf = parabolic(self.t, h0, h)
+        # return np.vstack(( ref_xy_sfTOcom_in_wf, ref_z_sfTOcom_in_wf ))
+        return ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf
     #==========工具function==========#
     @staticmethod
     def _get_alipMatA(t):
@@ -210,7 +211,7 @@ class LeftLegBalance:
             np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
             
         y_pel = linearMove(*[0, 0.09], *[0*T, 0.5*T])
-        z_sf  = linearMove(*[0, 0.05], *[1*T, 1.1*T])
+        z_sf  = linearMove(*[0, Config.STEP_HEIGHT], *[1*T, 1.1*T])
         
         if self.t < 2 * Config.DDT:
             print(f"LeftLegBalance.t = {self.t:.2f}")
@@ -239,3 +240,12 @@ def _get_ref_pelVar(ref_pel: np.ndarray, ref_cf: np.ndarray) -> dict[str, np.nda
         'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
     }
     
+def parabolic(t: float, h0: float, hmax: float) -> float:
+    h0, hmax = sorted([h0, hmax])
+    T = Config.STEP_TIMELENGTH
+    
+    a = - ( 2*T*hmax - T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**3)
+    b = ( 2*T*hmax - 2*T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**2)
+    c = h0
+    
+    return a * t**2 + b*t + c
