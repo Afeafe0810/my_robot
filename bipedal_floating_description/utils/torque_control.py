@@ -5,6 +5,7 @@ import numpy as np; np.set_printoptions(precision=5)
 from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from utils.motion_planning import Ref
+from utils.config import Config
 
 # TODO    
 # - 如何給初速
@@ -13,6 +14,11 @@ from utils.motion_planning import Ref
 #   - 限制腳踝扭矩大小
 # - 碰撞偵測
 #    - 正常的力 - 碰撞的力，再經過低通濾波器
+
+# NOTE
+# 當單腳站立, 支撐腳給初速會很奇怪
+# 但當雙支撐, 支撐腳扭矩又不夠大
+# 換個想法可能要用擺動腳掌踢一下地面來給初速
 
 class TorqueControl:
     """TorqueControl 類別負責處理機器人扭矩對state的pattern matching邏輯。"""
@@ -90,7 +96,7 @@ class AlipControl:
         # }
         pass
         
-    def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[np.ndarray]) -> np.ndarray:
+    def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
         """回傳支撐腳腳踝扭矩"""
         cf, sf = stance
         
@@ -161,10 +167,14 @@ class AlipControl:
         # }
         
         #==========全狀態回授==========#
-        u_cf = {
+        u_cf : dict[str, np.ndarray] = {
             'x': -matK['x'] @ ( var_cf['x'] - ref_var['x'] ), #腳踝pitch控制x方向
-            'y': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制x方向
+            'y': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
         }
+        
+        print(f"u_cf1: {u_cf['y']}")
+        u_cf['y'] = u_cf['y'].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT) #飽和
+        print(f"u_cf2: {u_cf['y']}")
 
         #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
@@ -173,10 +183,10 @@ class AlipControl:
 
         
 
-        if stance != stance_past:
-            u_cf['x'] = u_cf['y'] = 0
+        # if stance != stance_past:
+            # u_cf['x'] = u_cf['y'] = 0
 
-        #--torque assign
+        # ALIP計算的u指關節對軀體的扭矩, pub的torque是從骨盆往下建, 扭矩方向相反
         torque_ankle_cf = - np.vstack(( u_cf['x'], u_cf['y'] ))
         
         #==========更新值==========#

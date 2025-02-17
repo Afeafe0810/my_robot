@@ -54,7 +54,7 @@ class UpperLevelController(Node):
         #     'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
         #     'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
         # }
-        # #TODO contact移到torque內
+        # #HACK contact移到torque內
         # contact_lf, contact_rf = contact['lf'], contact['rf']
 
         #========支撐狀態切換=====#

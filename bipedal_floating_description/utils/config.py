@@ -43,6 +43,6 @@ class Config:
     OMEGA = ( GC / IDEAL_Z_COM_IN_WF )**0.5
     STEP_HEIGHT = 0.02
     
-    
-    
-    
+    #腳踝關節限制
+    FOOT_WIDTH = 0.04
+    ANKLE_LIMIT = MASS * GC * FOOT_WIDTH #3.53 Nm

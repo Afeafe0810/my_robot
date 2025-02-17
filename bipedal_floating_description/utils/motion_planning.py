@@ -71,6 +71,7 @@ class AlipTraj:
         ref_p_sf_in_wf = - ref_p_sfTOcom_in_wf + ref_p_com_in_wf
         
         #==========更新時間==========#
+        print(f"Walk.t = {self.t:.2f}")
         self.t += Config.TIMER_PERIOD
         
         ref_ft = {
