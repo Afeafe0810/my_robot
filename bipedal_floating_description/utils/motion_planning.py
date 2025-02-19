@@ -73,7 +73,14 @@ class LeftLegBalance:
 # state 30
 class AlipTraj:
     def __init__(self):
+        #時間
         self.t : float = 0.0
+        
+        #幾個sample -> 因為float加法會出現二進制誤差，所以t改用T_n*T來計算
+        self.T_n :int = 0
+        
+        #剛啟動
+        self.isJustStarted = True
         
         #初值
         self.var0 : dict[str, np.ndarray] = None
@@ -82,23 +89,19 @@ class AlipTraj:
         self.ref_xy_swTOcom_in_wf_T : np.ndarray = None
     
     def plan(self, frame: RobotFrame, stance:list[str], des_vx_com_in_wf_2T: float ) -> Ref:
-        isJustStarted = ( self.t == 0 )
-        isTimesUp = ( self.t - Config.STEP_TIMELENGTH > 1e-8  )
         
-        #==========當一步踩完, 時間歸零+主被動腳交換==========#
-        if isTimesUp:
-            self.t = 0
-            stance.reverse()
-            
+        self.t = self.T_n * Config.TIMER_PERIOD
         cf, sf = stance
         
         #==========踩第一步的時候, 拿取初值與預測==========#
-        if isJustStarted or isTimesUp:
+        if self.isJustStarted: #如果剛從state 2啟動
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
+            self.var0['y'][1,0] = 0.245867
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
             
-            #(側旋角動量Lx須用ref, 不然軌跡極怪)
-            # self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
-            self.var0['y'][1,0] = 0 #現在的參考的角動量是前一個的支撐腳的結尾
+        elif self.T_n == 0: #如果剛從state 2啟動
+            self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
+            self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
@@ -109,14 +112,18 @@ class AlipTraj:
         ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_ft_in_wf[cf]
         ref_xy_sf_in_wf = - ref_xy_sfTOcom_in_wf + ref_p_com_in_wf[:2]
         
-        #==========更新時間==========#
-        print(f"Walk.t = {self.t:.2f}")
-        self.t += Config.TIMER_PERIOD
-        
         ref_ft = {
             cf: self.p0_ft_in_wf[cf],
             sf: np.vstack((ref_xy_sf_in_wf, ref_z_sf_in_wf))
         }
+        
+        #==========更新時間與初值==========#
+        print(f"Walk.t = {self.t:.2f}")
+        if self.T_n == Config.STEP_SAMPLELENGTH:
+            self.T_n = 0
+            stance.reverse()
+        else:
+            self.T_n += 1
         
         return Ref(
             com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),

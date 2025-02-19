@@ -34,6 +34,7 @@ class Config:
     
     #行走每步時間?
     STEP_TIMELENGTH = 0.5
+    STEP_SAMPLELENGTH : int = int(STEP_TIMELENGTH / TIMER_PERIOD)
     
     #機器人的物理模型
     MASS = 9
