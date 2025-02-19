@@ -172,9 +172,9 @@ class AlipControl:
             'y': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
         }
         
-        print(f"u_cf1: {u_cf['y']}")
+        # print(f"u_cf1: {u_cf['y']}")
         u_cf['y'] = u_cf['y'].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT) #飽和
-        print(f"u_cf2: {u_cf['y']}")
+        # print(f"u_cf2: {u_cf['y']}")
 
         #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 

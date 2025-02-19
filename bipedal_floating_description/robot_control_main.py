@@ -41,7 +41,7 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, _, _, jp, jv = self.ros.returnSubData()
+        p_base_in_wf, r_base_to_wf, state, _, _, jp, jv, f_ft, tau_ft = self.ros.returnSubData()
         
         #==========更新可視化的機器人==========#
         config = self.robot.update_VizAndMesh(jp)

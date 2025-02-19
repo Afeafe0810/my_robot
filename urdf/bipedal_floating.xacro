@@ -562,7 +562,33 @@
     <rpy_offset>0 0 0</rpy_offset>
   </plugin>
 
+  <plugin name="lf_sensor" filename="libgazebo_ros_ft_sensor.so">
+    <ros>
+      <namespace>/lf_sensor</namespace>
+      <topic_name>force</topic_name>
+    </ros>
+    <joint_name>L_Ankle_Pitch</joint_name>
+    <update_rate>500</update_rate>
+    <gaussian_noise>0.0</gaussian_noise>
+  </plugin>
+
+  <plugin name="rf_sensor" filename="libgazebo_ros_ft_sensor.so">
+    <ros>
+      <namespace>/rf_sensor</namespace>
+      <topic_name>force</topic_name>
+    </ros>
+    <joint_name>R_Ankle_Pitch</joint_name>
+    <update_rate>500</update_rate>
+    <gaussian_noise>0.0</gaussian_noise>
+  </plugin>
+
 </gazebo>
 
+<gazebo reference = "L_Ankle_Pitch">
+  <provideFeedback>true</provideFeedback>
+</gazebo>
+<gazebo reference = "R_Ankle_Pitch">
+  <provideFeedback>true</provideFeedback>
+</gazebo>
 
 </robot>

@@ -12,6 +12,7 @@ from sensor_msgs.msg import JointState
 from gazebo_msgs.msg import ContactsState
 from nav_msgs.msg import Odometry
 from trajectory_msgs.msg import JointTrajectory
+from geometry_msgs.msg import WrenchStamped
 
 #================ import other code =====================#
 from utils.config import Config
@@ -40,6 +41,9 @@ class ROSInterfaces:
         self._p_base_in_wf = self._r_base_to_wf = self._jp = None
         self._state = 0.0
         self._contact_lf = self._contact_rf = True
+        self._f_lf = self._tau_lf = None
+        self._f_rf = self._tau_rf = None
+
         
         self._callback_count = 0 #每5次會呼叫一次maincallback
         self._main_callback = main_callback #引入main_callback來持續呼叫
@@ -50,7 +54,7 @@ class ROSInterfaces:
         self.subscriber = self._createSubscribers(node)
     
     #=========對外主要接口===========#
-    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, bool, bool, np.ndarray, np.ndarray]:
+    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, bool, bool, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波
@@ -58,7 +62,8 @@ class ROSInterfaces:
         jv = Dsp.FILTER_JV.filt(_jv)
         
         return list( map( deepcopy,
-            [ self._p_base_in_wf, self._r_base_to_wf, self._state, self._contact_lf, self._contact_rf, self._jp, jv ]
+            [ self._p_base_in_wf, self._r_base_to_wf, self._state, self._contact_lf, self._contact_rf,
+             self._jp, jv, np.vstack((self._f_lf, self._f_rf)), np.vstack((self._tau_lf, self._tau_rf)) ]
         ))
     
     #=========發布器, 訂閱器建立===========#
@@ -99,6 +104,8 @@ class ROSInterfaces:
             "lf_contact"   : node.create_subscription( ContactsState,     '/l_foot/bumper_demo', self._update_contact_callback,  10 ),
             "rf_contact"   : node.create_subscription( ContactsState,     '/r_foot/bumper_demo', self._update_contact_callback,  10 ),
             "joint_states" : node.create_subscription( JointState,        '/joint_states',       self._update_jp_callback,       10 ),
+            "lf_force"     : node.create_subscription( WrenchStamped,     '/lf_sensor/wrench',   self._update_lfForce_callback,  10 ),
+            "rf_force"     : node.create_subscription( WrenchStamped,     '/rf_sensor/wrench',   self._update_rfForce_callback,  10 ),
         }
 
     #=========訂閱Callback===========#
@@ -129,6 +136,21 @@ class ROSInterfaces:
         if self._callback_count == 5:
             self._callback_count = 0
             self._main_callback()
+    
+    def _update_lfForce_callback(self, msg: WrenchStamped):
+        force = msg.wrench.force
+        torque = msg.wrench.torque
+        
+        self._f_lf = np.vstack(( force.x, force.y, force.z ))
+        self._tau_lf = np.vstack(( torque.x, torque.y, torque.z ))
+
+    def _update_rfForce_callback(self, msg: WrenchStamped):
+        """ 處理右腳感測器數據 """
+        force = msg.wrench.force
+        torque = msg.wrench.torque
+        
+        self._f_rf = np.vstack(( force.x, force.y, force.z ))
+        self._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
     
 class RobotModel:
     """
