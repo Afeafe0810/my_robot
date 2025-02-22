@@ -1,6 +1,7 @@
 import numpy as np
 #================ import library ========================#
 from utils.config import Config
+from numbers import Number
 #========================================================#
     
 class Filter:
@@ -11,9 +12,9 @@ class Filter:
                 num (list): 濾波器的分子係數。
                 den (list): 濾波器的分母係數。
                 
-        - filt(u: float | np.ndarray) -> float | np.ndarray:
+        - filt(u: Number | np.ndarray) -> float | np.ndarray:
             - 參數:
-                u (float | np.ndarray): 輸入信號，接受 column vector 或 float。
+                u (Number | np.ndarray): 輸入信號，接受 column vector 或 Number。
             - 返回:
                 float | np.ndarray: 濾波後的輸出信號。
     """
@@ -26,14 +27,14 @@ class Filter:
         self.__isStarted : bool = True
         
         # pasts從左到右是新到舊 k, k-1, k-2
-        self.__u_pasts : float|np.ndarray = None
-        self.__y_pasts : float|np.ndarray = None
+        self.__u_pasts : np.ndarray = None
+        self.__y_pasts : np.ndarray = None
 
         
-    def filt(self, u: float|np.ndarray) -> float|np.ndarray :
-        ''' u只接受是column vector或int '''
-        is_u_float = type(u) == float
-        if  is_u_float:
+    def filt(self, u: Number|np.ndarray) -> float|np.ndarray :
+        ''' u只接受是column vector或num '''
+        is_u_num = isinstance(u, Number)
+        if  is_u_num:
             u = np.array( [[u]] )
         if self.__isStarted:
             self.__isStarted = False
@@ -44,7 +45,7 @@ class Filter:
         self.__y_pasts = np.hstack(( y, self.__y_pasts[:,:-1] ))
         self.__u_pasts = np.hstack(( u, self.__u_pasts[:,:-1] ))
         
-        return y.item() if is_u_float else\
+        return y.item() if is_u_num else\
                y
 
 class Diffter:
