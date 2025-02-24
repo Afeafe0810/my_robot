@@ -7,20 +7,7 @@ from utils.frame_kinermatic import RobotFrame
 from utils.motion_planning import Ref
 from utils.config import Config
 
-# TODO    
-# - 如何給初速
-#   - 腳踝給一個pulse
-#   - 要確定方向正確
-#   - 限制腳踝扭矩大小
-# - 碰撞偵測
-#    - 正常的力 - 碰撞的力，再經過低通濾波器
-
-# NOTE
-# 當單腳站立, 支撐腳給初速會很奇怪
-# 但當雙支撐, 支撐腳扭矩又不夠大
-# 換個想法可能要用擺動腳掌踢一下地面來給初速
-
-# TODO 其他關節照樣，但支撐腳踝ax方向扭矩開到最大
+# TODO 碰撞偵測：正常的力 - 碰撞的力，再經過低通濾波器
 
 class TorqueControl:
     """TorqueControl 類別負責處理機器人扭矩對state的pattern matching邏輯。"""

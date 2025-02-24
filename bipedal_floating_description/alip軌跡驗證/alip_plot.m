@@ -1,7 +1,7 @@
-close all
+close all; clear; clc
 % 讀取 CSV 文件
-data = readmatrix('alip_traj_output.csv');
-
+data = readmatrix('alip_test_data.csv');
+data= data(2:end,2:end)
 % 提取時間和數據
 t = data(:, 1);       % 時間
 com_x = data(:, 2);   % com 的 x
@@ -13,7 +13,12 @@ lf_z = data(:, 7);    % lf 的 z
 rf_x = data(:, 8);    % rf 的 x
 rf_y = data(:, 9);    % rf 的 y
 rf_z = data(:, 10);   % rf 的 z
-
+x = data(:, 11);
+y = data(:, 12);
+Ly = data(:, 13);
+Lx = data(:, 14);
+plot(t,com_y)
+%%
 % 計算軸範圍
 x_min = min([com_x; lf_x; rf_x]) - 0.1;
 x_max = max([com_x; lf_x; rf_x]) + 0.1;
@@ -60,7 +65,9 @@ for i = 1:length(t)
     legend({'COM', 'LF', 'RF'}, 'Location', 'best'); % 設置 Legend 標籤
     % 暫停以模擬動態效果
     pause(0.01);
-    % input('go')
+    % if round(t(i),3) == 0.55
+    %     input('wait...')
+    % end
 end
 
 hold off;
