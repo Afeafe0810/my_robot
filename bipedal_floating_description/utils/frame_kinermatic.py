@@ -92,7 +92,7 @@ class RobotFrame:
             'lf': self.p_lf_in_wf,
             'rf': self.p_rf_in_wf
         }
-        p0_ftTocom_in_wf = {
+        p_ftTocom_in_wf = {
             'lf': self.p_com_in_wf - self.p_lf_in_wf,
             'rf': self.p_com_in_wf - self.p_rf_in_wf
         }
@@ -100,12 +100,12 @@ class RobotFrame:
             'lf': self.L_com_in_lf,
             'rf': self.L_com_in_rf,
         }
-        var0 = {
-            'x': np.vstack(( p0_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
-            'y': np.vstack(( p0_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
+        var = {
+            'x': np.vstack(( p_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
+            'y': np.vstack(( p_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
         }
         return list( map( deepcopy, 
-            [var0, p0_ftTocom_in_wf, p_ft_in_wf]
+            [var, p_ftTocom_in_wf, p_ft_in_wf]
         ))
     
     def calculate_gravity(self, robot: RobotModel, jp: np.ndarray) -> tuple[np.ndarray] :

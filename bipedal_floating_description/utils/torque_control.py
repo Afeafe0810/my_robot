@@ -20,6 +20,8 @@ from utils.config import Config
 # 但當雙支撐, 支撐腳扭矩又不夠大
 # 換個想法可能要用擺動腳掌踢一下地面來給初速
 
+# TODO 其他關節照樣，但支撐腳踝ax方向扭矩開到最大
+
 class TorqueControl:
     """TorqueControl 類別負責處理機器人扭矩對state的pattern matching邏輯。"""
     
@@ -168,13 +170,13 @@ class AlipControl:
         
         #==========全狀態回授==========#
         u_cf : dict[str, np.ndarray] = {
-            'x': -matK['x'] @ ( var_cf['x'] - ref_var['x'] ), #腳踝pitch控制x方向
-            'y': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
+            'y': -matK['x'] @ ( var_cf['x'] - ref_var['x'] ), #腳踝pitch控制x方向
+            'x': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
         }
         
-        # print(f"u_cf1: {u_cf['y']}")
-        u_cf['y'] = u_cf['y'].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT) #飽和
-        # print(f"u_cf2: {u_cf['y']}")
+        print(f"u_cf1: {u_cf['x']}")
+        u_cf['x'] = u_cf['x'].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT) #飽和
+        print(f"u_cf2: {u_cf['x']}")
 
         #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
@@ -187,7 +189,7 @@ class AlipControl:
             # u_cf['x'] = u_cf['y'] = 0
 
         # ALIP計算的u指關節對軀體的扭矩, pub的torque是從骨盆往下建, 扭矩方向相反
-        torque_ankle_cf = - np.vstack(( u_cf['x'], u_cf['y'] ))
+        torque_ankle_cf = - np.vstack(( u_cf['y'], u_cf['x'] ))
         
         #==========更新值==========#
         # var_e_p[cf].update(var_e_cf)
