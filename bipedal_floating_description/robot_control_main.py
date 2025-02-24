@@ -41,7 +41,7 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, _, _, jp, jv, f_ft, tau_ft = self.ros.returnSubData()
+        p_base_in_wf, r_base_to_wf, state, is_contact, jp, jv, force_ft, tau_ft = self.ros.returnSubData()
         
         #==========更新可視化的機器人==========#
         config = self.robot.update_VizAndMesh(jp)
@@ -49,32 +49,35 @@ class UpperLevelController(Node):
         #==========更新frame==========#
         self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)        
         
-        # #========接觸判斷========#
-        # contact = {
-        #     'lf': (self.frame.p_lf_in_wf[2,0] <= 0.01),
-        #     'rf': (self.frame.p_lf_in_wf[2,0] <= 0.01)
-        # }
-        # #HACK contact移到torque內
-        # contact_lf, contact_rf = contact['lf'], contact['rf']
+        #========接觸判斷========#
+        is_firmly = self._is_step_firmly(force_ft)
 
         #========支撐狀態切換=====#
-        self._setStance(state)
+        self._set_stance(state)
         
         #========軌跡規劃========#
-        ref = self.traj.plan(state, self.frame, self.stance)
-
+        ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, jp, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.stance_past = self.stance
 
-    def _setStance(self, state):
+    def _set_stance(self, state):
         """掌管state 0, 1, 2的支撐腳邏輯"""
         if state in [0, 1, 2]:
             #(這邊不能用return寫，否則state30會是None)
             self.stance = ['lf', 'rf']
-            
+
+    @staticmethod
+    def _is_step_firmly(force_ft: dict[str, float]) -> dict[str, bool]:
+        """
+        用力規讀取z方向的分力, 來判斷擺動腳是否踩穩, 若受力 > 10N則視為踩穩
+        (這對擺動腳比較重要)
+        """
+        threshold = 10
+        return { key: val> threshold for key, val in force_ft.items()}
+    
 def main(args=None):
     rclpy.init(args=args)
 

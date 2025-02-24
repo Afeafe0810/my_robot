@@ -40,9 +40,9 @@ class ROSInterfaces:
         #=========初始化===========#
         self._p_base_in_wf = self._r_base_to_wf = self._jp = None
         self._state = 0.0
-        self._contact_lf = self._contact_rf = True
-        self._f_lf = self._tau_lf = None
-        self._f_rf = self._tau_rf = None
+        self._is_contact_lf = self._is_contact_rf = True
+        self._force_lf = self._tau_lf = None
+        self._force_rf = self._tau_rf = None
 
         
         self._callback_count = 0 #每5次會呼叫一次maincallback
@@ -54,16 +54,28 @@ class ROSInterfaces:
         self.subscriber = self._createSubscribers(node)
     
     #=========對外主要接口===========#
-    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, bool, bool, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, dict[str, bool], np.ndarray, np.ndarray, dict[str, float], dict[str, float]]:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波
         _jv = np.clip( Dsp.DIFFTER_JP.diff(self._jp), -0.75, 0.75)
         jv = Dsp.FILTER_JV.filt(_jv)
         
+        is_contact = {'lf' : self._is_contact_lf, 'rf' : self._is_contact_rf}
+        force_ft = {'lf' : self._force_lf, 'rf' : self._force_rf}
+        tau_ft = {'lf' : self._tau_lf, 'rf' : self._tau_rf}
+        
         return list( map( deepcopy,
-            [ self._p_base_in_wf, self._r_base_to_wf, self._state, self._contact_lf, self._contact_rf,
-             self._jp, jv, np.vstack((self._f_lf, self._f_rf)), np.vstack((self._tau_lf, self._tau_rf)) ]
+            [ 
+                self._p_base_in_wf,
+                self._r_base_to_wf,
+                self._state,
+                is_contact,
+                self._jp, 
+                jv, 
+                force_ft, 
+                tau_ft
+            ]
         ))
     
     #=========發布器, 訂閱器建立===========#
@@ -122,9 +134,9 @@ class ROSInterfaces:
     def _update_contact_callback(self, msg:ContactsState ):
         '''可以判斷是否『接觸』, 無法判斷是否『踩穩』'''
         if msg.header.frame_id == 'l_foot_1':
-            self._contact_lf = len(msg.states)>=1
+            self._is_contact_lf = len(msg.states)>=1
         elif msg.header.frame_id == 'r_foot_1':
-            self._contact_rf = len(msg.states)>=1
+            self._is_contact_rf = len(msg.states)>=1
             
     def _update_jp_callback(self, msg:JointState ):
         '''訂閱jp, 且每5次會callback主程式一次'''
@@ -141,7 +153,7 @@ class ROSInterfaces:
         force = msg.wrench.force
         torque = msg.wrench.torque
         
-        self._f_lf = np.vstack(( force.x, force.y, force.z ))
+        self._force_lf = np.vstack(( force.x, force.y, force.z ))
         self._tau_lf = np.vstack(( torque.x, torque.y, torque.z ))
 
     def _update_rfForce_callback(self, msg: WrenchStamped):
@@ -149,7 +161,7 @@ class ROSInterfaces:
         force = msg.wrench.force
         torque = msg.wrench.torque
         
-        self._f_rf = np.vstack(( force.x, force.y, force.z ))
+        self._force_rf = np.vstack(( force.x, force.y, force.z ))
         self._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
     
 class RobotModel:

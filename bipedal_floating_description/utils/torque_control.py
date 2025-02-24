@@ -34,8 +34,12 @@ class TorqueControl:
                 #支撐腳腳踝
                 torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
                 
-                if state == 30 and ref.need_push:
-                    torque[cf][5,0] = self.alip.init_push()
+                if state == 30:
+                    if ref.need_push:
+                        torque[cf][5,0] = self.alip.init_push()
+                    elif ref.need_close:
+                        torque[cf][5,0] = 0
+                        
                     print(f"u_cf3: {-torque[cf][5]}")
                 return np.vstack(( torque['lf'], torque['rf'] ))
     

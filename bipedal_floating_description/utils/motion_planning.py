@@ -15,6 +15,7 @@ class Ref:
     var : dict[str, np.ndarray]
     com : np.ndarray = None #沒有這麼重要
     need_push : bool = False #預設都是False
+    need_close: bool = False #預設都是False
     
 class Trajatory:
     def __init__(self):
@@ -23,7 +24,7 @@ class Trajatory:
         #state 30
         self.aliptraj = AlipTraj()
     
-    def plan(self, state: float, frame: RobotFrame, stance: list[str]) -> Ref:
+    def plan(self, state: float, frame: RobotFrame, stance: list[str], is_firmly: dict[str, bool]) -> Ref:
         match state:          
             case 0 | 1 : #雙支撐
                 return bipedalBalance_plan()
@@ -32,6 +33,8 @@ class Trajatory:
                 return self.lf_stand.plan()
                      
             case 30:#步行
+                
+                #剛開始走需要推
                 if need_push := self.aliptraj.doesNeedToPush(frame, stance):
                     print(f"pushing...")
                     ref = self.lf_stand.plan()
@@ -99,7 +102,7 @@ class AlipTraj:
         self.p0_ft_in_wf : dict[str, np.ndarray] = None
         self.ref_xy_swTOcom_in_wf_T : np.ndarray = None
     
-    def plan(self, frame: RobotFrame, stance:list[str], des_vx_com_in_wf_2T: float ) -> Ref:
+    def plan(self, frame: RobotFrame, stance:list[str], des_vx_com_in_wf_2T: float, is_firmly: dict[str, bool]) -> Ref:
         
         self.t = self.T_n * Config.TIMER_PERIOD
         cf, sf = stance
@@ -113,7 +116,7 @@ class AlipTraj:
             
         elif self.T_n == 0: #換腳時
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
-            self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
+            self.var0['y'][1,0] = self.ref.var['y'][1,0] #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
@@ -132,12 +135,15 @@ class AlipTraj:
         #==========更新時間與初值==========#
         print(f"Walk.t = {self.t:.2f}")
         if self.T_n == Config.STEP_SAMPLELENGTH:
-            self.T_n = 0
-            stance.reverse()
+            if is_firmly[sf]:
+                self.T_n = 0
+                stance.reverse()
+            else: #還沒踩穩就輸出同一位置
+                self.ref.need_close = True
+                return self.ref
         else:
             self.T_n += 1
-        
-        return Ref(
+        self.ref = Ref(
             com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
             rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
@@ -147,6 +153,7 @@ class AlipTraj:
                     np.zeros((3,1))
                 ))
         )
+        return self.ref
         
     def doesNeedToPush(self, frame: RobotFrame, stance: list[str]) -> bool:
         if self.alip_need_push:
