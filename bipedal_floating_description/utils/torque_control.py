@@ -47,6 +47,9 @@ class TorqueControl:
                 #支撐腳腳踝
                 torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
                 
+                if state == 30 and ref.need_push:
+                    torque[cf][5,0] = self.alip.init_push()
+                    print(f"u_cf3: {-torque[cf][5]}")
                 return np.vstack(( torque['lf'], torque['rf'] ))
     
 def anklePD_ctrl(frame: RobotFrame, sf: str):
@@ -97,7 +100,11 @@ class AlipControl:
         #     'y': np.zeros((2,1))
         # }
         pass
-        
+    
+    def init_push(self):
+        """在 state2 切到 state30 的瞬間，把扭矩開到最大，給一個初始角動量"""
+        return -Config.ANKLE_LIMIT #負號是關節順序相反
+    
     def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
         """回傳支撐腳腳踝扭矩"""
         cf, sf = stance

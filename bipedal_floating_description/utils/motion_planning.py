@@ -14,6 +14,7 @@ class Ref:
     rf  : np.ndarray
     var : dict[str, np.ndarray]
     com : np.ndarray = None #沒有這麼重要
+    need_push : bool = False #預設都是False
     
 class Trajatory:
     def __init__(self):
@@ -31,7 +32,15 @@ class Trajatory:
                 return self.lf_stand.plan()
                      
             case 30:#步行
-                return self.aliptraj.plan(frame, stance, 0)
+                if need_push := self.aliptraj.doesNeedToPush(frame, stance):
+                    print(f"pushing...")
+                    ref = self.lf_stand.plan()
+                else:
+                    ref = self.aliptraj.plan(frame, stance, 0)
+                    
+                ref.need_push = need_push
+                
+                return ref
 
 # state 0, 1
 def bipedalBalance_plan():
@@ -73,6 +82,8 @@ class LeftLegBalance:
 # state 30
 class AlipTraj:
     def __init__(self):
+        #AlIP是否推完的追蹤
+        self.alip_need_push : bool = True
         #時間
         self.t : float = 0.0
         
@@ -95,11 +106,12 @@ class AlipTraj:
         
         #==========踩第一步的時候, 拿取初值與預測==========#
         if self.isJustStarted: #如果剛從state 2啟動
+            self.isJustStarted = False
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
-            self.var0['y'][1,0] = 0.245867
+            self.var0['y'][1,0] = Config.INITIAL_LX
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
             
-        elif self.T_n == 0: #如果剛從state 2啟動
+        elif self.T_n == 0: #換腳時
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
             self.var0['y'][1,0] = self._get_ref_timesUp_Lx(sf) #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
@@ -136,6 +148,15 @@ class AlipTraj:
                 ))
         )
         
+    def doesNeedToPush(self, frame: RobotFrame, stance: list[str]) -> bool:
+        if self.alip_need_push:
+            Lx = frame.get_alipdata(stance)[0]['y'][1,0]
+            
+            if Lx >= Config.INITIAL_LX:
+                self.alip_need_push = False
+                
+        return self.alip_need_push
+    
     #==========主要演算法==========# 
     def _plan_com(self, stance: list[str]) -> tuple[np.ndarray, dict[str, np.ndarray]] :
         """回傳ref_com與ref_var"""
