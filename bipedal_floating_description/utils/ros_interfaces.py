@@ -62,7 +62,7 @@ class ROSInterfaces:
         jv = Dsp.FILTER_JV.filt(_jv)
         
         is_contact = {'lf' : self._is_contact_lf, 'rf' : self._is_contact_rf}
-        force_ft = {'lf' : self._force_lf, 'rf' : self._force_rf}
+        force_ft = {'lf' : self._force_lf[2,0], 'rf' : self._force_rf[2,0]}
         tau_ft = {'lf' : self._tau_lf, 'rf' : self._tau_rf}
         
         return list( map( deepcopy,

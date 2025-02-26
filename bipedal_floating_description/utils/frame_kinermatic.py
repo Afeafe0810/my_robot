@@ -82,8 +82,8 @@ class RobotFrame:
         """
         得到ALIP需要的資訊(先用wf代替in cf好了) #HACK 之後可能要改用cf
         - RETURN
-            - var0
-            - p0_ftTocom_in_wf
+            - var
+            - p_ftTocom_in_wf
             - p_ft_in_wf
         """
         cf, sf = stance

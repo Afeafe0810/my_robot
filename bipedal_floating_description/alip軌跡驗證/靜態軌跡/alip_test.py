@@ -273,8 +273,6 @@ def store_ref(ref_store: pd.DataFrame, t:float, ref_now : Ref):
     ref_store = pd.concat([ref_store, new_df], ignore_index=True)
     return ref_store
     
-    return ref_store
-    
 if __name__ == "__main__":
     alip = AlipTraj()
     stance = ['lf', 'rf']

@@ -39,7 +39,7 @@ class Trajatory:
                     print(f"pushing...")
                     ref = self.lf_stand.plan()
                 else:
-                    ref = self.aliptraj.plan(frame, stance, 0)
+                    ref = self.aliptraj.plan(frame, stance, 0, is_firmly)
                     
                 ref.need_push = need_push
                 
@@ -107,6 +107,11 @@ class AlipTraj:
         self.t = self.T_n * Config.TIMER_PERIOD
         cf, sf = stance
         
+        if is_firmly[sf] and 0.3 < self.t < Config.STEP_TIMELENGTH: #提前踏到步，就提前換下一步
+            self.T_n = 0
+            stance.reverse()
+            cf, sf = stance
+            
         #==========踩第一步的時候, 拿取初值與預測==========#
         if self.isJustStarted: #如果剛從state 2啟動
             self.isJustStarted = False
@@ -128,7 +133,7 @@ class AlipTraj:
         ref_xy_sf_in_wf = - ref_xy_sfTOcom_in_wf + ref_p_com_in_wf[:2]
         
         ref_ft = {
-            cf: self.p0_ft_in_wf[cf],
+            cf: np.vstack((self.p0_ft_in_wf[cf][:2], 0)),
             sf: np.vstack((ref_xy_sf_in_wf, ref_z_sf_in_wf))
         }
         
@@ -143,13 +148,21 @@ class AlipTraj:
                 return self.ref
         else:
             self.T_n += 1
+        
+        var, *_ = frame.get_alipdata(stance)
+        print(f"mea_y = {var['y'][0,0]}")
+        print(f"ref_y = {ref_var['y'][0,0]}")
+        print(f"mea_Lx = {var['y'][1,0]}")
+        print(f"ref_Lx = {ref_var['y'][1,0]}")
+        
         self.ref = Ref(
             com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
             rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
             var = ref_var,
             pel = np.vstack((
-                    ref_p_com_in_wf - frame.p_com_in_wf + frame.p_pel_in_wf,
+                    ( ref_p_com_in_wf - frame.p_com_in_wf + frame.p_pel_in_wf )[:2],
+                    Config.IDEAL_Z_PEL_IN_WF,
                     np.zeros((3,1))
                 ))
         )
