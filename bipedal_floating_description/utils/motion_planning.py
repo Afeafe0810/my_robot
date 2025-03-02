@@ -116,11 +116,13 @@ class AlipTraj:
         if self.isJustStarted: #如果剛從state 2啟動
             self.isJustStarted = False
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
+            self.z0_pel_in_wf = frame.p_pel_in_wf[2,0]
             self.var0['y'][1,0] = Config.INITIAL_LX
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
             
         elif self.T_n == 0: #換腳時
             self.var0, self.p0_ftTocom_in_wf, self.p0_ft_in_wf = frame.get_alipdata(stance)
+            self.z0_pel_in_wf = frame.p_pel_in_wf[2,0]
             self.var0['y'][1,0] = self.ref.var['y'][1,0] #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
 
@@ -162,7 +164,7 @@ class AlipTraj:
             var = ref_var,
             pel = np.vstack((
                     ( ref_p_com_in_wf - frame.p_com_in_wf + frame.p_pel_in_wf )[:2],
-                    Config.IDEAL_Z_PEL_IN_WF,
+                    self.z0_pel_in_wf,
                     np.zeros((3,1))
                 ))
         )
