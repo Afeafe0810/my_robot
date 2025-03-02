@@ -17,7 +17,7 @@ class TorqueControl:
         self.alip = AlipControl()
         
     def update_torque(self, frame: RobotFrame, robot: RobotModel, ref: Ref, state: float,
-                      stance: list[str], stance_past: list[str],jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
+                      stance: list[str], stance_past: list[str], is_firmly: dict[str, bool], jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
         
         cf, sf = stance
         
@@ -26,7 +26,7 @@ class TorqueControl:
                 return balance_ctrl(frame, robot, jp)
             case 1 | 2 | 30:
                 #雙腳膝蓋
-                torque = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance)
+                torque = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 
                 #擺動腳腳踝
                 torque[sf][4:6] = anklePD_ctrl(frame, sf)
@@ -217,7 +217,7 @@ class KneeLoop:
     def __init__(self):
         pass
     
-    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str]) -> dict[str, np.ndarray]:
+    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str], is_firmly: dict[str, bool]) -> dict[str, np.ndarray]:
         
         #==========外環==========#
         endVel: dict[str, np.ndarray] = self._endErr_to_endVel(frame, ref)
@@ -226,7 +226,7 @@ class KneeLoop:
         
         #==========內環==========#
         tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
-        kl, kr  = self._get_innerloop_K(state, stance)
+        kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
         
         tauG = np.vstack(( tauG_lf, tauG_rf ))
         kp = np.vstack(( kl,kr ))
@@ -318,7 +318,7 @@ class KneeLoop:
         return cmd_jv
    
     @staticmethod
-    def _get_innerloop_K(state: float, stance: list[str]) -> tuple[np.ndarray]:
+    def _get_innerloop_K(state: float, stance: list[str], is_firmly: dict[str, bool]) -> tuple[np.ndarray]:
         # HACK 之後gain要改
         cf, sf = stance
         # if cf == 'rf':
@@ -343,15 +343,24 @@ class KneeLoop:
         #         kl = np.array([[1],[1],[1],[1],[1],[1]])
 
 
-
-        if state == 1:
-            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
+        match state:
+            case 1:
+                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
         
-        if state == 2 or state == 30:
-            kr = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            kl = np.array([[0.5],[0.5],[0.5],[0.5],[0.5],[0.5]])
-            
+            case 2:
+                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+                
+            case 30:
+                k = {'lf': None, 'rf': None}
+                k[sf] = np.vstack(( 1, 1, 1, 1, 0, 0 ))
+                
+                k[cf] = np.vstack((1.2, 1.2, 1.2, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
+                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))
+                        
+                return k['lf'], k['rf']
+                
         return kl, kr
 
 def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray) -> np.ndarray:

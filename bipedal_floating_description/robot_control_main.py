@@ -74,7 +74,7 @@ class UpperLevelController(Node):
             
             
         #========扭矩控制========#
-        torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, jp, jv)
+        torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
         
         self.stance_past = self.stance
