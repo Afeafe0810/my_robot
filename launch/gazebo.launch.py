@@ -9,6 +9,7 @@ import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch.event_handlers import (OnExecutionComplete, OnProcessExit,
                                 OnProcessIO, OnProcessStart, OnShutdown)
+from launch.actions import TimerAction
 
 
 def generate_launch_description():
@@ -49,7 +50,7 @@ def generate_launch_description():
         executable='joint_state_publisher',
         name='joint_state_publisher'
     )
-
+    
     gazebo_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -59,7 +60,7 @@ def generate_launch_description():
             ])
         ]),
         launch_arguments={
-            'pause': 'true',
+            'pause': 'false',
             'world': world,
         }.items()
     )
@@ -86,7 +87,7 @@ def generate_launch_description():
         executable='spawn_entity.py',
         arguments=[
             '-entity', 'bipedal_floating',
-            '-topic', 'robot_description'
+            '-topic', 'robot_description',
         ],
         output='screen'
     )
@@ -96,7 +97,7 @@ def generate_launch_description():
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','joint_state_broadcaster'],
         output='screen'
     )
-
+    
     velocity_controller = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'active','velocity_controller'],
         output='screen'
@@ -122,6 +123,11 @@ def generate_launch_description():
         )
 
 
+    delayed_urdf_spawn_node = TimerAction(
+        period=3.0,
+        actions=[urdf_spawn_node]
+    )
+
 
 
     return LaunchDescription([
@@ -129,24 +135,36 @@ def generate_launch_description():
         declare_world_cmd,
         robot_state_publisher_node,
         # joint_state_publisher_node,
+        effort_controllers,
         gazebo_server,
         gazebo_client,
-        urdf_spawn_node,
+        joint_state_broadcaster,
+        
+        
 
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=urdf_spawn_node,
-                on_exit=[joint_state_broadcaster]
-            )
-        ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=urdf_spawn_node,
+        #         on_exit=[joint_state_broadcaster]
+        #     )
+        # ),
 
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=joint_state_broadcaster,
-                on_exit=[effort_controllers]
-            )
-        ),
+        # RegisterEventHandler(
+        #     OnProcessExit(
+        #         target_action=joint_state_broadcaster,
+        #         on_exit=[effort_controllers]
+        #     )
+        # ),
+        
+        # Delay actions by 3 seconds
+        # delayed_gazebo_server,
+        # delayed_gazebo_client,
+        
+        delayed_urdf_spawn_node,
+        
 
+        # urdf_spawn_node,
+        
         # RegisterEventHandler(
         #     OnProcessExit(
         #         target_action=joint_state_broadcaster,
