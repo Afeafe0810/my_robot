@@ -160,6 +160,7 @@ class AlipTraj:
             
         elif self.T_n == 0: #如果換腳
             self.p0_ft_in_wf = mea.p_ft_in_wf
+            self.p0_ft_in_wf[cf][2, 0] = 0.0
             # self.p0_ft_in_wf = {
             #     'lf' : self.ref.lf[:3],
             #     'rf' : self.ref.rf[:3]
@@ -2572,9 +2573,11 @@ class UpperLevelController(Node):
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count,state)
             print(stance)
             if stance == 1:
+                torque_L[[5,11]] = torque_L[[5,11]].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT)
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
             elif stance == 0:
+                torque_R[[5,11]] = torque_R[[5,11]].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT)
                 self.effort_publisher.publish(Float64MultiArray(data=torque_R))
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
             
