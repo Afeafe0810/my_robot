@@ -51,6 +51,32 @@ class Ref:
     var : dict[str, np.ndarray]
     com : np.ndarray = None #沒有這麼重要
     need_push : bool = False #預設都是False
+
+def store_ref(ref_store: pd.DataFrame, ref_now : Ref):
+    new_data = {
+        'pel_x': ref_now.pel[0, 0],
+        'pel_y': ref_now.pel[1, 0],
+        'pel_z': ref_now.pel[2, 0],
+
+        'lf_x': ref_now.lf[0, 0],
+        'lf_y': ref_now.lf[1, 0],
+        'lf_z': ref_now.lf[2, 0],
+
+        'rf_x': ref_now.rf[0, 0],
+        'rf_y': ref_now.rf[1, 0],
+        'rf_z': ref_now.rf[2, 0],
+
+        'x': ref_now.var['x'][0, 0],
+        'y': ref_now.var['y'][0, 0],
+        
+        'Ly': ref_now.var['x'][1, 0],
+        'Lx': ref_now.var['y'][1, 0],
+    }
+    # 建立一筆資料的 DataFrame
+    new_df = pd.DataFrame([new_data])
+    # 使用 pd.concat 進行疊加
+    ref_store = pd.concat([ref_store, new_df], ignore_index=True)
+    return ref_store
     
 class AlipTraj:
     def __init__(self):
@@ -78,10 +104,6 @@ class AlipTraj:
         return self.T_n * Config.TIMER_PERIOD
     
     def plan(self, stance_num:int, des_vx_com_in_wf_2T: float ) -> Ref:
-        self.stance = ['lf', 'rf'] if stance_num == 1 else\
-                      ['rf', 'lf'] if stance_num == 0 else\
-                      self.stance
-        
         stance = self.stance
         cf, sf = stance
         
@@ -148,13 +170,13 @@ class AlipTraj:
             stance.reverse()
         else:
             self.T_n += 1
-        
+        com = np.vstack((ref_p_com_in_wf[:2],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
         self.ref = Ref(
-            com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
+            com = com,
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
             rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
             var = ref_var,
-            pel = np.vstack((ref_p_com_in_wf, np.zeros((3,1))))
+            pel = com
         )
         
         return self.ref
@@ -416,13 +438,13 @@ class UpperLevelController(Node):
         self.P_Y_ref = 0.0
 
         #path_data_norman(減過後的軌跡)
-        self.L_ref_data = pd.read_csv('/home/ldsc/Path_norman/LX.csv', header=None).values
-        self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
+        # self.L_ref_data = pd.read_csv('/home/ldsc/Path_norman/LX.csv', header=None).values
+        # self.R_ref_data = pd.read_csv('/home/ldsc/Path_norman/RX.csv', header=None).values
 
         #path_data_ALIP
-        self.ACX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/CX_ref.csv', header=None).values
-        self.ALX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/LX_ref.csv', header=None).values
-        self.ARX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/RX_ref.csv', header=None).values
+        # self.ACX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/CX_ref.csv', header=None).values
+        # self.ALX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/LX_ref.csv', header=None).values
+        # self.ARX_ref_data = pd.read_csv('/home/ldsc/matlab/ALIP/RX_ref.csv', header=None).values
 
         self.count = 0
         self.stance = 2
@@ -454,6 +476,7 @@ class UpperLevelController(Node):
         #ALIP
         #time
         self.ALIP_count = 0
+        self.ALIP_count_past = -1
         self.alip_t = 0.0
         #--velocity
         self.CX_past_L = 0.0
@@ -505,16 +528,29 @@ class UpperLevelController(Node):
         self.ar_R = 0.0
         self.ar_past_R = 0.0
         #--ref    
-        self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values
-        self.yc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/yc_ref.csv', header=None).values
-        self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values
-        self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values
+        
         #touch for am tracking check
         self.touch = 0
  
         # Initialize the service client
         self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
         self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
+        
+        self.alip = AlipTraj()
+        self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values[0,0]
+        self.yc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/yc_ref.csv', header=None).values[0,0]
+        self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values[0,0]
+        self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values[0,0]
+
+        self.ref_store = pd.DataFrame(columns=[
+        't',
+        'pel_x', 'pel_y', 'pel_z',
+        'lf_x', 'lf_y', 'lf_z',
+        'rf_x', 'rf_y', 'rf_z',
+        'x', 'y',
+        'Ly', 'Lx'
+        ])
+        
     
     def attach_links(self, model1_name, link1_name, model2_name, link2_name):
         req = AttachLink.Request()
@@ -1299,27 +1335,27 @@ class UpperLevelController(Node):
             R_Yaw_ref = 0.0
 
             
-            if state == 30:
-                L_X_ref = self.ALX_ref_data[ALIP_count,0]
-                L_Y_ref = self.ALX_ref_data[ALIP_count,1]
-                L_Z_ref = self.ALX_ref_data[ALIP_count,2]
+            # if state == 30:
+            #     L_X_ref = self.ALX_ref_data[ALIP_count,0]
+            #     L_Y_ref = self.ALX_ref_data[ALIP_count,1]
+            #     L_Z_ref = self.ALX_ref_data[ALIP_count,2]
 
-                R_X_ref = self.ARX_ref_data[ALIP_count,0]
-                R_Y_ref = self.ARX_ref_data[ALIP_count,1]
-                R_Z_ref = self.ARX_ref_data[ALIP_count,2]
+            #     R_X_ref = self.ARX_ref_data[ALIP_count,0]
+            #     R_Y_ref = self.ARX_ref_data[ALIP_count,1]
+            #     R_Z_ref = self.ARX_ref_data[ALIP_count,2]
 
-                if stance == 1:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
-                    P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
-                    P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
-                    P_Z_ref = self.ACX_ref_data[ALIP_count,2]
-                elif stance == 0:
-                    # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                    # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
-                    P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
-                    P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
-                    P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+            #     if stance == 1:
+            #         # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+            #         # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+            #         P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+            #         P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
+            #         P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+            #     elif stance == 0:
+            #         # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+            #         # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+            #         P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+            #         P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
+            #         P_Z_ref = self.ACX_ref_data[ALIP_count,2]
 
             self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
             self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
@@ -1348,26 +1384,50 @@ class UpperLevelController(Node):
 
         
         if state == 30:
-            L_X_ref = self.ALX_ref_data[ALIP_count,0]
-            L_Y_ref = self.ALX_ref_data[ALIP_count,1]
-            L_Z_ref = self.ALX_ref_data[ALIP_count,2]
+            # TODO 這邊有一個問題是, 只要我用plan就代表之前一定ALIP_count+=1, 要確認+＝1的條件
+            if self.ALIP_count == self.ALIP_count_past:
+                self.ref = self.ref
+            else:
+                self.ref = self.alip.plan(stance, 0)
+                print(self.ref)
+            
+            self.xc_ref = self.ref.var['x'][0,0]
+            # self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values
+            self.yc_ref = self.ref.var['y'][0,0]
+            # self.yc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/yc_ref.csv', header=None).values
+            self.ly_ref = self.ref.var['x'][1,0]
+            # self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values
+            self.lx_ref = self.ref.var['y'][1,0]
+            # self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values
+            
+            L_X_ref = self.ref.lf[0,0]
+            # L_X_ref = self.ALX_ref_data[ALIP_count,0]
+            L_Y_ref = self.ref.lf[1,0]
+            # L_Y_ref = self.ALX_ref_data[ALIP_count,1]
+            L_Z_ref = self.ref.lf[2,0]
+            # L_Z_ref = self.ALX_ref_data[ALIP_count,2]
 
-            R_X_ref = self.ARX_ref_data[ALIP_count,0]
-            R_Y_ref = self.ARX_ref_data[ALIP_count,1]
-            R_Z_ref = self.ARX_ref_data[ALIP_count,2]
+            R_X_ref = self.ref.rf[0,0]
+            # R_X_ref = self.ARX_ref_data[ALIP_count,0]
+            R_Y_ref = self.ref.rf[1,0]
+            # R_Y_ref = self.ARX_ref_data[ALIP_count,1]
+            R_Z_ref = self.ref.rf[2,0]
+            # R_Z_ref = self.ARX_ref_data[ALIP_count,2]
 
             if stance == 1:
-                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
-                P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
-                P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
-                P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+                P_X_ref = self.ref.com[0,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+                P_Y_ref = self.ref.com[1,0] + (px_in_lf[1,0]-com_in_lf[1,0])
+                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
+                P_Z_ref = self.ref.com[2,0]
+                # P_Z_ref = self.ACX_ref_data[ALIP_count,2]
             elif stance == 0:
-                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
-                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
-                P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
-                P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
-                P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+                P_X_ref = self.ref.com[0,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+                P_Y_ref = self.ref.com[1,0] + (px_in_rf[1,0]-com_in_rf[1,0])
+                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
+                P_Z_ref = self.ref.com[2,0]
+                # P_Z_ref = self.ACX_ref_data[ALIP_count,2]
 
         self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
         self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
@@ -1446,9 +1506,9 @@ class UpperLevelController(Node):
         
         if state == 20 and self.count < 4200:
             #foot_trajectory(by norman)
-            L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
-            R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
-
+            # L_ref = (np.reshape(self.L_ref_data[:,self.count],(6,1)))
+            # R_ref = (np.reshape(self.R_ref_data[:,self.count],(6,1)))
+            pass
         else:
             #foot_trajectory(by myself)
             L_ref = LX_ref - PX_ref 
@@ -2117,10 +2177,10 @@ class UpperLevelController(Node):
         
        
         #參考值
-        Xc_ref = self.xc_ref[ALIP_count,0]
-        Ly_ref = self.ly_ref[ALIP_count,0]
-        Yc_ref = self.yc_ref[ALIP_count,0]
-        Lx_ref = self.lx_ref[ALIP_count,0]
+        Xc_ref = self.xc_ref
+        Ly_ref = self.ly_ref
+        Yc_ref = self.yc_ref
+        Lx_ref = self.lx_ref
        
         self.ref_x_L = np.array([[Xc_ref],[Ly_ref]])
         self.ref_y_L = np.array([[Yc_ref],[Lx_ref]])
@@ -2239,10 +2299,10 @@ class UpperLevelController(Node):
         
 
         #參考值
-        Xc_ref = self.xc_ref[ALIP_count,0]
-        Ly_ref = self.ly_ref[ALIP_count,0]
-        Yc_ref = self.yc_ref[ALIP_count,0]
-        Lx_ref = self.lx_ref[ALIP_count,0]
+        Xc_ref = self.xc_ref
+        Ly_ref = self.ly_ref
+        Yc_ref = self.yc_ref
+        Lx_ref = self.lx_ref
        
         self.ref_x_R = np.array([[Xc_ref],[Ly_ref]])
         self.ref_y_R = np.array([[Yc_ref],[Lx_ref]])
@@ -2447,10 +2507,16 @@ class UpperLevelController(Node):
         if state == 30:
             self.ref_cmd30(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
+            self.ref_store = store_ref(self.ref_store, self.ref)
+            self.ALIP_count_past = self.ALIP_count
+            print(f"{self.ALIP_count = }")
+            
         else:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_compemsate(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact,state)
 
+        
+        
         JLL = self.left_leg_jacobian()
         JRR = self.right_leg_jacobian()
         Le_2,Re_2,L = self.calculate_err(state)
@@ -2484,28 +2550,16 @@ class UpperLevelController(Node):
             #踩到地面才切換支撐腳
             if self.ALIP_count%50 == 0:
 
-                if self.stance == 1:
-                    if self.P_R_wf[2,0] <= 0.01:
-                        # if self.delay%2 == 0:
-                        #     self.ALIP_count += 1
-                        #     self.delay = 0
-                        # self.delay +=1
-                        self.ALIP_count += 1
-                    else:
-                        self.ALIP_count = self.ALIP_count
-                elif self.stance == 0:
-                    if self.P_L_wf[2,0] <= 0.01:
-                        # if self.delay%2 == 0:
-                        #     self.ALIP_count += 1
-                        #     self.delay = 0
-                        self.delay +=1
-                        self.ALIP_count += 1
-                    else:
-                        self.ALIP_count = self.ALIP_count
+                if (
+                    self.stance == 1 and self.P_R_wf[2,0] <= 0.01 or
+                    self.stance == 0 and self.P_L_wf[2,0] <= 0.01
+                ):
+                    self.ALIP_count += 1
             else:
                 self.ALIP_count += 1
 
-
+            if state == 30:
+                self.ref_store.to_csv("./alip_test_data.csv")
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
