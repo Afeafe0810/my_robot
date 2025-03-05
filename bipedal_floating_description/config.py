@@ -36,7 +36,7 @@ class Config:
     
     #機器人的物理模型
     MASS = 9
-    IDEAL_Z_COM_IN_WF = 0.4
+    IDEAL_Z_COM_IN_WF = 0.45
     IDEAL_Z_PEL_IN_WF = 0.55
     IDEAL_Y_RFTOLF_IN_WF = 0.2
     GC = 9.81

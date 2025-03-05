@@ -30,6 +30,7 @@ from os.path import dirname, join, abspath
 import os
 import copy
 import math
+from math import sin, cos, cosh, sinh, pi
 from scipy.spatial.transform import Rotation as R
 
 import pandas as pd
@@ -37,6 +38,254 @@ import csv
 
 from linkattacher_msgs.srv import AttachLink
 from linkattacher_msgs.srv import DetachLink
+from config import Config
+from dataclasses import dataclass
+
+H = Config.IDEAL_Z_COM_IN_WF
+
+@dataclass
+class Ref:
+    pel : np.ndarray
+    lf  : np.ndarray
+    rf  : np.ndarray
+    var : dict[str, np.ndarray]
+    com : np.ndarray = None #沒有這麼重要
+    need_push : bool = False #預設都是False
+    
+class AlipTraj:
+    def __init__(self):
+        self.stance = ['lf', 'rf']
+        #AlIP是否推完的追蹤
+        self.alip_need_push : bool = True
+        
+        #幾個sample -> 因為float加法會出現二進制誤差，所以t改用T_n*T來計算
+        self.T_n :int = 0
+        
+        #剛啟動
+        self.isJustStarted = True
+        
+        #初值
+        self.var0 : dict[str, np.ndarray] = None
+        self.p0_ftTocom_in_wf : dict[str, np.ndarray] = None
+        self.p0_ft_in_wf : dict[str, np.ndarray] = None
+        self.ref_xy_swTOcom_in_wf_T : np.ndarray = None
+        
+        #紀錄ref
+        self.ref: Ref = None
+        
+    @property
+    def t(self):
+        return self.T_n * Config.TIMER_PERIOD
+    
+    def plan(self, stance_num:int, des_vx_com_in_wf_2T: float ) -> Ref:
+        self.stance = ['lf', 'rf'] if stance_num == 1 else\
+                      ['rf', 'lf'] if stance_num == 0 else\
+                      self.stance
+        
+        stance = self.stance
+        cf, sf = stance
+        
+        #==========踩第一步的時候, 拿取初值與預測==========#
+        if self.isJustStarted: #如果剛從state 2啟動
+            self.isJustStarted = False
+            p_pel_in_wf = np.vstack([0,  0.08, H])
+            self.p0_ft_in_wf = {
+                'lf' : np.vstack([0,  0.1 , 0]),
+                'rf' : np.vstack([0, -0.1 , 0])
+            }
+            
+            self.p0_ftTocom_in_wf = {
+                'lf' : p_pel_in_wf - self.p0_ft_in_wf['lf'],
+                'rf' : p_pel_in_wf - self.p0_ft_in_wf['rf']
+            }
+            
+            self.var0 = {
+                'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
+                'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
+            }
+            
+            self.var0['y'][1,0] = 0
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
+            print(f"{self.ref_xy_swTOcom_in_wf_T.T = }")
+            
+        elif self.T_n == 0: #如果換腳
+            self.p0_ft_in_wf = {
+                'lf' : self.ref.lf[:3],
+                'rf' : self.ref.rf[:3]
+            }
+            self.p0_ftTocom_in_wf = {
+                'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
+                'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
+            }
+            
+            self.var0 = {
+                'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
+                'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
+            }
+            
+            self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
+            
+            self.T_n += 1
+
+        #==========得到軌跡點==========#
+        ref_p_cfTOcom_in_wf, ref_var = self._plan_com(stance)
+        ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf = self._sf_trajFit(stance, self.p0_ft_in_wf[sf][2])
+        
+        #==========轉成wf==========#
+        ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_ft_in_wf[cf]
+        ref_xy_sf_in_wf = - ref_xy_sfTOcom_in_wf + ref_p_com_in_wf[:2]
+        
+        ref_ft = {
+            cf: self.p0_ft_in_wf[cf],
+            sf: np.vstack((ref_xy_sf_in_wf, ref_z_sf_in_wf))
+        }
+        
+        #==========更新時間與初值==========#
+        print(f"Walk.t = {self.t:.2f}")
+        if self.T_n == Config.STEP_SAMPLELENGTH:
+            self.T_n = 0
+            stance.reverse()
+        else:
+            self.T_n += 1
+        
+        self.ref = Ref(
+            com = np.vstack((ref_p_com_in_wf, np.zeros((3,1)))),
+            lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
+            rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
+            var = ref_var,
+            pel = np.vstack((ref_p_com_in_wf, np.zeros((3,1))))
+        )
+        
+        return self.ref
+        
+    # def doesNeedToPush(self, frame: RobotFrame, stance: list[str]) -> bool:
+    #     if self.alip_need_push:
+    #         Lx = frame.get_alipdata(stance)[0]['y'][1,0]
+            
+    #         if Lx >= Config.INITIAL_LX:
+    #             self.alip_need_push = False
+                
+    #     return self.alip_need_push
+    
+    #==========主要演算法==========# 
+    def _plan_com(self, stance: list[str]) -> tuple[np.ndarray, dict[str, np.ndarray]] :
+        """回傳ref_com與ref_var"""
+        cf, sf = stance
+        
+        #==========參數==========#
+        H = Config.IDEAL_Z_COM_IN_WF
+        
+        #==========狀態轉移矩陣==========#
+        A = self._get_alipMatA(self.t)
+        
+        #==========狀態方程==========#
+        ref_var = {
+            'x': A['x'] @ self.var0['x'],
+            'y': A['y'] @ self.var0['y'],
+        }
+        print(ref_var)
+        return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
+       
+    def _sf_placement(self, stance: list[str], des_vx_com_in_wf_2T: float) -> np.ndarray:
+        """回傳擺動腳到質心的落點向量"""
+        cf, sf = stance
+        
+        #==========機器人參數==========#
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        W = Config.IDEAL_Y_RFTOLF_IN_WF
+        h = Config.STEP_HEIGHT
+        w = Config.OMEGA
+        T = Config.STEP_TIMELENGTH
+        
+        #==========下兩步的理想角動量(那時的支撐腳是現在的擺動腳)==========#
+        des_L_com_2T = {
+            'y': m * des_vx_com_in_wf_2T * H,
+            'x': self._get_ref_timesUp_Lx(sf)
+        }
+        
+        #==========下步落地的角動量==========#
+        A = self._get_alipMatA(T)
+        ref_L_com_1T = {
+            'y': ( A['x'] @ self.var0['x'] ) [1,0],
+            'x': ( A['y'] @ self.var0['y'] ) [1,0]
+        }
+        
+        #==========下步落地向量==========#
+        ref_xy_swTOcom_in_wf_T = np.vstack(( 
+            ( des_L_com_2T['y'] - cosh(w*T)*ref_L_com_1T['y'] ) /  ( m*H*w*sinh(w*T) ),
+            ( des_L_com_2T['x'] - cosh(w*T)*ref_L_com_1T['x'] ) / -( m*H*w*sinh(w*T) )
+        ))
+        
+        return ref_xy_swTOcom_in_wf_T
+
+    def _sf_trajFit(self, stance: list[str], h0: float) -> tuple[np.ndarray, float]:
+        """
+        擬合擺動腳的軌跡
+            - xy方向用三角函數模擬簡諧
+            - z方向用拋物線模擬重力
+        """
+        cf, sf = stance
+        
+        h = Config.STEP_HEIGHT
+        H = Config.IDEAL_Z_COM_IN_WF
+        T = Config.STEP_TIMELENGTH
+        
+        ratioT = self.t/T
+        
+        #x,y方向用三角函數進行線性擬合，有點像簡諧(初/末速=0)
+        xy0_sfTocom_in_wf = self.p0_ftTocom_in_wf[sf][:2]
+        xy1_sfTocom_in_wf = self.ref_xy_swTOcom_in_wf_T
+        ref_xy_sfTOcom_in_wf = xy0_sfTocom_in_wf + (xy1_sfTocom_in_wf - xy0_sfTocom_in_wf)/(-2) * ( cos(pi*ratioT)-1 )
+        
+        #z方向用拋物線, 最高點在h
+        # ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
+        ref_z_sf_in_wf = self._parabolic_fit(self.t, h0, h)
+        # return np.vstack(( ref_xy_sfTOcom_in_wf, ref_z_sfTOcom_in_wf ))
+        return ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf
+    #==========工具function==========#
+    @staticmethod
+    def _get_alipMatA(t):
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        w = Config.OMEGA
+        return {
+            'x': np.array([
+                    [         cosh(w*t), sinh(w*t)/(m*H*w) ], 
+                    [ m*H*w * sinh(w*t), cosh(w*t)         ]   
+                ]),
+            'y': np.array([
+                    [          cosh(w*t), -sinh(w*t)/(m*H*w) ],
+                    [ -m*H*w * sinh(w*t),  cosh(w*t)         ]
+                ])
+        }
+    
+    @staticmethod
+    def _get_ref_timesUp_Lx(cf:str) -> float:
+        """給定支撐腳, 會回傳踏步(過T秒)瞬間的角動量"""
+        
+        m = Config.MASS
+        H = Config.IDEAL_Z_COM_IN_WF
+        W = Config.IDEAL_Y_RFTOLF_IN_WF
+        w = Config.OMEGA
+        T = Config.STEP_TIMELENGTH
+        
+        sign_Lx = 1 if cf =='lf' else\
+                 -1 #if cf == 'rf'
+        return sign_Lx * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) )
+
+    @staticmethod
+    def _parabolic_fit(t: float, h0: float, hmax: float) -> float:
+        h0, hmax = sorted([h0, hmax])
+        T = Config.STEP_TIMELENGTH
+        
+        a = - ( 2*T*hmax - T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**3)
+        b = ( 2*T*hmax - 2*T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**2)
+        c = h0
+        
+        return a * t**2 + b*t + c
+
 
 class UpperLevelController(Node):
 
@@ -1077,7 +1326,114 @@ class UpperLevelController(Node):
             self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])  
         
         return 
-   
+
+    def ref_cmd30(self,state,px_in_lf,px_in_rf,stance,ALIP_count,com_in_lf,com_in_rf):
+        #pelvis
+        P_Z_ref = 0.55
+        P_Roll_ref = 0.0
+        P_Pitch_ref = 0.0
+        P_Yaw_ref = 0.0
+
+        #left_foot
+        L_Y_ref = 0.1
+        L_Roll_ref = 0.0
+        L_Pitch_ref = 0.0
+        L_Yaw_ref = 0.0
+        
+        #right_foot
+        R_Y_ref = -0.1           
+        R_Roll_ref = 0.0
+        R_Pitch_ref = 0.0
+        R_Yaw_ref = 0.0
+
+        
+        if state == 30:
+            L_X_ref = self.ALX_ref_data[ALIP_count,0]
+            L_Y_ref = self.ALX_ref_data[ALIP_count,1]
+            L_Z_ref = self.ALX_ref_data[ALIP_count,2]
+
+            R_X_ref = self.ARX_ref_data[ALIP_count,0]
+            R_Y_ref = self.ARX_ref_data[ALIP_count,1]
+            R_Z_ref = self.ARX_ref_data[ALIP_count,2]
+
+            if stance == 1:
+                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+                P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+                P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
+                P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+            elif stance == 0:
+                # P_X_ref = self.ACX_ref_data[ALIP_count,0] + 0.5*(self.P_PV_wf[0,0] - self.P_COM_wf[0,0])
+                # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + 0.5*(self.P_PV_wf[1,0] - self.P_COM_wf[1,0])
+                P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+                P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
+                P_Z_ref = self.ACX_ref_data[ALIP_count,2]
+
+        self.PX_ref = np.array([[P_X_ref],[P_Y_ref],[P_Z_ref],[P_Roll_ref],[P_Pitch_ref],[P_Yaw_ref]])
+        self.LX_ref = np.array([[L_X_ref],[L_Y_ref],[L_Z_ref],[L_Roll_ref],[L_Pitch_ref],[L_Yaw_ref]])
+        self.RX_ref = np.array([[R_X_ref],[R_Y_ref],[R_Z_ref],[R_Roll_ref],[R_Pitch_ref],[R_Yaw_ref]])  
+        
+        return 
+
+    def measure(self):
+        com_in_wf = copy.deepcopy(self.P_COM_wf)
+        lx_in_wf = copy.deepcopy(self.P_L_wf)
+
+        #質心相對L frame的位置
+        PX_l = com_in_wf - lx_in_wf
+        PX_l[0,0] = PX_l[0,0] #xc
+        PX_l[1,0] = PX_l[1,0] #yc
+
+        #計算質心速度(v從世界座標下求出)
+        self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
+        self.CX_past_L = com_in_wf[0,0]
+        self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
+        self.CY_past_L = com_in_wf[1,0]
+
+        #velocity filter
+        self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
+        self.Vx_past_L = self.Vx_L
+        self.CX_dot_past_L =  self.CX_dot_L
+
+        self.Vy_L = 0.7408*self.Vy_past_L + 0.2592*self.CY_dot_past_L  #濾過後的速度(5Hz)
+        self.Vy_past_L = self.Vy_L
+        self.CY_dot_past_L =  self.CY_dot_L
+
+        #量測值
+        Xc_mea = PX_l[0,0]
+        Ly_mea = 9*self.Vx_L*0.4
+        Yc_mea = PX_l[1,0]
+        Lx_mea = -9*self.Vy_L*0.4 #(記得加負號)
+        self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
+        self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
+        
+        com_in_wf = copy.deepcopy(self.P_COM_wf)
+        rx_in_wf = copy.deepcopy(self.P_R_wf)
+        PX_r = com_in_wf - rx_in_wf
+       
+        #計算質心速度
+        self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
+        self.CX_past_R = com_in_wf[0,0]
+        self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
+        self.CY_past_R = com_in_wf[1,0]
+
+        #velocity filter
+        self.Vx_R = 0.7408*self.Vx_past_R + 0.2592*self.CX_dot_past_R  #濾過後的速度(5Hz)
+        self.Vx_past_R = self.Vx_R
+        self.CX_dot_past_R =  self.CX_dot_R
+
+        self.Vy_R = 0.7408*self.Vy_past_R + 0.2592*self.CY_dot_past_R  #濾過後的速度(5Hz)
+        self.Vy_past_R = self.Vy_R
+        self.CY_dot_past_R =  self.CY_dot_R
+
+        #量測值
+        Xc_mea = PX_r[0,0]
+        Ly_mea = 9*self.Vx_R*0.4
+        Yc_mea = PX_r[1,0]
+        Lx_mea = -9*self.Vy_R*0.4 #(記得加負號)
+        self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
+        self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
+    
     def calculate_err(self,state):
         PX_ref = copy.deepcopy(self.PX_ref)
         LX_ref = copy.deepcopy(self.LX_ref)
@@ -1758,36 +2114,7 @@ class UpperLevelController(Node):
         stance = copy.deepcopy(stance_type) 
         #獲得kine算出來的關節扭矩 用於後續更改腳踝扭矩
         torque = copy.deepcopy(torque_ALIP) 
-        com_in_wf = copy.deepcopy(self.P_COM_wf)
-        lx_in_wf = copy.deepcopy(self.P_L_wf)
-
-        #質心相對L frame的位置
-        PX_l = com_in_wf - lx_in_wf
-        PX_l[0,0] = PX_l[0,0] #xc
-        PX_l[1,0] = PX_l[1,0] #yc
-
-        #計算質心速度(v從世界座標下求出)
-        self.CX_dot_L = (com_in_wf[0,0] - self.CX_past_L)/self.timer_period
-        self.CX_past_L = com_in_wf[0,0]
-        self.CY_dot_L = (com_in_wf[1,0] - self.CY_past_L)/self.timer_period
-        self.CY_past_L = com_in_wf[1,0]
-
-        #velocity filter
-        self.Vx_L = 0.7408*self.Vx_past_L + 0.2592*self.CX_dot_past_L  #濾過後的速度(5Hz)
-        self.Vx_past_L = self.Vx_L
-        self.CX_dot_past_L =  self.CX_dot_L
-
-        self.Vy_L = 0.7408*self.Vy_past_L + 0.2592*self.CY_dot_past_L  #濾過後的速度(5Hz)
-        self.Vy_past_L = self.Vy_L
-        self.CY_dot_past_L =  self.CY_dot_L
-
-        #量測值
-        Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.4
-        Yc_mea = PX_l[1,0]
-        Lx_mea = -9*self.Vy_L*0.4 #(記得加負號)
-        self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
-        self.mea_y_L = np.array([[Yc_mea],[Lx_mea]])
+        
        
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
@@ -1909,32 +2236,7 @@ class UpperLevelController(Node):
         stance = copy.deepcopy(stance_type) 
         #獲取量測值(相對於右腳腳底)
         # PX_r = copy.deepcopy(com_in_rf)
-        com_in_wf = copy.deepcopy(self.P_COM_wf)
-        rx_in_wf = copy.deepcopy(self.P_R_wf)
-        PX_r = com_in_wf - rx_in_wf
-       
-        #計算質心速度
-        self.CX_dot_R = (com_in_wf[0,0] - self.CX_past_R)/self.timer_period
-        self.CX_past_R = com_in_wf[0,0]
-        self.CY_dot_R = (com_in_wf[1,0] - self.CY_past_R)/self.timer_period
-        self.CY_past_R = com_in_wf[1,0]
-
-        #velocity filter
-        self.Vx_R = 0.7408*self.Vx_past_R + 0.2592*self.CX_dot_past_R  #濾過後的速度(5Hz)
-        self.Vx_past_R = self.Vx_R
-        self.CX_dot_past_R =  self.CX_dot_R
-
-        self.Vy_R = 0.7408*self.Vy_past_R + 0.2592*self.CY_dot_past_R  #濾過後的速度(5Hz)
-        self.Vy_past_R = self.Vy_R
-        self.CY_dot_past_R =  self.CY_dot_R
-
-        #量測值
-        Xc_mea = PX_r[0,0]
-        Ly_mea = 9*self.Vx_R*0.4
-        Yc_mea = PX_r[1,0]
-        Lx_mea = -9*self.Vy_R*0.4 #(記得加負號)
-        self.mea_x_R = np.array([[Xc_mea],[Ly_mea]])
-        self.mea_y_R = np.array([[Yc_mea],[Lx_mea]])
+        
 
         #參考值
         Xc_ref = self.xc_ref[ALIP_count,0]
@@ -2140,9 +2442,10 @@ class UpperLevelController(Node):
             r_contact == 0
 
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
-
+        self.measure()
+        
         if state == 30:
-            self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
+            self.ref_cmd30(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
         else:
             self.ref_cmd(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
