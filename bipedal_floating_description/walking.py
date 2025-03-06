@@ -197,7 +197,7 @@ class AlipTraj:
         
         ref_ft = {
             cf: self.p0_ft_in_wf[cf],
-            sf: np.vstack((ref_xy_sf_in_wf, ref_z_sf_in_wf))
+            sf: np.vstack((self.p0_ft_in_wf[cf][0,0], ref_xy_sf_in_wf[1,0], ref_z_sf_in_wf))
         }
         
         #==========更新時間與初值==========#
@@ -207,7 +207,7 @@ class AlipTraj:
             stance.reverse()
         else:
             self.T_n += 1
-        com = np.vstack((ref_p_com_in_wf[:2],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
+        com = np.vstack((ref_ft[cf][0,0], ref_p_com_in_wf[1,0],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
         self.ref = Ref(
             com = com,
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
