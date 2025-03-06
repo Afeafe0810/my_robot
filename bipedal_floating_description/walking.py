@@ -85,12 +85,12 @@ class Mea:
         
         var = {
             'lf': {
-                'x': mea_x_L,
-                'y': mea_y_L
+                'x': copy.deepcopy(mea_x_L),
+                'y': copy.deepcopy(mea_y_L)
             },
             'rf': {
-                'x': mea_x_R,
-                'y': mea_y_R
+                'x': copy.deepcopy(mea_x_R),
+                'y': copy.deepcopy(mea_y_R)
             },
         }
         p_ftTocom_in_wf = {
@@ -98,8 +98,8 @@ class Mea:
             'rf': p_com_in_wf - p_rf_in_wf
         }
         p_ft_in_wf = {
-            'lf': p_lf_in_wf,
-            'rf': p_rf_in_wf
+            'lf': copy.deepcopy(p_lf_in_wf),
+            'rf': copy.deepcopy(p_rf_in_wf)
         }
         
         self.var = var[cf]
@@ -158,28 +158,34 @@ class AlipTraj:
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
             print(f"{self.ref_xy_swTOcom_in_wf_T.T = }")
             
-        elif self.T_n == 0: #如果換腳
-            self.p0_ft_in_wf = mea.p_ft_in_wf
-            self.p0_ft_in_wf[cf][2, 0] = 0.0
-            # self.p0_ft_in_wf = {
-            #     'lf' : self.ref.lf[:3],
-            #     'rf' : self.ref.rf[:3]
-            # }
-            self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
-            # self.p0_ftTocom_in_wf = {
-            #     'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
-            #     'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
-            # }
-            self.var0 = mea.var
-            # self.var0 = {
-            #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
-            #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
-            # }
-            
-            self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
-            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
-            
-            self.T_n += 1
+        else:
+            if self.T_n == 0: #如果換腳
+                self.p0_ft_in_wf = mea.p_ft_in_wf
+                self.p0_ft_in_wf[cf][2, 0] = 0.0
+                # self.p0_ft_in_wf = {
+                #     'lf' : self.ref.lf[:3],
+                #     'rf' : self.ref.rf[:3]
+                # }
+                self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
+                # self.p0_ftTocom_in_wf = {
+                #     'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
+                #     'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
+                # }
+                self.var0 = mea.var
+                # self.var0 = {
+                #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
+                #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
+                # }
+                
+                self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
+                self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
+                
+                self.T_n += 1
+                
+            else: # 只更新支撐腳就好
+                self.p0_ft_in_wf[cf] = mea.p_ft_in_wf[cf]
+                self.p0_ft_in_wf[cf][2, 0] = 0.0
+
 
         #==========得到軌跡點==========#
         ref_p_cfTOcom_in_wf, ref_var = self._plan_com(stance)
