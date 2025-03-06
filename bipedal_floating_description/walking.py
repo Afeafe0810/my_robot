@@ -77,7 +77,35 @@ def store_ref(ref_store: pd.DataFrame, ref_now : Ref):
     # 使用 pd.concat 進行疊加
     ref_store = pd.concat([ref_store, new_df], ignore_index=True)
     return ref_store
-    
+
+class Mea:
+    def __init__(self, stance_num, mea_x_L, mea_x_R, mea_y_L, mea_y_R, p_com_in_wf, p_lf_in_wf, p_rf_in_wf):
+        stance = ['lf', 'rf'] if stance_num == 1 else ['rf', 'lf']
+        cf, sf = stance
+        
+        var = {
+            'lf': {
+                'x': mea_x_L,
+                'y': mea_y_L
+            },
+            'rf': {
+                'x': mea_x_R,
+                'y': mea_y_R
+            },
+        }
+        p_ftTocom_in_wf = {
+            'lf': p_com_in_wf - p_lf_in_wf,
+            'rf': p_com_in_wf - p_rf_in_wf
+        }
+        p_ft_in_wf = {
+            'lf': p_lf_in_wf,
+            'rf': p_rf_in_wf
+        }
+        
+        self.var = var[cf]
+        self.p_ftTocom_in_wf = p_ftTocom_in_wf
+        self.p_ft_in_wf = p_ft_in_wf
+        
 class AlipTraj:
     def __init__(self):
         self.stance = ['lf', 'rf']
@@ -103,7 +131,7 @@ class AlipTraj:
     def t(self):
         return self.T_n * Config.TIMER_PERIOD
     
-    def plan(self, stance_num:int, des_vx_com_in_wf_2T: float ) -> Ref:
+    def plan(self, stance_num:int, des_vx_com_in_wf_2T: float, mea: Mea) -> Ref:
         stance = self.stance
         cf, sf = stance
         
@@ -131,19 +159,21 @@ class AlipTraj:
             print(f"{self.ref_xy_swTOcom_in_wf_T.T = }")
             
         elif self.T_n == 0: #如果換腳
-            self.p0_ft_in_wf = {
-                'lf' : self.ref.lf[:3],
-                'rf' : self.ref.rf[:3]
-            }
-            self.p0_ftTocom_in_wf = {
-                'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
-                'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
-            }
-            
-            self.var0 = {
-                'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
-                'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
-            }
+            self.p0_ft_in_wf = mea.p_ft_in_wf
+            # self.p0_ft_in_wf = {
+            #     'lf' : self.ref.lf[:3],
+            #     'rf' : self.ref.rf[:3]
+            # }
+            self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
+            # self.p0_ftTocom_in_wf = {
+            #     'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
+            #     'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
+            # }
+            self.var0 = mea.var
+            # self.var0 = {
+            #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
+            #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
+            # }
             
             self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
@@ -1388,7 +1418,7 @@ class UpperLevelController(Node):
             if self.ALIP_count == self.ALIP_count_past:
                 self.ref = self.ref
             else:
-                self.ref = self.alip.plan(stance, 0)
+                self.ref = self.alip.plan(stance, 0, self.mea)
                 print(self.ref)
             
             self.xc_ref = self.ref.var['x'][0,0]
@@ -2505,6 +2535,7 @@ class UpperLevelController(Node):
         self.measure()
         
         if state == 30:
+            self.mea = Mea(stance, self.mea_x_L, self.mea_x_R, self.mea_y_L, self.mea_y_R, self.P_COM_wf, self.P_L_wf, self.P_R_wf)
             self.ref_cmd30(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
             self.ref_store = store_ref(self.ref_store, self.ref)
