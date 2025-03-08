@@ -2581,11 +2581,15 @@ class UpperLevelController(Node):
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count,state)
             print(stance)
             if stance == 1:
-                torque_L[[5,11]] = torque_L[[5,11]].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT)
+                torque_L[[5,11]] = torque_L[[5,11]].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT)
+                torque_L[[4,10]] = torque_L[[4,10]].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT)
+                
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
             elif stance == 0:
-                torque_R[[5,11]] = torque_R[[5,11]].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT)
+                torque_R[[5,11]] = torque_R[[5,11]].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT)
+                torque_R[[4,10]] = torque_R[[4,10]].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT)
+                
                 self.effort_publisher.publish(Float64MultiArray(data=torque_R))
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
             
