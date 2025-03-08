@@ -1452,14 +1452,16 @@ class UpperLevelController(Node):
             # R_Z_ref = self.ARX_ref_data[ALIP_count,2]
 
             if stance == 1:
-                P_X_ref = self.ref.com[0,0] + (px_in_lf[0,0]-com_in_lf[0,0])
+                P_X_ref = self.ref.com[0,0]
+                # P_X_ref = self.ref.com[0,0] + (px_in_lf[0,0]-com_in_lf[0,0])
                 # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_lf[0,0]-com_in_lf[0,0])
                 P_Y_ref = self.ref.com[1,0] + (px_in_lf[1,0]-com_in_lf[1,0])
                 # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_lf[1,0]-com_in_lf[1,0])
                 P_Z_ref = self.ref.com[2,0]
                 # P_Z_ref = self.ACX_ref_data[ALIP_count,2]
             elif stance == 0:
-                P_X_ref = self.ref.com[0,0] + (px_in_rf[0,0]-com_in_rf[0,0])
+                P_X_ref = self.ref.com[0,0]
+                # P_X_ref = self.ref.com[0,0] + (px_in_rf[0,0]-com_in_rf[0,0])
                 # P_X_ref = self.ACX_ref_data[ALIP_count,0] + (px_in_rf[0,0]-com_in_rf[0,0])
                 P_Y_ref = self.ref.com[1,0] + (px_in_rf[1,0]-com_in_rf[1,0])
                 # P_Y_ref = self.ACX_ref_data[ALIP_count,1] + (px_in_rf[1,0]-com_in_rf[1,0])
