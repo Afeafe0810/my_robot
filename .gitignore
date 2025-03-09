@@ -4,3 +4,10 @@ __pycache__/
 # 忽略所有的 .pyc 文件
 *.pyc
 
+bipedal_floating_description/real_measure.csv
+bipedal_floating_description/real_planning.csv
+bipedal_floating_description/alip軌跡驗證/動態軌跡/real_measure.csv
+bipedal_floating_description/alip軌跡驗證/動態軌跡/real_planning.csv
+bipedal_floating_description/alip軌跡驗證/靜態軌跡/real_measure.csv
+bipedal_floating_description/alip軌跡驗證/靜態軌跡/real_planning.csv
+bipedal_floating_description/alip軌跡驗證/靜態軌跡/alip_test_data.csv
