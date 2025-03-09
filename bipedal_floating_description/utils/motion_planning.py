@@ -162,7 +162,7 @@ class AlipTraj:
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
             rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
             var = ref_var,
-            pel = np.vstack((
+            pel = np.vstack(( #TODO 學長用模型com_ft來推出差別的並且加上ftTOpel_wf
                     ( ref_p_com_in_wf - frame.p_com_in_wf + frame.p_pel_in_wf )[:2],
                     self.z0_pel_in_wf,
                     np.zeros((3,1))

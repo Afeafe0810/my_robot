@@ -8,7 +8,7 @@ from utils.motion_planning import Ref
 from utils.config import Config
 
 # TODO 碰撞偵測：正常的力 - 碰撞的力，再經過低通濾波器
-
+# TODO 這邊之後要重構, 整個看起來好混亂
 class TorqueControl:
     """TorqueControl 類別負責處理機器人扭矩對state的pattern matching邏輯。"""
     
@@ -52,7 +52,7 @@ def anklePD_ctrl(frame: RobotFrame, sf: str):
         'rf': frame.r_rf_to_wf
     }
     ayx_sf_in_wf = frame.rotMat_to_euler(r_ft_to_wf[sf]) [1:]
-    
+    #TODO 摩擦力看要不要加
     torque_ankle_sf = 0.1 * ( ref_jp - ayx_sf_in_wf ) # HACK 現在只用P control
     
     return torque_ankle_sf
@@ -99,7 +99,7 @@ class AlipControl:
     def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
         """回傳支撐腳腳踝扭矩"""
         cf, sf = stance
-        
+        #TODO 這邊改用估測控制
         # if stance != stance_past:
         #     self.update_initialValue(stance)
             
@@ -241,7 +241,7 @@ class KneeLoop:
     @staticmethod           
     def _endErr_to_endVel(frame: RobotFrame, ref: Ref) -> dict[str,np.ndarray] :
         """端末位置經過減法器 + P control + 方向矩陣，轉成端末速度"""
-        pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf = frame.pa_pel_in_pf, frame.pa_lf_in_pf , frame.pa_rf_in_pf
+        pa_pel_in_pf, pa_lf_in_pf , pa_rf_in_pf = frame.pa_pel_in_pf, frame.pa_lf_in_pf , frame.pa_rf_in_pf #HACK 學長用pf, 但照理來說應該要用wf
         #========求相對骨盆的向量========#
         ref_pa_pelTOlf_in_pf = ref.lf - ref.pel
         ref_pa_pelTOrf_in_pf = ref.rf - ref.pel
@@ -254,7 +254,7 @@ class KneeLoop:
         err_pa_pelTOrf_in_pf = ref_pa_pelTOrf_in_pf - pa_pelTOrf_in_pf
 
         #========經P gain作為微分========#
-        derr_pa_pelTOlf_in_pf = 20 * err_pa_pelTOlf_in_pf
+        derr_pa_pelTOlf_in_pf = 20 * err_pa_pelTOlf_in_pf #HACK 外環kp之後要改
         derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
         
         #========歐拉角速度轉幾何角速度========#
@@ -282,7 +282,7 @@ class KneeLoop:
             'lf': JL,
             'rf': JR
         }
-        
+        #TODO 學長30是用state1的跑
         match state:
             case 2 | 30: #HACK 之後改成case 1一樣的，現在還沒排除干擾
                 cmd_jv = {
@@ -357,7 +357,7 @@ class KneeLoop:
                 k[sf] = np.vstack(( 1, 1, 1, 1, 0, 0 ))
                 
                 k[cf] = np.vstack((1.2, 1.2, 1.2, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))
+                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))# TODO is_firmly改一下
                         
                 return k['lf'], k['rf']
                 

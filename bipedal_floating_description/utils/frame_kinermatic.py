@@ -143,7 +143,7 @@ class RobotFrame:
             g0 +(g1-g0)/(x1-x0)*(x-x0)
         
         pa_lfTOpel_in_pf, pa_rfTOpel_in_pf = self.get_posture()
-        
+        #TODO ALIP重力是用支撐腳區分的
         Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
                       weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
                       gravity_single
@@ -165,7 +165,7 @@ class RobotFrame:
     def __update_pfFrame(self, config: pink.Configuration, robot: RobotModel, jp: np.ndarray):
         '''可以得到各部位在pink frame下的資訊'''
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
-        self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1")
+        self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1") #TODO 我開始好奇這個地方是真的命名錯誤還是寫錯了
         self.p_LhipZ_in_pf,  self.r_LhipZ_to_pf  = self.__getOneInPf(config, "l_hip_pitch_1")
         self.p_LhipY_in_pf,  self.r_LhipY_to_pf  = self.__getOneInPf(config, "l_thigh_1")
         self.p_LkneeY_in_pf, self.r_LkneeY_to_pf = self.__getOneInPf(config, "l_shank_1")
@@ -294,7 +294,7 @@ class RobotFrame:
         return p_in_pf, r_to_pf 
     
     def __get_comInPf(self, robot: RobotModel, jp: np.ndarray):
-        
+        # TODO 學長有用其他模型建立, 不知道會不會有差, 但我目前是覺得就算有差也不可能差多少啦
         pin.centerOfMass(
             robot.bipedal_floating.model, robot.bipedal_floating.data, jp
         )
