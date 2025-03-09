@@ -142,10 +142,10 @@ class RobotFrame:
         weighted = lambda x, x0, x1, g0, g1 :\
             g0 +(g1-g0)/(x1-x0)*(x-x0)
         
-        px_in_lf,px_in_rf = self.get_posture()
+        pa_lfTOpel_in_pf, pa_rfTOpel_in_pf = self.get_posture()
         
-        Leg_gravity = weighted(px_in_lf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
-                      weighted(px_in_rf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(px_in_lf[1,0]) < abs(px_in_rf[1,0]) else\
+        Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
+                      weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
                       gravity_single
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
