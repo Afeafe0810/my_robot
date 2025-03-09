@@ -2512,7 +2512,7 @@ class UpperLevelController(Node):
 
         joint_velocity_cal = self.joint_velocity_cal(joint_position)
         # joint_velocity_cal = self.joint_velocity_cal(jp_f)
-        jv_f = self.joint_velocity_filter(joint_velocity_cal)
+        jv_f = self.joint_velocity_filter(joint_velocity_cal) #HACK 幹, 發現學長關節速度設成0......！！！！！！
         # self.position_publisher.publish(Float64MultiArray(data=joint_position))#檢查收到的位置(普)
         # self.velocity_publisher.publish(Float64MultiArray(data=jv_f))#檢查濾過後的速度
         configuration = pink.Configuration(self.robot.model, self.robot.data,joint_position)
