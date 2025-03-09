@@ -1502,7 +1502,7 @@ class UpperLevelController(Node):
 
         #量測值
         Xc_mea = PX_l[0,0]
-        Ly_mea = 9*self.Vx_L*0.4
+        Ly_mea = 9*self.Vx_L*0.4 #TODO 學長的質心高度到底是想要取多少
         Yc_mea = PX_l[1,0]
         Lx_mea = -9*self.Vy_L*0.4 #(記得加負號)
         self.mea_x_L = np.array([[Xc_mea],[Ly_mea]])
