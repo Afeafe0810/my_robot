@@ -768,7 +768,7 @@ class UpperLevelController(Node):
 
         # self.jv = 1.1580*self.jv_p - 0.4112*self.jv_pp + 0.1453*self.jv_sub_p + 0.1078*self.jv_sub_pp #10Hz
         # self.jv = 0.5186*self.jv_p - 0.1691*self.jv_pp + 0.4215*self.jv_sub_p + 0.229*self.jv_sub_pp #20Hz
-        # self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
+        self.jv = 0.0063*self.jv_p - 0.0001383*self.jv_pp + 1.014*self.jv_sub_p -0.008067*self.jv_sub_pp #100Hz
 
         self.jv_pp = copy.deepcopy(self.jv_p)
         self.jv_p = copy.deepcopy(self.jv)
