@@ -130,7 +130,7 @@ class AlipTraj:
     @property
     def t(self):
         return self.T_n * Config.TIMER_PERIOD
-    
+    # TODO 除了更新cf, var0也更新一下
     def plan(self, stance_num:int, des_vx_com_in_wf_2T: float, mea: Mea) -> Ref:
         stance = self.stance
         cf, sf = stance
@@ -178,6 +178,8 @@ class AlipTraj:
                 # }
                 
                 self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
+                self.var0['x'][1,0] = 0 #x方向角動量設成0
+                
                 self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
                 
                 self.T_n += 1
