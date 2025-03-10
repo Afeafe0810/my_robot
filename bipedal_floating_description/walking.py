@@ -1218,7 +1218,7 @@ class UpperLevelController(Node):
             # hight  = 0.03
             hLth = 0.0
             hhLth = 0.0
-            pyLth = -0.06
+            pyLth = -0.06 #HACK 明明佑華學長的軌跡初始位置在0.08
             hight  = 0.0
             if state == 1:
                 # P_X_ref = 0.0
