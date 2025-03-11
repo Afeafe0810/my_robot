@@ -85,12 +85,12 @@ class Mea:
         
         var = {
             'lf': {
-                'x': copy.deepcopy(mea_x_L),
-                'y': copy.deepcopy(mea_y_L)
+                'x': mea_x_L,
+                'y': mea_y_L
             },
             'rf': {
-                'x': copy.deepcopy(mea_x_R),
-                'y': copy.deepcopy(mea_y_R)
+                'x': mea_x_R,
+                'y': mea_y_R
             },
         }
         p_ftTocom_in_wf = {
@@ -98,13 +98,14 @@ class Mea:
             'rf': p_com_in_wf - p_rf_in_wf
         }
         p_ft_in_wf = {
-            'lf': copy.deepcopy(p_lf_in_wf),
-            'rf': copy.deepcopy(p_rf_in_wf)
+            'lf': p_lf_in_wf,
+            'rf': p_rf_in_wf
         }
         
-        self.var = var[cf]
-        self.p_ftTocom_in_wf = p_ftTocom_in_wf
-        self.p_ft_in_wf = p_ft_in_wf
+        self.p_com_in_wf, self.var, self.p_ftTocom_in_wf, self.p_ft_in_wf = list(map(
+            copy.deepcopy,
+            [p_com_in_wf, var[cf], p_ftTocom_in_wf, p_ft_in_wf]
+        ))
         
 class AlipTraj:
     def __init__(self):
@@ -126,7 +127,7 @@ class AlipTraj:
         
         #紀錄ref
         self.ref: Ref = None
-        
+            
     @property
     def t(self):
         return self.T_n * Config.TIMER_PERIOD
@@ -138,15 +139,15 @@ class AlipTraj:
         #==========踩第一步的時候, 拿取初值與預測==========#
         if self.isJustStarted: #如果剛從state 2啟動
             self.isJustStarted = False
-            p_pel_in_wf = np.vstack([0,  0.08, H])
+            self.p0_com_in_wf = np.vstack([0,  0.08, H])
             self.p0_ft_in_wf = {
                 'lf' : np.vstack([0,  0.1 , 0]),
                 'rf' : np.vstack([0, -0.1 , 0])
             }
             
             self.p0_ftTocom_in_wf = {
-                'lf' : p_pel_in_wf - self.p0_ft_in_wf['lf'],
-                'rf' : p_pel_in_wf - self.p0_ft_in_wf['rf']
+                'lf' : self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
+                'rf' : self.p0_com_in_wf - self.p0_ft_in_wf['rf']
             }
             
             self.var0 = {
@@ -162,23 +163,17 @@ class AlipTraj:
             if self.T_n == 0: #如果換腳
                 self.p0_ft_in_wf = mea.p_ft_in_wf
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
-                # self.p0_ft_in_wf = {
-                #     'lf' : self.ref.lf[:3],
-                #     'rf' : self.ref.rf[:3]
-                # }
-                self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
-                # self.p0_ftTocom_in_wf = {
-                #     'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
-                #     'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
-                # }
-                self.var0 = mea.var
-                # self.var0 = {
-                #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
-                #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
-                # }
-                
-                self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
-                self.var0['x'][1,0] = 0 #x方向角動量設成0
+                self.p0_com_in_wf = mea.p_com_in_wf
+                self.p0_com_in_wf[2, 0] = H
+                self.p0_ftTocom_in_wf = {
+                    'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
+                    'rf': self.p0_com_in_wf - self.p0_ft_in_wf['rf']
+                }
+
+                self.var0 = {
+                    'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),#現在的參考的角動量是前一個的支撐腳的結尾
+                    'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], self.ref.var['y'][1, 0]))#x方向角動量設成0
+                }
                 
                 self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
                 
@@ -187,6 +182,20 @@ class AlipTraj:
             else: # 只更新支撐腳就好
                 self.p0_ft_in_wf[cf] = mea.p_ft_in_wf[cf]
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
+                
+                self.p0_ftTocom_in_wf = {
+                    'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
+                    'rf': self.p0_com_in_wf - self.p0_ft_in_wf['rf']
+                }
+
+                self.var0 = {
+                    'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], self.var0['x'][1,0] )),
+                    'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], self.var0['y'][1,0] ))
+                }
+
+                
+                self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
+                
 
 
         #==========得到軌跡點==========#
