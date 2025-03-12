@@ -139,31 +139,26 @@ class AlipTraj:
         #==========踩第一步的時候, 拿取初值與預測==========#
         if self.isJustStarted: #如果剛從state 2啟動
             self.isJustStarted = False
+            self.p0_ft_in_wf = copy.deepcopy(mea.p_ft_in_wf)
+            self.p0_ft_in_wf[cf][2, 0] = 0.0
             self.p0_com_in_wf = np.vstack([0,  0.08, H])
-            self.p0_ft_in_wf = {
-                'lf' : np.vstack([0,  0.1 , 0]),
-                'rf' : np.vstack([0, -0.1 , 0])
-            }
-            
             self.p0_ftTocom_in_wf = {
-                'lf' : self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
-                'rf' : self.p0_com_in_wf - self.p0_ft_in_wf['rf']
+                'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
+                'rf': self.p0_com_in_wf - self.p0_ft_in_wf['rf']
             }
-            
+
             self.var0 = {
-                'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
-                'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
+                'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),#現在的參考的角動量是前一個的支撐腳的結尾
+                'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))#x方向角動量設成0
             }
             
-            self.var0['y'][1,0] = 0
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
-            print(f"{self.ref_xy_swTOcom_in_wf_T.T = }")
             
         else:
             if self.T_n == 0: #如果換腳
-                self.p0_ft_in_wf = mea.p_ft_in_wf
+                self.p0_ft_in_wf = copy.deepcopy(mea.p_ft_in_wf)
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
-                self.p0_com_in_wf = mea.p_com_in_wf
+                self.p0_com_in_wf = copy.deepcopy(mea.p_com_in_wf)
                 self.p0_com_in_wf[2, 0] = H
                 self.p0_ftTocom_in_wf = {
                     'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
@@ -180,18 +175,24 @@ class AlipTraj:
                 self.T_n += 1
                 
             else: # 只更新支撐腳就好
-                self.p0_ft_in_wf[cf] = mea.p_ft_in_wf[cf]
+                self.p0_ft_in_wf[cf] = copy.deepcopy(mea.p_ft_in_wf[cf])
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
                 
-                self.p0_ftTocom_in_wf = {
-                    'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
-                    'rf': self.p0_com_in_wf - self.p0_ft_in_wf['rf']
-                }
-
-                self.var0 = {
+                self.p0_ftTocom_in_wf[cf] = self.p0_com_in_wf - self.p0_ft_in_wf[cf]
+                print("before\n", self.var0)
+                print("after\n", {
                     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], self.var0['x'][1,0] )),
                     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], self.var0['y'][1,0] ))
-                }
+                })
+                # self.p0_ftTocom_in_wf = {
+                #     'lf': self.p0_com_in_wf - self.p0_ft_in_wf['lf'],
+                #     'rf': self.p0_com_in_wf - self.p0_ft_in_wf['rf']
+                # }
+
+                # self.var0 = {
+                #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], self.var0['x'][1,0] )),
+                #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], self.var0['y'][1,0] ))
+                # }
 
                 
                 self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
@@ -254,7 +255,7 @@ class AlipTraj:
             'x': A['x'] @ self.var0['x'],
             'y': A['y'] @ self.var0['y'],
         }
-        print(ref_var)
+        # print(ref_var)
         return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
        
     def _sf_placement(self, stance: list[str], des_vx_com_in_wf_2T: float) -> np.ndarray:
@@ -1437,7 +1438,7 @@ class UpperLevelController(Node):
                 self.ref = self.ref
             else:
                 self.ref = self.alip.plan(stance, 0, self.mea)
-                print(self.ref)
+                # print(self.ref)
             
             self.xc_ref = self.ref.var['x'][0,0]
             # self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values
