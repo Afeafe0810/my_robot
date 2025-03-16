@@ -4,7 +4,7 @@ import numpy as np; np.set_printoptions(precision=5)
 #================ import library ========================#
 from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
-from utils.motion_planning import Ref
+from motion_planning import Ref
 from utils.config import Config
 
 # TODO 碰撞偵測：正常的力 - 碰撞的力，再經過低通濾波器

@@ -3,12 +3,12 @@ from std_msgs.msg import Float64MultiArray
 
 import numpy as np; np.set_printoptions(precision=2)
 import pandas as pd
-
+from copy import deepcopy
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces, RobotModel
 from utils.frame_kinermatic import RobotFrame
-from utils.motion_planning import *
+from motion_planning import Trajatory
 from utils.torque_control import *
 #========================================================#
 

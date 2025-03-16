@@ -2,98 +2,10 @@ import numpy as np; np.set_printoptions(precision=2)
 from math import cosh, sinh, cos, sin, pi
 from copy import deepcopy
 #================ import library ========================#
-from utils.config import Config
+from motion_planning.utils import Ref
 from utils.frame_kinermatic import RobotFrame
-from dataclasses import dataclass
+from utils.config import Config
 #========================================================#
-
-@dataclass
-class Ref:
-    pel : np.ndarray #[z, ax, ay, az]由cf膝上
-    lf  : np.ndarray
-    rf  : np.ndarray
-    var : dict[str, np.ndarray]
-    com : np.ndarray = None #[x,y]由cf腳踝ALIP #不重要, 只是用來畫圖, 功能由var取代
-    @property
-    def x(self):
-        return self.var['x'][0,0]
-    
-    @property
-    def Ly(self):
-        return self.var['x'][1,0]
-    
-    @property
-    def y(self):
-        return self.var['y'][0,0]
-    
-    @property
-    def Lx(self):
-        return self.var['y'][1,0]
-    
-    @staticmethod
-    def _generate_var_insteadOf_com(ref_pel: np.ndarray, ref_cf: np.ndarray) -> dict[str, np.ndarray] :
-        """平衡(不管是單腳還是雙腳平衡)時, 用pel代替com, 角動量ref皆設0"""
-        return {
-            'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
-            'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
-        }
-        
-class Trajatory:
-    def __init__(self):
-        #state 2
-        self.lf_stand = LeftLegBalance()
-        #state 30
-        self.aliptraj = AlipTraj()
-    
-    def plan(self, state: float, frame: RobotFrame, stance: list[str], is_firmly: dict[str, bool]) -> Ref:
-        match state:          
-            case 0 | 1 : #雙支撐
-                return bipedalBalance_plan()
-
-            case 2: #左腳站立
-                return self.lf_stand.plan()
-                     
-            case 30:#步行
-                return self.aliptraj.plan(frame, 0, is_firmly)
-
-# state 0, 1
-def bipedalBalance_plan():
-    """回傳雙腳支撐時的參考值"""
-    return Ref(
-        pel := np.vstack(( 0,    0, 0.55, 0, 0, 0 )),
-        lf  := np.vstack(( 0,  0.1,    0, 0, 0, 0 )),
-        rf   = np.vstack(( 0, -0.1,    0, 0, 0, 0 )),
-        var  = Ref._generate_var_insteadOf_com(pel, lf)
-    )
-
-# state 2
-class LeftLegBalance:
-    """回傳左腳支撐時的參考值"""
-    def __init__(self):
-        self.t : float = 0.0
-        
-    def plan(self):
-        T = Config.DDT
-        Ts = Config.TIMER_PERIOD
-                        
-        #==========線性移動==========#
-        linearMove = lambda x0, x1, t0, t1:\
-            np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
-            
-        y_pel = linearMove(*[0, 0.06], *[0*T, 0.5*T])
-        # z_sf  = linearMove(*[0, Config.STEP_HEIGHT], *[1*T, 1.1*T])
-        z_sf  = 0.0
-        
-        if self.t < 2 * T:
-            print(f"LeftLegBalance.t = {self.t:.2f}")
-            self.t += Ts            
-
-        return Ref(
-            pel := np.vstack(( 0, y_pel, 0.55, 0, 0, 0 )),
-            lf  := np.vstack(( 0,   0.1,    0, 0, 0, 0 )),
-            rf   = np.vstack(( 0,  -0.1, z_sf, 0, 0, 0 )),
-            var  = Ref._generate_var_insteadOf_com(pel, lf)
-        )
 
 # state 30
 class AlipTraj:
@@ -376,4 +288,3 @@ class AlipTraj:
         
         return (h - 4*h*(t/T - 0.5)**2)
     
-
