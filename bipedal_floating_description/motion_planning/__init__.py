@@ -21,4 +21,4 @@ class Trajatory:
                 return self.lf_stand.plan()
                      
             case 30:#步行
-                return self.aliptraj.plan(frame, 0, is_firmly)
+                return self.aliptraj.plan(frame, 0, is_firmly, stance)

@@ -31,15 +31,20 @@ class AlipTraj:
         #紀錄ref
         self.ref: Ref = None
     
-    def plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float, is_firmly: dict[str, bool]) -> Ref:
+    #==========會不斷重算的property==========# 
+    @property
+    def t(self) -> float:
+        return self.T_n * Config.TIMER_PERIOD
+    
+    def plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float, is_firmly: dict[str, bool], stance: list[str]) -> Ref:
         print(f"{self.T_n = }")
         
-        cf, sf = self.stance
+        cf, sf = stance
         
         if self.T_n == Config.STEP_SAMPLELENGTH:
             if is_firmly[sf]: #時間到了, 若踩穩就繼續規劃下一點
                 self.T_n = 0
-                self.stance.reverse()
+                stance.reverse()
                 return self.ordinary_plan(frame, des_vx_com_in_wf_2T)
             
             else: #時間到, 若沒踩穩就輸出同一點
@@ -49,131 +54,100 @@ class AlipTraj:
             self.T_n += 1
             return self.ordinary_plan(frame, des_vx_com_in_wf_2T)
         
-    def ordinary_plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float) -> Ref:
+    def update_alipData(self, frame: RobotFrame, des_vx_com_in_wf_2T: float):
+        
         cf, sf = self.stance
         
         #踩第一步的時候, 拿取初值與預測
         if self.isJustStarted:
             self.isJustStarted = False
-            self.initialize_alipData()
+            
+            H = Config.IDEAL_Z_COM_IN_WF
+            
+            p_pel_in_wf = np.vstack([0,  0.08, H])
+            
+            self.p0_ft_in_wf = {
+                'lf' : np.vstack([0,  0.1 , 0]),
+                'rf' : np.vstack([0, -0.1 , 0])
+            }
+            
+            self.p0_ftTOcom_in_wf = {
+                'lf' : p_pel_in_wf - self.p0_ft_in_wf['lf'],
+                'rf' : p_pel_in_wf - self.p0_ft_in_wf['rf']
+            }
+            
+            self.var0 = {
+                'x': np.vstack((self.p0_ftTOcom_in_wf[cf][0,0], 0)),
+                'y': np.vstack((self.p0_ftTOcom_in_wf[cf][1,0], 0))
+            }
+            
+            self.var0['y'][1,0] = 0
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(self.stance, des_vx_com_in_wf_2T)
+            
             
         #換腳時重新量取三部位
         elif self.T_n == 0:
-            self.update_alipData(frame)
+            self.p0_ft_in_wf = deepcopy(frame.p_ft_in_wf)
+            self.p0_ft_in_wf[cf][2, 0] = 0.0
+            
+            self.p0_ftTOcom_in_wf = {
+                'lf' : frame.p_com_in_wf[:3] - self.p0_ft_in_wf['lf'],
+                'rf' : frame.p_com_in_wf[:3] - self.p0_ft_in_wf['rf']
+            }
+            
+            self.var0 = deepcopy({
+                'x': np.vstack(( self.p0_ftTOcom_in_wf[cf][0,0], 0 )), #x方向角動量設成0
+                'y': np.vstack(( self.p0_ftTOcom_in_wf[cf][1,0], self.ref.var['y'][1,0] )) #現在的參考的角動量是前一個的支撐腳的結尾
+            })
+            
+            self.ref_xy_swTOcom_in_wf_T = self._sf_placement(self.stance, des_vx_com_in_wf_2T)
+            
             self.T_n += 1
             
         #踏步過程中, 只重新更新cf部位
         else:
-            self.update_cfData_only(frame, self.stance)
+            self.p0_ft_in_wf[cf] = deepcopy(frame.p_ft_in_wf[cf])
+            self.p0_ft_in_wf[cf][2, 0] = 0.0
             
-        #==========規劃落地點==========#
-        self.ref_xy_swTOcom_in_wf_T = self._sf_placement(self.stance, des_vx_com_in_wf_2T)
+    def ordinary_plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float) -> Ref:
+        cf, sf = self.stance
+        
+        self.update_alipData(frame, des_vx_com_in_wf_2T)
+            
+        # #==========規劃落地點==========#
+        # self.ref_xy_swTOcom_in_wf_T = self._sf_placement(self.stance, des_vx_com_in_wf_2T)
 
         #==========得到軌跡點==========#
         ref_p_cfTOcom_in_wf, ref_var = self._plan_com(self.stance)
-        ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf = self._sf_trajFit(self.stance, self.p0_in_wf[sf][2])
+        ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf = self._sf_trajFit(self.stance, self.p0_ft_in_wf[sf][2])
         
         #==========轉成wf==========#
-        ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_in_wf[cf]
+        ref_p_com_in_wf = ref_p_cfTOcom_in_wf + self.p0_ft_in_wf[cf]
         ref_xy_sf_in_wf = - ref_xy_sfTOcom_in_wf + ref_p_com_in_wf[:2]
         
-        #==========強制將軌跡設成跟cf同x, 使得不前進==========#
-        ref_p_com_in_wf[0,0] = self.p0_ftTOcom_in_wf[cf][0,0]
-
         ref_ft = {
-            cf: self.p0_in_wf[cf],
-            sf: np.vstack((self.p0_in_wf[cf][0,0], ref_xy_sf_in_wf[1,0], ref_z_sf_in_wf))
+            cf: self.p0_ft_in_wf[cf],
+            sf: np.vstack((self.p0_ft_in_wf[cf][0,0], ref_xy_sf_in_wf[1,0], ref_z_sf_in_wf))
         }
-            
-        #==========輸出==========#
-        _com = np.vstack(( ref_p_com_in_wf, np.zeros((3,1)) ))
-        #其實骨盆的x,y不是這麼重要, 主要是控com的x,y
-        _pel = np.vstack((
-            _com[0,0],
-            _com[1,0] - frame.p_com_in_wf[1,0] + frame.p_pel_in_wf[1,0],
-            # _com[:2] - frame.p_com_in_wf[:2] + frame.p_pel_in_wf[:2],
-            Config.IDEAL_Z_PEL_IN_WF,
-            np.zeros((3,1))
-        ))
         
+        #==========更新時間與初值==========#
+        print(f"Walk.t = {self.t:.2f}")
+        if self.T_n == Config.STEP_SAMPLELENGTH:
+            self.T_n = 0
+            self.stance.reverse()
+        else:
+            self.T_n += 1
+        com = np.vstack((ref_ft[cf][0,0], ref_p_com_in_wf[1,0],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
         self.ref = Ref(
-            pel = _pel,
-            lf  = np.vstack((ref_ft['lf'] , np.zeros((3,1)))),
-            rf  = np.vstack((ref_ft['rf'] , np.zeros((3,1)))),
+            com = com,
+            lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
+            rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
             var = ref_var,
-            com = _com #只是用來plot而已
+            pel = com
         )
         
         return self.ref
-
-    #==========會不斷重算的property==========# 
-    @property
-    def t(self) -> float:
-        return self.T_n * Config.TIMER_PERIOD
     
-    @property
-    def p0_ftTOcom_in_wf(self):
-        return {
-            'lf' : self.p0_in_wf['com'] - self.p0_in_wf['lf'],
-            'rf' : self.p0_in_wf['com'] - self.p0_in_wf['rf']
-        }
-    
-    def set_var(self, Ly: float, Lx: float) -> dict[str, np.ndarray]:
-        """var中的角動量多用理論值, 所以不要用frame_kinermatic回傳的"""
-        cf, sf = self.stance
-        
-        return {
-            'x': np.vstack((self.p0_ftTOcom_in_wf[cf][0,0], Ly)),
-            'y': np.vstack((self.p0_ftTOcom_in_wf[cf][1,0], Lx))
-        }
-    
-    def initialize_alipData(self):
-        """
-        更新
-        self.p0_in_wf
-        self.var0
-        """
-        H = Config.IDEAL_Z_COM_IN_WF
-        y0_com = 0.08
-        
-        self.p0_in_wf = {
-            'com': np.vstack([0, y0_com, H]),
-            'lf' : np.vstack([0,  0.1 , 0]),
-            'rf' : np.vstack([0, -0.1 , 0])
-        }
-        
-        self.var0 = self.set_var(0, 0)
-
-    def update_alipData(self, frame: RobotFrame):
-        cf, sf = self.stance
-        
-        #拿取三部位真實的量測值
-        self.p0_in_wf = {
-            'com': deepcopy(frame.p_com_in_wf),
-            'lf' : deepcopy(frame.p_lf_in_wf) ,
-            'rf' : deepcopy(frame.p_rf_in_wf)
-        }
-        
-        #強制將支撐腳的高度設成0
-        self.p0_in_wf[cf][2, 0] = 0.0
-        
-        #將角動量連續化, 且不要往前走
-        self.var0 = self.set_var(
-            Ly = 0.0,
-            Lx = self.ref.Lx
-        )
-    
-    def update_cfData_only(self, frame: RobotFrame, stance: list[str]):
-        cf, sf = stance
-        
-        self.p0_in_wf[cf] = deepcopy(frame.p_ft_in_wf[cf])
-        self.p0_in_wf[cf][2, 0] = 0.0
-        
-        self.var0 = self.set_var(
-                Ly = self.var0['x'][1,0],
-                Lx = self.var0['y'][1,0]
-            )
-        
     #==========主要演算法==========# 
     def _plan_com(self, stance: list[str]) -> tuple[np.ndarray, dict[str, np.ndarray]] :
         """回傳ref_com與ref_var"""
@@ -241,13 +215,14 @@ class AlipTraj:
         ratioT = self.t/T
         
         #x,y方向用三角函數進行線性擬合，有點像簡諧(初/末速=0)
-        xy0 = self.p0_ftTOcom_in_wf[sf][:2]
-        xy1 = self.ref_xy_swTOcom_in_wf_T
-        ref_xy_sfTOcom_in_wf = xy0 + (xy1 - xy0)/(-2) * ( cos(pi*ratioT)-1 )
+        xy0_sfTocom_in_wf = self.p0_ftTOcom_in_wf[sf][:2]
+        xy1_sfTocom_in_wf = self.ref_xy_swTOcom_in_wf_T
+        ref_xy_sfTOcom_in_wf = xy0_sfTocom_in_wf + (xy1_sfTocom_in_wf - xy0_sfTocom_in_wf)/(-2) * ( cos(pi*ratioT)-1 )
         
         #z方向用拋物線, 最高點在h
-        ref_z_sf_in_wf = self._parabolic_fit(self.t)
-        
+        # ref_z_sfTOcom_in_wf = H - (h - 4*h*(ratioT-0.5)**2)
+        ref_z_sf_in_wf = self._parabolic_fit(self.t, h0, h)
+        # return np.vstack(( ref_xy_sfTOcom_in_wf, ref_z_sfTOcom_in_wf ))
         return ref_xy_sfTOcom_in_wf, ref_z_sf_in_wf
     #==========工具function==========#
     @staticmethod
@@ -281,10 +256,13 @@ class AlipTraj:
         return sign_Lx * ( 0.5*m*H*W ) * ( w*sinh(w*T) ) / ( 1+cosh(w*T) )
 
     @staticmethod
-    def _parabolic_fit(t: float) -> float:
-        """改回原本的, 用0->max->0的拋物線就好"""
-        h = Config.STEP_HEIGHT
-        T = Config.STEP_SAMPLELENGTH
+    def _parabolic_fit(t: float, h0: float, hmax: float) -> float:
+        h0, hmax = sorted([h0, hmax])
+        T = Config.STEP_TIMELENGTH
         
-        return (h - 4*h*(t/T - 0.5)**2)
+        a = - ( 2*T*hmax - T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**3)
+        b = ( 2*T*hmax - 2*T*h0 + 2*T*np.sqrt(hmax*(hmax - h0))) / (T**2)
+        c = h0
+        
+        return a * t**2 + b*t + c
     
