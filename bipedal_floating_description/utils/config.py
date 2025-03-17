@@ -52,3 +52,10 @@ class Config:
     
     #state2 切到 state30 的初始角速度Lx
     INITIAL_LX = 0.245867
+    ALIP_COLUMN_TITLE = [
+        'com_x', 'com_y', 'com_z',
+        'lf_x','lf_y','lf_z',
+        'rf_x', 'rf_y', 'rf_z',
+        'x','y',
+        'Ly','Lx'
+    ]

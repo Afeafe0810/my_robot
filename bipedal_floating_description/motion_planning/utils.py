@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
+import pandas as pd
 
 @dataclass
 class Ref:
@@ -32,3 +33,31 @@ class Ref:
             'x': np.vstack(( ref_pel[0]-ref_cf[0], 0 )),
             'y': np.vstack(( ref_pel[1]-ref_cf[1], 0 )),
         }
+    
+    def to_csv(self, records: pd.DataFrame):
+        
+        this_record = pd.DataFrame([{
+            'com_x': self.com[0, 0],
+            'com_y': self.com[1, 0],
+            'com_z': self.com[2, 0],
+
+            'lf_x': self.lf[0, 0],
+            'lf_y': self.lf[1, 0],
+            'lf_z': self.lf[2, 0],
+
+            'rf_x': self.rf[0, 0],
+            'rf_y': self.rf[1, 0],
+            'rf_z': self.rf[2, 0],
+
+            'x': self.var['x'][0, 0],
+            'y': self.var['y'][0, 0],
+            
+            'Ly': self.var['x'][1, 0],
+            'Lx': self.var['y'][1, 0],
+        }])
+        
+        updated_records = pd.concat([records, this_record], ignore_index=True)
+        
+        updated_records.to_csv("real_planning.csv")
+        
+        return updated_records

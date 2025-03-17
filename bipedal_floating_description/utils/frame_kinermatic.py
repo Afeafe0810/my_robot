@@ -1,5 +1,6 @@
 from std_msgs.msg import Float64MultiArray 
 import numpy as np; np.set_printoptions(precision=2)
+import pandas as pd
 from copy import deepcopy
 from math import cos, sin
 from scipy.spatial.transform import Rotation as R
@@ -174,6 +175,35 @@ class RobotFrame:
             R.from_matrix(r_to_frame).as_euler('zyx', degrees=False)[::-1]
         ))
         
+    def to_csv(self, records: pd.DataFrame, stance: list[str]):
+        
+        var = self.get_alipdata(stance)[0]
+        
+        this_record = pd.DataFrame([{
+            'com_x': self.p_com_in_wf[0,0],
+            'com_y': self.p_com_in_wf[1,0],
+            'com_z': self.p_com_in_wf[2,0],
+
+            'lf_x': self.p_lf_in_wf[0,0],
+            'lf_y': self.p_lf_in_wf[1,0],
+            'lf_z': self.p_lf_in_wf[2,0],
+
+            'rf_x': self.p_rf_in_wf[0,0],
+            'rf_y': self.p_rf_in_wf[1,0],
+            'rf_z': self.p_rf_in_wf[2,0],
+
+            'x': var['x'][0,0],
+            'y': var['y'][0,0],
+            
+            'Ly': var['x'][1, 0],
+            'Lx': var['y'][1, 0],
+        }])
+        
+        new_records = pd.concat([records, this_record], ignore_index=True)
+        
+        records.to_csv("real_measure.csv")
+        
+        return new_records
     #=======================封裝主要的部份================================#
     
     def __update_pfFrame(self, config: pink.Configuration, robot: RobotModel, jp: np.ndarray):

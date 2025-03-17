@@ -8,7 +8,7 @@ from copy import deepcopy
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces, RobotModel
 from utils.frame_kinermatic import RobotFrame
-from motion_planning import Trajatory
+from motion_planning import Trajatory, Ref
 from utils.torque_control import *
 #========================================================#
 
@@ -39,14 +39,8 @@ class UpperLevelController(Node):
         self.stance : list[str] = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
         self.stance_past : list[str] = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
         
-        self.ref_store = pd.DataFrame(columns=[
-            'pel_x', 'pel_y', 'pel_z',
-            'lf_x', 'lf_y', 'lf_z',
-            'rf_x', 'rf_y', 'rf_z',
-            'x', 'y',
-            'Ly', 'Lx'
-        ])
-        self.mea_store = deepcopy(self.ref_store)
+        self.ref_record     = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
+        self.measure_record = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
@@ -68,11 +62,8 @@ class UpperLevelController(Node):
         #========軌跡規劃========#
         ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
         if state == 30:
-            self.ref_store = Test.store_ref(self.ref_store, ref)
-            self.mea_store = Test.store_mea(self.mea_store, self.frame, self.stance)
-            self.ref_store.to_csv("real_planning.csv")
-            self.mea_store.to_csv("real_measure.csv")
-            
+            self.ref_record = ref.to_csv(self.ref_record)
+            self.measure_record = self.frame.to_csv(self.measure_record, self.stance)
             
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
@@ -103,62 +94,6 @@ class UpperLevelController(Node):
             'rf': frame.p_rf_in_wf[2, 0] <= 0.01,
         }
 
-class Test:
-    @staticmethod
-    def store_ref(ref_store: pd.DataFrame, ref : Ref):
-        new_data = {
-            'pel_x': ref.pel[0, 0],
-            'pel_y': ref.pel[1, 0],
-            'pel_z': ref.pel[2, 0],
-
-            'lf_x': ref.lf[0, 0],
-            'lf_y': ref.lf[1, 0],
-            'lf_z': ref.lf[2, 0],
-
-            'rf_x': ref.rf[0, 0],
-            'rf_y': ref.rf[1, 0],
-            'rf_z': ref.rf[2, 0],
-
-            'x': ref.var['x'][0, 0],
-            'y': ref.var['y'][0, 0],
-            
-            'Ly': ref.var['x'][1, 0],
-            'Lx': ref.var['y'][1, 0],
-        }
-        # 建立一筆資料的 DataFrame
-        new_df = pd.DataFrame([new_data])
-        # 使用 pd.concat 進行疊加
-        ref_store = pd.concat([ref_store, new_df], ignore_index=True)
-        return ref_store
-
-    @staticmethod
-    def store_mea(mea_store: pd.DataFrame, frame: RobotFrame, stance: list[str]):
-        var = frame.get_alipdata(stance)[0]
-        new_data = {
-            'pel_x': frame.p_pel_in_wf[0,0],
-            'pel_y': frame.p_pel_in_wf[1,0],
-            'pel_z': frame.p_pel_in_wf[2,0],
-
-            'lf_x': frame.p_lf_in_wf[0,0],
-            'lf_y': frame.p_lf_in_wf[1,0],
-            'lf_z': frame.p_lf_in_wf[2,0],
-
-            'rf_x': frame.p_rf_in_wf[0,0],
-            'rf_y': frame.p_rf_in_wf[1,0],
-            'rf_z': frame.p_rf_in_wf[2,0],
-
-            'x': var['x'][0,0],
-            'y': var['y'][0,0],
-            
-            'Ly': var['x'][1, 0],
-            'Lx': var['y'][1, 0],
-        }
-        # 建立一筆資料的 DataFrame
-        new_df = pd.DataFrame([new_data])
-        # 使用 pd.concat 進行疊加
-        mea_store = pd.concat([mea_store, new_df], ignore_index=True)
-        return mea_store
-        
 def main(args=None):
     rclpy.init(args=args)
 
