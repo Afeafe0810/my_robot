@@ -93,7 +93,7 @@ class AlipControl:
         #     self.update_initialValue(stance)
             
         #==========量測的狀態變數==========#
-        var_cf, *_ = frame.get_alipdata(stance)
+        var_cf = frame.get_alipVar(stance)
         
         #==========過去的變數==========#
         # u_p = {'lf': self.u_p_lf, 'rf': self.u_p_rf}

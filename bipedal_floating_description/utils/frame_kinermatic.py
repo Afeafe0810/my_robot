@@ -85,22 +85,12 @@ class RobotFrame:
             'lf': self.p_lf_in_wf,
             'rf': self.p_rf_in_wf
         }
-    #TODO 準備廢除了, motion_planning根本就不太需要, 而torque只需要var
-    def get_alipdata(self, stance: list[str]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
-        """
-        得到ALIP需要的資訊(先用wf代替in cf好了)
-        - RETURN
-            - var
-            - p_ftTocom_in_wf
-            - p_ft_in_wf
-        """
+    
+    def get_alipVar(self, stance: list[str]) -> dict[str, np.ndarray]:
+        """ retrurn alip_var = {'x': [x, Ly], 'y': [y, Lx]}"""
         #HACK 之後可能要改用cf
         cf, sf = stance
         
-        p_ft_in_wf = {
-            'lf': self.p_lf_in_wf,
-            'rf': self.p_rf_in_wf
-        }
         p_ftTocom_in_wf = {
             'lf': self.p_com_in_wf - self.p_lf_in_wf,
             'rf': self.p_com_in_wf - self.p_rf_in_wf
@@ -113,9 +103,7 @@ class RobotFrame:
             'x': np.vstack(( p_ftTocom_in_wf[cf][0], L_com_in_ft[cf]['y'])),
             'y': np.vstack(( p_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
         }
-        return list( map( deepcopy, 
-            [var, p_ftTocom_in_wf, p_ft_in_wf]
-        ))
+        return deepcopy(var)
     
     def calculate_gravity(self, robot: RobotModel, jp: np.ndarray, state: float, stance: list[str]) -> tuple[np.ndarray] :
 
@@ -177,7 +165,7 @@ class RobotFrame:
         
     def to_csv(self, records: pd.DataFrame, stance: list[str]):
         
-        var = self.get_alipdata(stance)[0]
+        var = self.get_alipVar(stance)
         
         this_record = pd.DataFrame([{
             'com_x': self.p_com_in_wf[0,0],
