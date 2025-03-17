@@ -80,12 +80,13 @@ class RobotFrame:
     
     def get_alipdata(self, stance: list[str]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
         """
-        得到ALIP需要的資訊(先用wf代替in cf好了) #HACK 之後可能要改用cf
+        得到ALIP需要的資訊(先用wf代替in cf好了)
         - RETURN
             - var
             - p_ftTocom_in_wf
             - p_ft_in_wf
         """
+        #HACK 之後可能要改用cf
         cf, sf = stance
         
         p_ft_in_wf = {

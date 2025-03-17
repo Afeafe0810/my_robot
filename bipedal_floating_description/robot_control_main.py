@@ -59,8 +59,9 @@ class UpperLevelController(Node):
         self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)        
         
         #========接觸判斷========#
-        #TODO 用高度來進行接觸判斷
-        is_firmly = self._is_step_firmly(force_ft)
+        #[ ] 用高度來進行接觸判斷
+        # is_firmly = self._is_step_firmly(force_ft)
+        is_firmly = self._is_no_hight(self.frame)
         
         #========支撐狀態切換=====#
         self._set_stance(state)
@@ -94,6 +95,13 @@ class UpperLevelController(Node):
         """
         threshold = 10
         return { key: val> threshold for key, val in force_ft.items()}
+    
+    @staticmethod
+    def _is_no_hight(frame: RobotFrame) -> dict[str, bool]:
+        return {
+            'lf': frame.p_lf_in_wf[2, 0] <= 0.01,
+            'rf': frame.p_rf_in_wf[2, 0] <= 0.01,
+        }
 
 class Test:
     @staticmethod
