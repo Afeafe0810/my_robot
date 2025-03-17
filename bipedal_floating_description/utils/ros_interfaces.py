@@ -59,7 +59,7 @@ class ROSInterfaces:
         
         #微分得到速度(飽和)，並濾波
         _jv = np.clip( Dsp.DIFFTER_JP.diff(self._jp), -0.75, 0.75)
-        jv = Dsp.FILTER_JV.filt(_jv) #TODO 原本舊的沒有濾波, 甚至設成0
+        jv = Dsp.FILTER_JV.filt(_jv)
         
         is_contact = {'lf' : self._is_contact_lf, 'rf' : self._is_contact_rf}
         force_ft = {'lf' : self._force_lf[2,0], 'rf' : self._force_rf[2,0]}

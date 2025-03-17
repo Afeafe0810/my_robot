@@ -45,7 +45,7 @@ class RobotFrame:
 
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
  
-    def left_leg_jacobian(self):
+    def get_jacobian(self):
         Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_LhipX_in_pf ), axis = 0 )
         Jp2_L = np.cross( self.axis_2L_in_pf, (self.p_lf_in_pf - self.p_LhipZ_in_pf ), axis = 0 )
         Jp3_L = np.cross( self.axis_3L_in_pf, (self.p_lf_in_pf - self.p_LhipY_in_pf ), axis = 0 )
@@ -78,6 +78,13 @@ class RobotFrame:
         
         return JL, JR
     
+    @property
+    def p_ft_in_wf(self):
+        return {
+            'lf': self.p_lf_in_wf,
+            'rf': self.p_rf_in_wf
+        }
+    #TODO 準備廢除了, motion_planning根本就不太需要, 而torque只需要var
     def get_alipdata(self, stance: list[str]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray]]:
         """
         得到ALIP需要的資訊(先用wf代替in cf好了)
@@ -109,7 +116,7 @@ class RobotFrame:
             [var, p_ftTocom_in_wf, p_ft_in_wf]
         ))
     
-    def calculate_gravity(self, robot: RobotModel, jp: np.ndarray) -> tuple[np.ndarray] :
+    def calculate_gravity(self, robot: RobotModel, jp: np.ndarray, state: float, stance: list[str]) -> tuple[np.ndarray] :
 
         jp_ = {
             'lf': jp[:6],
@@ -144,10 +151,16 @@ class RobotFrame:
             g0 +(g1-g0)/(x1-x0)*(x-x0)
         
         pa_lfTOpel_in_pf, pa_rfTOpel_in_pf = self.get_posture()
-        #TODO ALIP重力是用支撐腳區分的
-        Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
-                      weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
-                      gravity_single
+
+        match state:
+            case 0 | 1 | 2:
+                Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
+                              weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
+                              gravity_single
+            case 30:
+                cf, sf = stance
+                
+                Leg_gravity = 0.3 * gravity_single + 0.75* gravity_from_ft[cf]
 
         l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
         r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))

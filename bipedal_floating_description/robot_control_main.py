@@ -59,7 +59,6 @@ class UpperLevelController(Node):
         self.frame.updateFrame(self.robot, config, p_base_in_wf, r_base_to_wf, jp)        
         
         #========接觸判斷========#
-        #[ ] 用高度來進行接觸判斷
         # is_firmly = self._is_step_firmly(force_ft)
         is_firmly = self._is_no_hight(self.frame)
         
@@ -68,7 +67,7 @@ class UpperLevelController(Node):
         
         #========軌跡規劃========#
         ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
-        if state == 30 and not ref.need_push:
+        if state == 30:
             self.ref_store = Test.store_ref(self.ref_store, ref)
             self.mea_store = Test.store_mea(self.mea_store, self.frame, self.stance)
             self.ref_store.to_csv("real_planning.csv")
@@ -78,7 +77,6 @@ class UpperLevelController(Node):
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
         self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
-        #TODO ALIP計數要加
         self.stance_past = self.stance
 
     def _set_stance(self, state):
@@ -86,7 +84,9 @@ class UpperLevelController(Node):
         if state in [0, 1, 2]:
             #(這邊不能用return寫，否則state30會是None)
             self.stance = ['lf', 'rf']
-        #TODO 用ALIP計數
+        if state == 30:
+            self.stance = self.traj.aliptraj.stance
+            
     @staticmethod
     def _is_step_firmly(force_ft: dict[str, float]) -> dict[str, bool]:
         """

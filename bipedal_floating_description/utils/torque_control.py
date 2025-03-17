@@ -34,13 +34,6 @@ class TorqueControl:
                 #支撐腳腳踝
                 torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
                 
-                if state == 30:
-                    if ref.need_push:
-                        torque[cf][5,0] = self.alip.init_push()
-                    elif ref.need_close:
-                        torque[cf][5,0] = 0
-                        
-                    print(f"u_cf3: {-torque[cf][5]}")
                 return np.vstack(( torque['lf'], torque['rf'] ))
     
 def anklePD_ctrl(frame: RobotFrame, sf: str):
@@ -91,10 +84,6 @@ class AlipControl:
         #     'y': np.zeros((2,1))
         # }
         pass
-    
-    def init_push(self):
-        """在 state2 切到 state30 的瞬間，把扭矩開到最大，給一個初始角動量"""
-        return -Config.ANKLE_LIMIT #負號是關節順序相反
     
     def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
         """回傳支撐腳腳踝扭矩"""
@@ -172,9 +161,8 @@ class AlipControl:
             'x': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
         }
         
-        print(f"u_cf1: {u_cf['x']}")
-        u_cf['x'] = u_cf['x'].clip(-Config.ANKLE_LIMIT, Config.ANKLE_LIMIT) #飽和
-        print(f"u_cf2: {u_cf['x']}")
+        u_cf['x'] = u_cf['x'].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT) #飽和
+        u_cf['y'] = u_cf['y'].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT) #飽和
 
         #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
@@ -225,7 +213,7 @@ class KneeLoop:
         cmd_jv_ : np.ndarray = np.vstack(( cmd_jv['lf'], cmd_jv['rf'] ))
         
         #==========內環==========#
-        tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp)
+        tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp, state, stance)
         kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
         
         tauG = np.vstack(( tauG_lf, tauG_rf ))
@@ -277,20 +265,20 @@ class KneeLoop:
         jv_ = {'lf': jv[:6], 'rf': jv[6:]}
         jv_ankle = {'lf': jv_['lf'][-2:], 'rf': jv_['rf'][-2:]}
         
-        JL, JR = frame.left_leg_jacobian()
+        JL, JR = frame.get_jacobian()
         J = {
             'lf': JL,
             'rf': JR
         }
-        #TODO 學長30是用state1的跑
+
         match state:
-            case 2 | 30: #HACK 之後改成case 1一樣的，現在還沒排除干擾
+            case 2: #HACK 之後改成case 1一樣的，現在還沒排除干擾
                 cmd_jv = {
                     'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
                     'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
                 }
 
-            case 1:
+            case 1 | 30:
                 # 支撐腳膝上四關節: 控骨盆z, axyz  ；  擺動腳膝上四關節: 控落點xyz, az
                 ctrlVel = {
                     cf: endVel[cf][2:],
@@ -357,7 +345,7 @@ class KneeLoop:
                 k[sf] = np.vstack(( 1, 1, 1, 1, 0, 0 ))
                 
                 k[cf] = np.vstack((1.2, 1.2, 1.2, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))# TODO is_firmly改一下
+                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))
                         
                 return k['lf'], k['rf']
                 
@@ -368,7 +356,7 @@ def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray) -> np.ndar
     ref_jp = np.zeros((12,1))
     kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
     
-    tauG_lf, tauG_rf = frame.calculate_gravity(robot, jp)
+    tauG_lf, tauG_rf = frame.calculate_gravity(robot, jp, 0, ['lf', 'rf'])
     
     tauG = np.vstack(( tauG_lf, tauG_rf ))
     
