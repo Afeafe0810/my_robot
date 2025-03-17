@@ -235,8 +235,11 @@ class RobotFrame:
         
         p_pf_in_wf, r_pf_to_wf = p_base_in_wf, r_base_to_wf
         
-        place_in_pfToWf = lambda p_in_pf: r_pf_to_wf @ p_in_pf + p_pf_in_wf
-        rotat_to_pfToWf = lambda r_to_pf: r_pf_to_wf @ r_to_pf
+        def place_in_pfToWf(p_in_pf: np.ndarray) -> np.ndarray: 
+            return r_pf_to_wf @ p_in_pf + p_pf_in_wf
+        
+        def rotat_to_pfToWf(r_to_pf: np.ndarray) -> np.ndarray:
+            return r_pf_to_wf @ r_to_pf
         
         self.p_pel_in_wf    = place_in_pfToWf(self.p_pel_in_pf)
         self.p_com_in_wf    = place_in_pfToWf(self.p_com_in_pf)
