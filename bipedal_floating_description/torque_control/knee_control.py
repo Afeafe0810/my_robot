@@ -139,20 +139,21 @@ class KneeLoop:
 
         match state:
             case 1:
-                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
+                return kl, kr
         
             case 2:
-                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+                kl = np.vstack([1.5, 1.5, 1.5, 1.5, 0, 0])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
+                return kl, kr
                 
             case 30:
                 k = {'lf': None, 'rf': None}
-                k[sf] = np.vstack(( 1, 1, 1, 1, 0, 0 ))
+                k[sf] = np.vstack(( 1.3, 1.3, 1.3, 1.3, 0, 0 ))
                 
-                k[cf] = np.vstack((1.2, 1.2, 1.2, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2, 1.2, 1.2))
+                k[cf] = np.vstack((1.5, 1.5, 1.5, 1.5, 0, 0)) if is_firmly[cf] else\
+                        np.vstack((1.2, 1.2, 1.2, 1.2, 0, 0))
                         
                 return k['lf'], k['rf']
                 
-        return kl, kr
