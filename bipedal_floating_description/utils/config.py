@@ -57,5 +57,6 @@ class Config:
         'lf_x','lf_y','lf_z',
         'rf_x', 'rf_y', 'rf_z',
         'x','y',
-        'Ly','Lx'
+        'Ly','Lx',
+        'pel_x', 'pel_y', 'pel_z',
     ]

@@ -54,6 +54,10 @@ class Ref:
             
             'Ly': self.var['x'][1, 0],
             'Lx': self.var['y'][1, 0],
+            
+            'pel_x': self.pel[0, 0],
+            'pel_y': self.pel[1, 0],
+            'pel_z': self.pel[2, 0],
         }])
         
         updated_records = pd.concat([records, this_record], ignore_index=True)

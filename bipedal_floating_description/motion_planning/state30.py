@@ -37,7 +37,6 @@ class AlipTraj:
         return self.T_n * Config.TIMER_PERIOD
     
     def plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float, is_firmly: dict[str, bool], stance: list[str]) -> Ref:
-        print(f"{self.T_n = }")
         
         cf, sf = stance
         
@@ -112,7 +111,8 @@ class AlipTraj:
         cf, sf = self.stance
         
         self.update_alipData(frame, des_vx_com_in_wf_2T)
-            
+        print(f"{self.T_n = }")
+        
         # #==========規劃落地點==========#
         # self.ref_xy_swTOcom_in_wf_T = self._sf_placement(self.stance, des_vx_com_in_wf_2T)
 
@@ -130,7 +130,6 @@ class AlipTraj:
         }
         
         #==========更新時間與初值==========#
-        print(f"Walk.t = {self.t:.2f}")
         if self.T_n == Config.STEP_SAMPLELENGTH:
             self.T_n = 0
             self.stance.reverse()
@@ -163,7 +162,6 @@ class AlipTraj:
             'x': A['x'] @ self.var0['x'],
             'y': A['y'] @ self.var0['y'],
         }
-        print(ref_var)
         return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
        
     def _sf_placement(self, stance: list[str], des_vx_com_in_wf_2T: float) -> np.ndarray:

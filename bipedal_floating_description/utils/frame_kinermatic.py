@@ -185,6 +185,10 @@ class RobotFrame:
             
             'Ly': var['x'][1, 0],
             'Lx': var['y'][1, 0],
+            
+            'pel_x': self.p_pel_in_wf[0,0],
+            'pel_y': self.p_pel_in_wf[1,0],
+            'pel_z': self.p_pel_in_wf[2,0],
         }])
         
         new_records = pd.concat([records, this_record], ignore_index=True)
