@@ -15,8 +15,8 @@ class KneeLoop:
         
         #==========外環==========#
         endVel: dict[str, np.ndarray] = self._endErr_to_endVel(frame, ref)
-        cmd_jv: dict[str, np.ndarray] = self._endVel_to_jv(frame, endVel, jv, state, stance)
-        cmd_jv_ : np.ndarray = np.vstack(( cmd_jv['lf'], cmd_jv['rf'] ))
+        _cmd_jv: dict[str, np.ndarray] = self._endVel_to_jv(frame, endVel, jv, state, stance)
+        cmd_jv : np.ndarray = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
         
         #==========內環==========#
         tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp, state, stance)
@@ -25,7 +25,7 @@ class KneeLoop:
         tauG = np.vstack(( tauG_lf, tauG_rf ))
         kp = np.vstack(( kl,kr ))
 
-        torque = kp * (cmd_jv_ - jv) + tauG
+        torque = kp * (cmd_jv - jv) + tauG
 
         return {
             'lf': torque[:6],
@@ -78,13 +78,13 @@ class KneeLoop:
         }
 
         match state:
-            case 2: #HACK 之後改成case 1一樣的，現在還沒排除干擾
-                cmd_jv = {
-                    'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
-                    'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
-                }
+            # case 2: #HACK 之後改成case 1一樣的，現在還沒排除干擾
+            #     cmd_jv = {
+            #         'lf': np.linalg.pinv(J['lf']) @ endVel['lf'],
+            #         'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
+            #     }
 
-            case 1 | 30:
+            case 1 | 2| 30:
                 # 支撐腳膝上四關節: 控骨盆z, axyz  ；  擺動腳膝上四關節: 控落點xyz, az
                 ctrlVel = {
                     cf: endVel[cf][2:],
