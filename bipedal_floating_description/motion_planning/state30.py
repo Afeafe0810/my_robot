@@ -41,17 +41,16 @@ class AlipTraj:
         
         cf, sf = stance
         
-        if self.T_n == Config.STEP_SAMPLELENGTH:
-            if is_firmly[sf]: #時間到了, 若踩穩就繼續規劃下一點
-                self.T_n = 0
-                stance.reverse()
-                return self.ordinary_plan(frame, des_vx_com_in_wf_2T)
-            
-            else: #時間到, 若沒踩穩就輸出同一點
-                return self.ref
-                
-        else: #時間還沒到, 就繼續規劃下一點
-            self.T_n += 1
+        should_switch = stance != self.stance
+        
+        #演算法已換腳且踩穩, 就將main邏輯的stance變得跟演算法一致
+        if should_switch and is_firmly[sf]:
+            stance.reverse()
+        
+        #演算法已換腳但實際還沒踩穩, 就輸出同個軌跡
+        if should_switch and not is_firmly[sf]:
+            return self.ref
+        else:
             return self.ordinary_plan(frame, des_vx_com_in_wf_2T)
         
     def update_alipData(self, frame: RobotFrame, des_vx_com_in_wf_2T: float):
@@ -137,13 +136,13 @@ class AlipTraj:
             self.stance.reverse()
         else:
             self.T_n += 1
-        com = np.vstack((ref_ft[cf][0,0], ref_p_com_in_wf[1,0],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
+        _pel = np.vstack((ref_ft[cf][0,0], ref_p_com_in_wf[1,0],Config.IDEAL_Z_PEL_IN_WF, np.zeros((3,1))))
         self.ref = Ref(
-            com = com,
+            com = ref_p_com_in_wf,
             lf  = np.vstack((ref_ft['lf']   , np.zeros((3,1)))),
             rf  = np.vstack((ref_ft['rf']   , np.zeros((3,1)))),
             var = ref_var,
-            pel = com
+            pel = _pel
         )
         
         return self.ref
