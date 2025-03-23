@@ -46,8 +46,8 @@ class Config:
     #腳踝關節限制
     FOOT_WIDTH = 0.04
     FOOT_LENGTH = 0.142/2
-    ANKLE_X_LIMIT = MASS * GC * FOOT_WIDTH * 0.8 #3.53 Nm
-    ANKLE_Y_LIMIT = MASS * GC * FOOT_LENGTH * 0.8 #3.53 Nm
+    ANKLE_AX_LIMIT = MASS * GC * FOOT_WIDTH * 0.8 #3.53 Nm
+    ANKLE_AY_LIMIT = MASS * GC * FOOT_LENGTH * 0.8 #3.53 Nm
     
     
     #state2 切到 state30 的初始角速度Lx

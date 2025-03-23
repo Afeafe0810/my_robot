@@ -9,56 +9,28 @@ class AlipControl:
     """AlipControl 類別負責支撐腳腳踝用ALIP的狀態控制"""
     
     def __init__(self):
-        # #(k-1)的輸入
-        # self.u_p_lf : dict[str, float] = {
-        #     'x' : 0.,
-        #     'y' : 0.
-        # }
-        # self.u_p_rf : dict[str, float] = {
-        #     'x' : 0.,
-        #     'y' : 0.
-        # }
+        #==========(k-1)的輸入==========#
+        # ax方向的扭矩控制側方向y, ay方向的扭矩控制向前x
+        # (因為很容易和線方向搞混, 但又不想用row,pitch命名, 所以決定還是改用ax, ay來命名)
+        self.u_p_ft = {
+            'lf': {'ax': np.zeros((1,1)), 'ay': np.zeros((1,1))},
+            'rf': {'ax': np.zeros((1,1)), 'ay': np.zeros((1,1))}
+        }
         
-        # #(k-1)的估測值
-        # self.var_e_p_lf : dict[str, np.ndarray] = {
-        #     'x': np.zeros((2,1)),
-        #     'y': np.zeros((2,1))
-        # }
-        # self.var_e_p_rf : dict[str, np.ndarray] = {
-        #     'x': np.zeros((2,1)),
-        #     'y': np.zeros((2,1))
-        # }
+        #==========(k-1)的估測值==========#
+        self.var_e_p_ft = {
+            'lf': {'x': np.zeros((2,1)), 'y': np.zeros((2,1))},
+            'rf': {'x': np.zeros((2,1)), 'y': np.zeros((2,1))}
+        }
         
-        # #(k-1)的量測值
-        # self.var_p_lf : dict[str, np.ndarray] = {
-        #     'x': np.zeros((2,1)),
-        #     'y': np.zeros((2,1))
-        # }
-        # self.var_p_rf : dict[str, np.ndarray] = {
-        #     'x': np.zeros((2,1)),
-        #     'y': np.zeros((2,1))
-        # }
-        pass
-    
-    def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
-        """回傳支撐腳腳踝扭矩"""
-        cf, sf = stance
-        #TODO 這邊改用估測控制
-        # if stance != stance_past:
-        #     self.update_initialValue(stance)
-            
-        #==========量測的狀態變數==========#
-        var_cf = frame.get_alipVar(stance)
+        #==========(k-1)的量測值==========#
+        self.var_p_ft = {
+            'lf': {'x': np.zeros((2,1)), 'y': np.zeros((2,1))},
+            'rf': {'x': np.zeros((2,1)), 'y': np.zeros((2,1))}
+        }
         
-        #==========過去的變數==========#
-        # u_p = {'lf': self.u_p_lf, 'rf': self.u_p_rf}
-        # var_e_p = {'lf': self.var_e_p_lf, 'rf': self.var_e_p_rf}
-        # var_p = {'lf': self.var_p_lf, 'rf': self.var_p_rf}
-        
-        # u_p_cf, var_e_p_cf, var_p_cf = u_p[cf], var_e_p[cf], var_p[cf]
-        
-        #==========離散的狀態矩陣==========#
-        matA = {
+        #==========狀態矩陣==========#
+        self.matA = {
             'x': np.array([
                 [ 1,      0.00247],
                 [ 0.8832, 1      ]
@@ -70,89 +42,76 @@ class AlipControl:
             ])
         }
         
-        matB = {
+        self.matB = {
             'x': np.vstack(( 0, 0.01 )),
             'y': np.vstack(( 0, 0.01 )),
         }
-        
-        matK = {
-            'x': np.array([ [ 150, 15.0198] ]),
-            'y': np.array([ [-150, 15     ] ])
+        # self.matK = { #沒有估測時用的K
+        #     'x': np.array([ [ 150, 15.0198] ]),
+        #     'y': np.array([ [-150, 15     ] ])
+        # }
+        self.matK = {
+            'x': np.array([[290.3274,15.0198]])*0.5,
+            'y': np.array([[-177.0596,9.6014]])*0.15
         }
-
-        # matL = {
-        #     'x': np.array([
-        #         [ 0.1390, 0.0025],
-        #         [ 0.8832, 0.2803]
-        #     ]),
-            
-        #     'y': np.array([
-        #         [  0.1288, -0.0026 ],
-        #         [ -0.8832,  0.1480 ]
-        #     ])
-        # }
-        
-        # matK = {
-        #     'x': np.array([[290.3274,15.0198]])*0.5,
-        #     'y': np.array([[-177.0596,9.6014]])*0.15
-        # }
-        
-        matL = {
+        self.matL = {
             'x': np.array([[0.1390,0.0025],[0.8832,0.2803]]),
-            
             'y': np.array([[0.1288,-0.0026],[-0.8832,0.1480]])
         }
+    
+    def ctrl(self, frame:RobotFrame, stance: list[str], stance_past: list[str], ref_var: dict[str, np.ndarray]) -> np.ndarray:
+        """回傳支撐腳腳踝扭矩"""
+        cf, sf = stance
+            
+        #==========現在量測的狀態變數==========#
+        var = frame.get_alipVar(stance)
         
+        #==========換腳瞬間過去值的取法==========#
+        if stance != stance_past:
+            self.set_past_value_for_stance_switch(stance, var)
         
-        #==========估測器補償==========#
-        # var_e_cf = {
-        #     'x': matA['x'] @ var_e_p_cf['x'] + matB['x'] * u_p_cf['x'] + matL['x'] @ (var_p_cf['x'] - var_e_p_cf['x']),
-        #     'y': matA['y'] @ var_e_p_cf['y'] + matB['y'] * u_p_cf['y'] + matL['y'] @ (var_p_cf['y'] - var_e_p_cf['y']),
-        # }
-        
-        #==========全狀態回授==========#
-        u_cf : dict[str, np.ndarray] = {
-            'y': -matK['x'] @ ( var_cf['x'] - ref_var['x'] ), #腳踝pitch控制x方向
-            'x': -matK['y'] @ ( var_cf['y'] - ref_var['y'] ), #腳踝row控制y方向
+        #==========過去的輸入與狀態變數==========#
+        u_p, var_e_p, var_p = self.u_p_ft[cf], self.var_e_p_ft[cf], self.var_p_ft[cf]
+
+        #==========狀態方程式與全狀態回授==========#
+        var_e = {
+            'x': self.matA['x'] @ var_e_p['x'] + self.matB['x'] * u_p['ay'] + self.matL['x'] @ (var_p['x'] - var_e_p['x']),
+            'y': self.matA['y'] @ var_e_p['y'] + self.matB['y'] * u_p['ax'] + self.matL['y'] @ (var_p['y'] - var_e_p['y']),
         }
         
-        u_cf['x'] = u_cf['x'].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT) #飽和
-        u_cf['y'] = u_cf['y'].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT) #飽和
-
-        #要補角動量切換！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-
-        # if self.stance_past == 0 and self.stance == 1:
-        #     self.mea_y_L[1,0] = copy.deepcopy(self.mea_y_past_R[1,0])
-
+        u : dict[str, np.ndarray] = {
+            'ay': -self.matK['x'] @ ( var['x'] - ref_var['x'] ),
+            'ax': -self.matK['y'] @ ( var['y'] - ref_var['y'] ),
+        }
         
-
-        # if stance != stance_past:
-            # u_cf['x'] = u_cf['y'] = 0
-
-        # ALIP計算的u指關節對軀體的扭矩, pub的torque是從骨盆往下建, 扭矩方向相反
-        torque_ankle_cf = - np.vstack(( u_cf['y'], u_cf['x'] ))
+        #==========設定扭矩飽和==========#
+        u['ax'] = u['ax'].clip(-Config.ANKLE_AX_LIMIT, Config.ANKLE_AX_LIMIT)
+        u['ay'] = u['ay'].clip(-Config.ANKLE_AY_LIMIT, Config.ANKLE_AY_LIMIT)
         
-        #==========更新值==========#
-        # var_e_p[cf].update(var_e_cf)
-        # var_p[cf].update(var_cf)
+        # ALIP計算的u指的是關節對軀體的扭矩, pub的torque是從骨盆往下建, 扭矩方向相反
+        torque_ankle_cf = - np.vstack(( u['ay'], u['ax'] ))
+        
+        #==========更新過去值==========#
+        self.u_p_ft[cf] = u
+        self.var_e_p_ft[cf] = var_e
+        self.var_p_ft[cf] = var
 
         return torque_ankle_cf
-
-    # def update_initialValue(self, stance):
-    #     cf, sf = stance
-    #     #==========過去的變數==========#
-    #     u_p = {'lf': self.u_p_lf, 'rf': self.u_p_rf}
-    #     var_e_p = {'lf': self.var_e_p_lf, 'rf': self.var_e_p_rf}
-    #     var_p = {'lf': self.var_p_lf, 'rf': self.var_p_rf}
+    
+    def set_past_value_for_stance_switch(self, stance: list[str], var: dict[str, np.ndarray]):
+        """設定換腳瞬間過去值的取法"""
         
-    #     #切換瞬間扭矩舊值為0
-    #     u_p[cf].update({ key: 0.0 for key in u_p})
+        cf, sf = stance
+        #換腳瞬間的「位置」過去值用現在的量測值
+        self.var_e_p_ft[cf]['x'][0,0] = self.var_p_ft[cf]['x'][0,0] = var['x'][0,0]
+        self.var_e_p_ft[cf]['y'][0,0] = self.var_p_ft[cf]['y'][0,0] = var['y'][0,0]
         
-    #     #切換瞬間量測的角動量一樣
-    #     var_p[cf]['x'][1] = var_p[sf]['x'][1]
-    #     var_p[cf]['y'][1] = var_p[sf]['y'][1]
+        #換腳瞬間的「角動量」過去值用連續性(左右腳相等)
+        self.var_p_ft[cf]['x'][1,0] = self.var_p_ft[sf]['x'][1,0]
+        self.var_p_ft[cf]['y'][1,0] = self.var_p_ft[sf]['y'][1,0]
+        self.var_e_p_ft[cf]['x'][1,0] = self.var_e_p_ft[sf]['x'][1,0]
+        self.var_e_p_ft[cf]['y'][1,0] = self.var_e_p_ft[sf]['y'][1,0]
         
-    #     #切換瞬間估測值代入量測值
-    #     var_e_p[cf].update(var_p[cf])
-            
-
+        #換腳瞬間的「扭矩」過去值用連續性(左右腳相等) #HACK 有點猶豫該不該這樣設定還是設成0
+        self.u_p_ft[cf] = self.u_p_ft[sf]
+        
