@@ -51,60 +51,91 @@ class Ref:
     var : dict[str, np.ndarray]
     com : np.ndarray = None #沒有這麼重要
     need_push : bool = False #預設都是False
-
-def store_ref(ref_store: pd.DataFrame, ref_now : Ref):
-    new_data = {
-        'pel_x': ref_now.pel[0, 0],
-        'pel_y': ref_now.pel[1, 0],
-        'pel_z': ref_now.pel[2, 0],
-
-        'lf_x': ref_now.lf[0, 0],
-        'lf_y': ref_now.lf[1, 0],
-        'lf_z': ref_now.lf[2, 0],
-
-        'rf_x': ref_now.rf[0, 0],
-        'rf_y': ref_now.rf[1, 0],
-        'rf_z': ref_now.rf[2, 0],
-
-        'x': ref_now.var['x'][0, 0],
-        'y': ref_now.var['y'][0, 0],
+    
+    def to_csv(self, records: pd.DataFrame):
         
-        'Ly': ref_now.var['x'][1, 0],
-        'Lx': ref_now.var['y'][1, 0],
-    }
-    # 建立一筆資料的 DataFrame
-    new_df = pd.DataFrame([new_data])
-    # 使用 pd.concat 進行疊加
-    ref_store = pd.concat([ref_store, new_df], ignore_index=True)
-    return ref_store
+        this_record = pd.DataFrame([{
+            'com_x': self.com[0, 0],
+            'com_y': self.com[1, 0],
+            'com_z': self.com[2, 0],
+
+            'lf_x': self.lf[0, 0],
+            'lf_y': self.lf[1, 0],
+            'lf_z': self.lf[2, 0],
+
+            'rf_x': self.rf[0, 0],
+            'rf_y': self.rf[1, 0],
+            'rf_z': self.rf[2, 0],
+
+            'x': self.var['x'][0, 0],
+            'y': self.var['y'][0, 0],
+            
+            'Ly': self.var['x'][1, 0],
+            'Lx': self.var['y'][1, 0],
+            
+            'pel_x': self.pel[0, 0],
+            'pel_y': self.pel[1, 0],
+            'pel_z': self.pel[2, 0],
+        }])
+        
+        updated_records = pd.concat([records, this_record], ignore_index=True)
+        
+        updated_records.to_csv("real_planning.csv")
+        
+        return updated_records
 
 class Mea:
-    def __init__(self, stance_num, mea_x_L, mea_x_R, mea_y_L, mea_y_R, p_com_in_wf, p_lf_in_wf, p_rf_in_wf):
+    def __init__(self, stance_num, mea_x_L, mea_x_R, mea_y_L, mea_y_R, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, p_pel_in_wf):
         stance = ['lf', 'rf'] if stance_num == 1 else ['rf', 'lf']
         cf, sf = stance
         
-        var = {
-            'lf': {
-                'x': copy.deepcopy(mea_x_L),
-                'y': copy.deepcopy(mea_y_L)
-            },
-            'rf': {
-                'x': copy.deepcopy(mea_x_R),
-                'y': copy.deepcopy(mea_y_R)
-            },
-        }
-        p_ftTocom_in_wf = {
+        self.var = {'x': mea_x_L, 'y': mea_y_L} if cf == 'lf' else \
+                   {'x': mea_x_R, 'y': mea_y_R} if cf == 'rf' else None
+
+        self.p_ftTocom_in_wf = {
             'lf': p_com_in_wf - p_lf_in_wf,
             'rf': p_com_in_wf - p_rf_in_wf
         }
-        p_ft_in_wf = {
-            'lf': copy.deepcopy(p_lf_in_wf),
-            'rf': copy.deepcopy(p_rf_in_wf)
+        self.p_ft_in_wf = {
+            'lf': p_lf_in_wf,
+            'rf': p_rf_in_wf
         }
+        self.p_com_in_wf = p_com_in_wf
+        self.p_pel_in_wf = p_pel_in_wf
+        self.p_lf_in_wf = p_lf_in_wf
+        self.p_rf_in_wf = p_rf_in_wf
+
+    def to_csv(self, records: pd.DataFrame):
         
-        self.var = var[cf]
-        self.p_ftTocom_in_wf = p_ftTocom_in_wf
-        self.p_ft_in_wf = p_ft_in_wf
+        this_record = pd.DataFrame([{
+            'com_x': self.p_com_in_wf[0,0],
+            'com_y': self.p_com_in_wf[1,0],
+            'com_z': self.p_com_in_wf[2,0],
+
+            'lf_x': self.p_lf_in_wf[0,0],
+            'lf_y': self.p_lf_in_wf[1,0],
+            'lf_z': self.p_lf_in_wf[2,0],
+
+            'rf_x': self.p_rf_in_wf[0,0],
+            'rf_y': self.p_rf_in_wf[1,0],
+            'rf_z': self.p_rf_in_wf[2,0],
+
+            'x': self.var['x'][0,0],
+            'y': self.var['y'][0,0],
+            
+            'Ly': self.var['x'][1, 0],
+            'Lx': self.var['y'][1, 0],
+            
+            'pel_x': self.p_pel_in_wf[0,0],
+            'pel_y': self.p_pel_in_wf[1,0],
+            'pel_z': self.p_pel_in_wf[2,0],
+        }])
+        
+        new_records = pd.concat([records, this_record], ignore_index=True)
+        
+        records.to_csv("real_measure.csv")
+        
+        return new_records
         
 class AlipTraj:
     def __init__(self):
@@ -160,23 +191,12 @@ class AlipTraj:
             
         else:
             if self.T_n == 0: #如果換腳
-                self.p0_ft_in_wf = mea.p_ft_in_wf
+                self.p0_ft_in_wf = copy.deepcopy(mea.p_ft_in_wf)
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
-                # self.p0_ft_in_wf = {
-                #     'lf' : self.ref.lf[:3],
-                #     'rf' : self.ref.rf[:3]
-                # }
-                self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
-                # self.p0_ftTocom_in_wf = {
-                #     'lf' : self.ref.pel[:3] - self.p0_ft_in_wf['lf'],
-                #     'rf' : self.ref.pel[:3] - self.p0_ft_in_wf['rf']
-                # }
-                self.var0 = mea.var
-                # self.var0 = {
-                #     'x': np.vstack((self.p0_ftTocom_in_wf[cf][0,0], 0)),
-                #     'y': np.vstack((self.p0_ftTocom_in_wf[cf][1,0], 0))
-                # }
                 
+                self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
+                
+                self.var0 = copy.deepcopy(mea.var)
                 self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
                 self.var0['x'][1,0] = 0 #x方向角動量設成0
                 
@@ -185,7 +205,7 @@ class AlipTraj:
                 self.T_n += 1
                 
             else: # 只更新支撐腳就好
-                self.p0_ft_in_wf[cf] = mea.p_ft_in_wf[cf]
+                self.p0_ft_in_wf[cf] = copy.deepcopy(mea.p_ft_in_wf[cf])
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
 
 
@@ -581,14 +601,8 @@ class UpperLevelController(Node):
         self.ly_ref = pd.read_csv('/home/ldsc/matlab/ALIP/ly_ref.csv', header=None).values[0,0]
         self.lx_ref = pd.read_csv('/home/ldsc/matlab/ALIP/lx_ref.csv', header=None).values[0,0]
 
-        self.ref_store = pd.DataFrame(columns=[
-        't',
-        'pel_x', 'pel_y', 'pel_z',
-        'lf_x', 'lf_y', 'lf_z',
-        'rf_x', 'rf_y', 'rf_z',
-        'x', 'y',
-        'Ly', 'Lx'
-        ])
+        self.ref_record     = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
+        self.measure_record = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
         
     
     def attach_links(self, model1_name, link1_name, model2_name, link2_name):
@@ -2546,10 +2560,13 @@ class UpperLevelController(Node):
         self.measure()
         
         if state == 30:
-            self.mea = Mea(stance, self.mea_x_L, self.mea_x_R, self.mea_y_L, self.mea_y_R, self.P_COM_wf, self.P_L_wf, self.P_R_wf)
+            self.mea = Mea(stance, self.mea_x_L, self.mea_x_R, self.mea_y_L, self.mea_y_R, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.P_PV_wf)
             self.ref_cmd30(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
-            self.ref_store = store_ref(self.ref_store, self.ref)
+            
+            self.ref_record = self.ref.to_csv(self.ref_record)
+            self.measure_record = self.mea.to_csv(self.measure_record)
+            
             self.ALIP_count_past = self.ALIP_count
             print(f"{self.ALIP_count = }")
             
@@ -2583,14 +2600,14 @@ class UpperLevelController(Node):
             torque_R =  self.alip_R(stance,px_in_lf,torque_ALIP,com_in_rf,self.ALIP_count,state)
             print(stance)
             if stance == 1:
-                torque_L[[5,11]] = torque_L[[5,11]].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT)
-                torque_L[[4,10]] = torque_L[[4,10]].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT)
+                torque_L[[5,11]] = torque_L[[5,11]].clip(-Config.ANKLE_AX_LIMIT, Config.ANKLE_AX_LIMIT)
+                torque_L[[4,10]] = torque_L[[4,10]].clip(-Config.ANKLE_AY_LIMIT, Config.ANKLE_AY_LIMIT)
                 
                 self.effort_publisher.publish(Float64MultiArray(data=torque_L))
 
             elif stance == 0:
-                torque_R[[5,11]] = torque_R[[5,11]].clip(-Config.ANKLE_X_LIMIT, Config.ANKLE_X_LIMIT)
-                torque_R[[4,10]] = torque_R[[4,10]].clip(-Config.ANKLE_Y_LIMIT, Config.ANKLE_Y_LIMIT)
+                torque_R[[5,11]] = torque_R[[5,11]].clip(-Config.ANKLE_AX_LIMIT, Config.ANKLE_AX_LIMIT)
+                torque_R[[4,10]] = torque_R[[4,10]].clip(-Config.ANKLE_AY_LIMIT, Config.ANKLE_AY_LIMIT)
                 
                 self.effort_publisher.publish(Float64MultiArray(data=torque_R))
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
@@ -2606,8 +2623,6 @@ class UpperLevelController(Node):
             else:
                 self.ALIP_count += 1
 
-            if state == 30:
-                self.ref_store.to_csv("./alip_test_data.csv")
         # elif self.state == 3:
         #     if stance == 0 or stance == 1 :
         #         com_in_lf,com_in_rf = self.com_position(joint_position,stance)
@@ -2624,9 +2639,7 @@ class UpperLevelController(Node):
         # elif state == 5:
         #     torque_test = self.alip_test(joint_position,jv_f,VL,VR,l_leg_gravity,r_leg_gravity,kl,kr,px_in_lf)
         #     self.effort_publisher.publish(Float64MultiArray(data=torque_test))
-
-
-                
+             
 def main(args=None):
     rclpy.init(args=args)
 

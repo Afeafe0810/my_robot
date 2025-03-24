@@ -46,9 +46,17 @@ class Config:
     #腳踝關節限制
     FOOT_WIDTH = 0.04
     FOOT_LENGTH = 0.142/2
-    ANKLE_X_LIMIT = MASS * GC * FOOT_WIDTH * 0.8 #3.53 Nm
-    ANKLE_Y_LIMIT = MASS * GC * FOOT_LENGTH * 0.8 #3.53 Nm
+    ANKLE_AX_LIMIT = MASS * GC * FOOT_WIDTH * 0.8 #3.53 Nm
+    ANKLE_AY_LIMIT = MASS * GC * FOOT_LENGTH * 0.8 #3.53 Nm
     
     
     #state2 切到 state30 的初始角速度Lx
     INITIAL_LX = 0.245867
+    ALIP_COLUMN_TITLE = [
+        'com_x', 'com_y', 'com_z',
+        'lf_x','lf_y','lf_z',
+        'rf_x', 'rf_y', 'rf_z',
+        'x','y',
+        'Ly','Lx',
+        'pel_x', 'pel_y', 'pel_z',
+    ]
