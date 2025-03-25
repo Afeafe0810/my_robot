@@ -322,7 +322,7 @@
   <parent link="l_hip_pitch_1"/>
   <child link="l_thigh_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
-  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+  <limit upper="1.940796" lower="-1.200796" effort="100" velocity="100"/>
 </joint>
 
 <joint name="L_Knee_Pitch" type="revolute">
@@ -330,7 +330,7 @@
   <parent link="l_thigh_1"/>
   <child link="l_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
-  <limit upper="1.919862" lower="0.0" effort="100" velocity="100"/>
+  <limit upper="1.179862" lower="-0.74" effort="100" velocity="100"/>
 </joint>
 
 <joint name="L_Ankle_Pitch" type="revolute">
@@ -338,7 +338,7 @@
   <parent link="l_shank_1"/>
   <child link="l_ankle_1"/>
   <axis xyz="0.0 1.0 0.0"/>
-  <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
+  <limit upper="0.806332" lower="-0.066332" effort="100" velocity="100"/>
 </joint>
 
 <joint name="L_Ankle_Roll" type="revolute">
@@ -370,7 +370,7 @@
   <parent link="r_hip_pitch_1"/>
   <child link="r_thigh_1"/>
   <axis xyz="0.0 1.0 0.0"/>
-  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+  <limit upper="1.940796" lower="-1.200796" effort="100" velocity="100"/>
 </joint>
 
 <joint name="R_Knee_Pitch" type="revolute">
@@ -378,7 +378,7 @@
   <parent link="r_thigh_1"/>
   <child link="r_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
-  <limit upper="1.919862" lower="0.0" effort="100" velocity="100"/>
+  <limit upper="1.179862" lower="-0.74" effort="100" velocity="100"/>
 </joint>
 
 <joint name="R_Ankle_Pitch" type="revolute">
@@ -394,7 +394,7 @@
   <parent link="r_ankle_1"/>
   <child link="r_foot_1"/>
   <axis xyz="1.0 0.0 -0.0"/>
-  <limit upper="0.436332" lower="-0.436332" effort="100" velocity="100"/>
+  <limit upper="0.806332" lower="-0.066332" effort="100" velocity="100"/>
 </joint>
 
 </robot>

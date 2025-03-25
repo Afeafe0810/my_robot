@@ -324,7 +324,7 @@
   <child link="l_thigh_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
   <dynamics damping="1" friction="0.2"/>
-  <limit upper="1.570796" lower="-1.570796" effort="15" velocity="45"/>
+  <limit upper="1.940796" lower="-1.200796" effort="15" velocity="45"/>
 </joint>
 
 <joint name="L_Knee_Pitch" type="revolute">
@@ -333,7 +333,7 @@
   <child link="l_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
   <dynamics damping="0.25" friction="0.2"/>
-  <limit upper="1.919862" lower="0.0" effort="15" velocity="45"/>
+  <limit upper="1.179862" lower="-0.74" effort="15" velocity="45"/>
 </joint>
 
 <joint name="L_Ankle_Pitch" type="revolute">
@@ -342,7 +342,7 @@
   <child link="l_ankle_1"/>
   <axis xyz="0.0 1.0 0.0"/>
   <dynamics damping="0.05" friction="0.2"/>
-  <limit upper="0.436332" lower="-0.436332" effort="15" velocity="45"/>
+  <limit upper="0.806332" lower="-0.066332" effort="15" velocity="45"/>
 </joint>
 
 <joint name="L_Ankle_Roll" type="revolute">
@@ -378,7 +378,7 @@
   <child link="r_thigh_1"/>
   <axis xyz="0.0 1.0 0.0"/>
   <dynamics damping="1" friction="0.2"/>
-  <limit upper="1.570796" lower="-1.570796" effort="15" velocity="45"/>
+  <limit upper="1.940796" lower="-1.200796" effort="15" velocity="45"/>
 </joint>
 
 <joint name="R_Knee_Pitch" type="revolute">
@@ -387,7 +387,7 @@
   <child link="r_shank_1"/>
   <axis xyz="0.0 1.0 0.0"/>
   <dynamics damping="0.25" friction="0.2"/>
-  <limit upper="1.919862" lower="0.0" effort="15" velocity="45"/>
+  <limit upper="1.179862" lower="-0.74" effort="15" velocity="45"/>
 </joint>
 
 <joint name="R_Ankle_Pitch" type="revolute">
@@ -396,7 +396,7 @@
   <child link="r_ankle_1"/>
   <axis xyz="0.0 1.0 -0.0"/>
   <dynamics damping="0.05" friction="0.2"/>
-  <limit upper="0.436332" lower="-0.436332" effort="15" velocity="45"/>
+  <limit upper="0.806332" lower="-0.066332" effort="15" velocity="45"/>
 </joint>
 
 <joint name="R_Ankle_Roll" type="revolute">
