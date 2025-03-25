@@ -1,6 +1,6 @@
 close all; clear; clc
 % 讀取 CSV 文件
-data = readmatrix('alip_test_data.csv');
+data = readmatrix("static_alip_test_data.csv");
 data= data(2:end,2:end)
 % 提取時間和數據
 t = data(:, 1);       % 時間

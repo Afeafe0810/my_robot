@@ -292,4 +292,4 @@ if __name__ == "__main__":
         t += Config.TIMER_PERIOD
     
     print(ref_store)
-    ref_store.to_csv("alip_test_data.csv")
+    ref_store.to_csv("static_alip_test_data.csv")

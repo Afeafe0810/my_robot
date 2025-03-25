@@ -304,10 +304,10 @@ for i=1:length(lx_collect)
     end
 end
 
-writematrix([lx_collect;ly_collect]',"l_traj.csv")
-writematrix([xc_collect;yc_collect;ones(1,length(xc_collect))*H]',"xc_traj.csv")
-writematrix([rf_x_collect; rf_y_collect; rf_z_collect]', "rf_traj.csv")
-writematrix([lf_x_collect; lf_y_collect; lf_z_collect]', "lf_traj.csv")
+% writematrix([lx_collect;ly_collect]',"l_traj.csv")
+% writematrix([xc_collect;yc_collect;ones(1,length(xc_collect))*H]',"xc_traj.csv")
+% writematrix([rf_x_collect; rf_y_collect; rf_z_collect]', "rf_traj.csv")
+% writematrix([lf_x_collect; lf_y_collect; lf_z_collect]', "lf_traj.csv")
 %%
 function[a,b]= rot(x,y,theta)
 %%rotation
