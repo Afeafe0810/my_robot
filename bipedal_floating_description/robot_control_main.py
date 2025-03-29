@@ -8,8 +8,8 @@ from copy import deepcopy
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces, RobotModel
 from utils.frame_kinermatic import RobotFrame
-from motion_planning import Trajatory, Ref
-from utils.torque_control import *
+from motion_planning import Trajatory
+from torque_control import TorqueControl
 #========================================================#
 
 class UpperLevelController(Node):
