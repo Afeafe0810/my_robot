@@ -233,26 +233,30 @@ class RobotFrame:
         def rotat_to_pfToWf(r_to_pf: np.ndarray) -> np.ndarray:
             return r_pf_to_wf @ r_to_pf
         
-        self.p_pel_in_wf    = place_in_pfToWf(self.p_pel_in_pf)
-        self.p_com_in_wf    = place_in_pfToWf(self.p_com_in_pf)
-        self.p_LhipX_in_wf  = place_in_pfToWf(self.p_LhipX_in_pf) 
-        self.p_LhipZ_in_wf  = place_in_pfToWf(self.p_LhipZ_in_pf) 
-        self.p_LhipY_in_wf  = place_in_pfToWf(self.p_LhipY_in_pf) 
+        self.p_pel_in_wf = place_in_pfToWf(self.p_pel_in_pf)
+        self.p_com_in_wf = place_in_pfToWf(self.p_com_in_pf)
+        self.p_LhipX_in_wf = place_in_pfToWf(self.p_LhipX_in_pf) 
+        self.p_LhipZ_in_wf = place_in_pfToWf(self.p_LhipZ_in_pf) 
+        self.p_LhipY_in_wf = place_in_pfToWf(self.p_LhipY_in_pf) 
         self.p_LkneeY_in_wf = place_in_pfToWf(self.p_LkneeY_in_pf)
-        self.p_LankY_in_wf  = place_in_pfToWf(self.p_LankY_in_pf) 
-        self.p_LankX_in_wf  = place_in_pfToWf(self.p_LankX_in_pf) 
-        self.p_lf_in_wf     = place_in_pfToWf(self.p_lf_in_pf)    
-        self.p_RhipX_in_wf  = place_in_pfToWf(self.p_RhipX_in_pf) 
-        self.p_RhipZ_in_wf  = place_in_pfToWf(self.p_RhipZ_in_pf) 
-        self.p_RhipY_in_wf  = place_in_pfToWf(self.p_RhipY_in_pf) 
+        self.p_LankY_in_wf = place_in_pfToWf(self.p_LankY_in_pf) 
+        self.p_LankX_in_wf = place_in_pfToWf(self.p_LankX_in_pf) 
+        _p_lf_in_wf = place_in_pfToWf(self.p_lf_in_pf)    
+        self.p_RhipX_in_wf = place_in_pfToWf(self.p_RhipX_in_pf) 
+        self.p_RhipZ_in_wf = place_in_pfToWf(self.p_RhipZ_in_pf) 
+        self.p_RhipY_in_wf = place_in_pfToWf(self.p_RhipY_in_pf) 
         self.p_RkneeY_in_wf = place_in_pfToWf(self.p_RkneeY_in_pf)
-        self.p_RankY_in_wf  = place_in_pfToWf(self.p_RankY_in_pf) 
-        self.p_RankX_in_wf  = place_in_pfToWf(self.p_RankX_in_pf) 
-        self.p_rf_in_wf     = place_in_pfToWf(self.p_rf_in_pf)    
+        self.p_RankY_in_wf = place_in_pfToWf(self.p_RankY_in_pf) 
+        self.p_RankX_in_wf = place_in_pfToWf(self.p_RankX_in_pf) 
+        _p_rf_in_wf = place_in_pfToWf(self.p_rf_in_pf)    
         
         self.r_pel_to_wf = rotat_to_pfToWf(self.r_pel_to_pf)
-        self.r_lf_to_wf  = rotat_to_pfToWf(self.r_lf_to_pf)
-        self.r_rf_to_wf  = rotat_to_pfToWf(self.r_rf_to_pf)
+        self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
+        self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
+        
+        self.p_lf_in_wf = Dsp.FILTER_P_LF_IN_WF.filt(_p_lf_in_wf)
+        self.p_rf_in_wf = Dsp.FILTER_P_RF_IN_WF.filt(_p_rf_in_wf)
+        
 
     def __update_linkRotMat(self, jps: np.ndarray):
         '''利用旋轉軸的向量得到link間的旋轉矩陣'''
