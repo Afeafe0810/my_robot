@@ -58,7 +58,8 @@ class ROSInterfaces:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波
-        _jv = np.clip( Dsp.DIFFTER_JP.diff(self._jp), -0.75, 0.75)
+        jp = Dsp.FILTER_JP.filt(self._jp)
+        _jv = np.clip( Dsp.DIFFTER_JP.diff(jp), -0.75, 0.75)
         jv = Dsp.FILTER_JV.filt(_jv)
         
         is_contact = {'lf' : self._is_contact_lf, 'rf' : self._is_contact_rf}
@@ -71,7 +72,7 @@ class ROSInterfaces:
                 self._r_base_to_wf,
                 self._state,
                 is_contact,
-                self._jp, 
+                jp, 
                 jv, 
                 force_ft, 
                 tau_ft
