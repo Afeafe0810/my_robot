@@ -15,8 +15,8 @@ class LeftLegBalance:
         Ts = Config.TIMER_PERIOD
                         
         #==========線性移動==========#
-        linearMove = lambda x0, x1, t0, t1:\
-            np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
+        def linearMove(x0, x1, t0, t1):
+            return np.clip(x0 + (x1-x0) * (self.t-t0)/(t1-t0), x0, x1 )
             
         y_pel = linearMove(*[0, 0.08], *[0*T, 0.5*T])
         # z_sf  = linearMove(*[0, Config.STEP_HEIGHT], *[1*T, 1.1*T])
