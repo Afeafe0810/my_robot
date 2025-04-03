@@ -14,10 +14,9 @@ class KneeLoop:
     def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str], is_firmly: dict[str, bool]) -> dict[str, np.ndarray]:
         
         #==========外環==========#
-        endVel: dict[str, np.ndarray] = self._endErr_to_endVel(frame, ref)
-        _cmd_jv: dict[str, np.ndarray] = self._endVel_to_jv(frame, endVel, jv, state, stance)
-        cmd_jv : np.ndarray = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
-        
+        endVel = self._endErr_to_endVel(frame, ref)
+        _cmd_jv= self._endVel_to_jv(frame, endVel, jv, state, stance)
+        cmd_jv = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
         #==========內環==========#
         tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp, state, stance)
         kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
