@@ -1,8 +1,14 @@
 import numpy as np
+from scipy.signal import butter
 #================ import library ========================#
 from utils.config import Config
 from numbers import Number
 #========================================================#
+def butter2(fn) -> tuple[np.ndarray]:
+    '''回傳z^-1的轉移函數係數 num, den'''
+    fs = 1 / Config.TIMER_PERIOD
+    wn_nml = fn * 2 / fs
+    return butter(2, wn_nml)
     
 class Filter:
     """
@@ -81,8 +87,11 @@ class Dsp:
     # DIFFTER_P_PEL_IN_RF = Diffter()
     
     #====================濾波器====================#
-    tf_15Hz = ([0.13111, 0.26221, 0.13111],[1, -0.74779, 0.27221])
-    tf_30Hz = ([0.39134, 0.78267, 0.39134],[1,  0.36953, 0.19582])
+    tf_15Hz = butter2(15)
+    tf_30Hz = butter2(30)
+    tf_5Hz =  butter2(15)
+    tf_4Hz =  butter2(4)
+    
     
     FILTER_JP = Filter(*tf_15Hz)
     FILTER_p = Filter(*tf_15Hz)
