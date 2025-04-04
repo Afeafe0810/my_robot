@@ -22,7 +22,10 @@ from utils.signal_process import Dsp
 
 class ROSInterfaces:
     """
-    負責處理ROS節點的訂閱與發佈
+    負責處理ROS節點的訂閱與發佈, 設做全局的class
+    
+    - 使用方法, 需要先init一次, 在各個模組內只要import就好
+    
     - 屬性:
         - publisher (dict)
         - subscriber (dict)
@@ -35,42 +38,44 @@ class ROSInterfaces:
             - 關節角度 (同時也每五次呼叫主程式的main_callback)
     """
 
-    def __init__(self, node: Node, main_callback: Callable ):
+    @classmethod
+    def init(cls, node: Node, main_callback: Callable ):
         
         #=========初始化===========#
-        self._p_base_in_wf = self._r_base_to_wf = self._jp = None
-        self._state = 0.0
-        self._is_contact_lf = self._is_contact_rf = True
-        self._force_lf = self._tau_lf = None
-        self._force_rf = self._tau_rf = None
+        cls._p_base_in_wf = cls._r_base_to_wf = cls._jp = None
+        cls._state = 0.0
+        cls._is_contact_lf = cls._is_contact_rf = True
+        cls._force_lf = cls._tau_lf = None
+        cls._force_rf = cls._tau_rf = None
 
         
-        self._callback_count = 0 #每5次會呼叫一次maincallback
-        self._main_callback = main_callback #引入main_callback來持續呼叫
+        cls._callback_count = 0 #每5次會呼叫一次maincallback
+        cls._main_callback = main_callback #引入main_callback來持續呼叫
         
         #=========ROS的訂閱與發布===========#
         
-        self.publisher = self._createPublishers(node)
-        self.subscriber = self._createSubscribers(node)
+        cls.publisher = cls._createPublishers(node)
+        cls.subscriber = cls._createSubscribers(node)
     
     #=========對外主要接口===========#
-    def returnSubData(self) -> tuple[np.ndarray, np.ndarray, float, dict[str, bool], np.ndarray, np.ndarray, dict[str, float], dict[str, float]]:
+    @classmethod
+    def returnSubData(cls) -> tuple[np.ndarray, np.ndarray, float, dict[str, bool], np.ndarray, np.ndarray, dict[str, float], dict[str, float]]:
         '''回傳訂閱器的data'''
         
         #微分得到速度(飽和)，並濾波
-        jp = Dsp.FILTER_JP.filt(self._jp)
+        jp = Dsp.FILTER_JP.filt(cls._jp)
         _jv = np.clip( Dsp.DIFFTER_JP.diff(jp), -0.75, 0.75)
         jv = Dsp.FILTER_JV.filt(_jv)
         
-        is_contact = {'lf' : self._is_contact_lf, 'rf' : self._is_contact_rf}
-        force_ft = {'lf' : self._force_lf[2,0], 'rf' : self._force_rf[2,0]}
-        tau_ft = {'lf' : self._tau_lf, 'rf' : self._tau_rf}
+        is_contact = {'lf' : cls._is_contact_lf, 'rf' : cls._is_contact_rf}
+        force_ft = {'lf' : cls._force_lf[2,0], 'rf' : cls._force_rf[2,0]}
+        tau_ft = {'lf' : cls._tau_lf, 'rf' : cls._tau_rf}
         
         return list( map( deepcopy,
             [ 
-                self._p_base_in_wf,
-                self._r_base_to_wf,
-                self._state,
+                cls._p_base_in_wf,
+                cls._r_base_to_wf,
+                cls._state,
                 is_contact,
                 jp, 
                 jv, 
@@ -109,61 +114,71 @@ class ROSInterfaces:
             "rf"        : node.create_publisher( Float64MultiArray , '/rx_data',                      10),
         }
 
-    def _createSubscribers(self, node: Node):
-        '''主要是為了訂閱base, joint_states, state'''
+    @classmethod
+    def _createSubscribers(cls, node: Node):
+        '''主要是為了訂閱base, joint_states, state
+        
+        main_callback是和joint_states同步
+        '''
         return{
-            "base"         : node.create_subscription( Odometry,          '/odom',               self._update_baseInWf_callback, 10 ),
-            "state"        : node.create_subscription( Float64MultiArray, 'state_topic',         self._update_state_callback,    10 ),
-            "lf_contact"   : node.create_subscription( ContactsState,     '/l_foot/bumper_demo', self._update_contact_callback,  10 ),
-            "rf_contact"   : node.create_subscription( ContactsState,     '/r_foot/bumper_demo', self._update_contact_callback,  10 ),
-            "joint_states" : node.create_subscription( JointState,        '/joint_states',       self._update_jp_callback,       10 ),
-            "lf_force"     : node.create_subscription( WrenchStamped,     '/lf_sensor/wrench',   self._update_lfForce_callback,  10 ),
-            "rf_force"     : node.create_subscription( WrenchStamped,     '/rf_sensor/wrench',   self._update_rfForce_callback,  10 ),
+            "base"         : node.create_subscription( Odometry,          '/odom',               cls._update_baseInWf_callback,  10 ),
+            "state"        : node.create_subscription( Float64MultiArray, 'state_topic',         cls._update_state_callback,     10 ),
+            "lf_contact"   : node.create_subscription( ContactsState,     '/l_foot/bumper_demo', cls._update_contact_callback,   10 ),
+            "rf_contact"   : node.create_subscription( ContactsState,     '/r_foot/bumper_demo', cls._update_contact_callback,   10 ),
+            "joint_states" : node.create_subscription( JointState,        '/joint_states',       cls._update_jpAndMain_callback, 10 ),
+            "lf_force"     : node.create_subscription( WrenchStamped,     '/lf_sensor/wrench',   cls._update_lfForce_callback,   10 ),
+            "rf_force"     : node.create_subscription( WrenchStamped,     '/rf_sensor/wrench',   cls._update_rfForce_callback,   10 ),
         }
 
     #=========訂閱Callback===========#
-    def _update_baseInWf_callback(self, msg:Odometry):
+    @classmethod
+    def _update_baseInWf_callback(cls, msg:Odometry):
         p = msg.pose.pose.position
         q = msg.pose.pose.orientation #四元數法
-        self._p_base_in_wf = np.vstack(( p.x, p.y, p.z ))
-        self._r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
+        cls._p_base_in_wf = np.vstack(( p.x, p.y, p.z ))
+        cls._r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
     
-    def _update_state_callback(self, msg:Float64MultiArray):
+    @classmethod
+    def _update_state_callback(cls, msg:Float64MultiArray):
         '''state是我們控制的模式, 用pub與subscibe來控制'''
-        self._state = msg.data[0]
+        cls._state = msg.data[0]
   
-    def _update_contact_callback(self, msg:ContactsState ):
+    @classmethod
+    def _update_contact_callback(cls, msg:ContactsState ):
         '''可以判斷是否『接觸』, 無法判斷是否『踩穩』'''
         if msg.header.frame_id == 'l_foot_1':
-            self._is_contact_lf = len(msg.states)>=1
+            cls._is_contact_lf = len(msg.states)>=1
         elif msg.header.frame_id == 'r_foot_1':
-            self._is_contact_rf = len(msg.states)>=1
+            cls._is_contact_rf = len(msg.states)>=1
             
-    def _update_jp_callback(self, msg:JointState ):
-        '''訂閱jp, 且每5次會callback主程式一次'''
+    @classmethod
+    def _update_jpAndMain_callback(cls, msg:JointState ):
+        '''訂閱jp, callback主程式'''
         if len(msg.position) == 12:
             jp_pair = {jnt: value for jnt,value in zip( Config.JNT_ORDER_SUB, msg.position) }
-            self._jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
+            cls._jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
 
-        self._callback_count += 1
-        if self._callback_count == 5:
-            self._callback_count = 0
-            self._main_callback()
+        cls._callback_count += 1
+        if cls._callback_count == 5:
+            cls._callback_count = 0
+            cls._main_callback()
     
-    def _update_lfForce_callback(self, msg: WrenchStamped):
+    @classmethod
+    def _update_lfForce_callback(cls, msg: WrenchStamped):
         force = msg.wrench.force
         torque = msg.wrench.torque
         
-        self._force_lf = np.vstack(( force.x, force.y, force.z ))
-        self._tau_lf = np.vstack(( torque.x, torque.y, torque.z ))
+        cls._force_lf = np.vstack(( force.x, force.y, force.z ))
+        cls._tau_lf = np.vstack(( torque.x, torque.y, torque.z ))
 
-    def _update_rfForce_callback(self, msg: WrenchStamped):
+    @classmethod
+    def _update_rfForce_callback(cls, msg: WrenchStamped):
         """ 處理右腳感測器數據 """
         force = msg.wrench.force
         torque = msg.wrench.torque
         
-        self._force_rf = np.vstack(( force.x, force.y, force.z ))
-        self._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
+        cls._force_rf = np.vstack(( force.x, force.y, force.z ))
+        cls._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
     
 class RobotModel:
     """

@@ -6,7 +6,8 @@ import pandas as pd
 from copy import deepcopy
 #================ import other code =====================#
 from utils.config import Config
-from utils.ros_interfaces import ROSInterfaces, RobotModel
+from utils.ros_interfaces import ROSInterfaces as ROS
+from utils.ros_interfaces import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from motion_planning import Trajatory
 from torque_control import TorqueControl
@@ -19,7 +20,7 @@ class UpperLevelController(Node):
         super().__init__('upper_level_controllers')
         
         #負責ROS的功能
-        self.ros = ROSInterfaces(self, self.main_controller_callback)
+        ROS.init(self, self.main_controller_callback)
         
         #機器人的模型
         self.robot = RobotModel()
@@ -44,7 +45,7 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, is_contact, jp, jv, force_ft, tau_ft = self.ros.returnSubData()
+        p_base_in_wf, r_base_to_wf, state, is_contact, jp, jv, force_ft, tau_ft = ROS.returnSubData()
         
         #==========更新可視化的機器人==========#
         config = self.robot.update_VizAndMesh(jp)
@@ -67,7 +68,7 @@ class UpperLevelController(Node):
             
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
-        self.ros.publisher['effort'].publish( Float64MultiArray(data = torque) )
+        ROS.publisher['effort'].publish( Float64MultiArray(data = torque) )
         self.stance_past = self.stance
 
     def _set_stance(self, state):
