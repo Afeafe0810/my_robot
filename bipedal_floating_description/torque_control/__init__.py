@@ -2,7 +2,7 @@
 import numpy as np; np.set_printoptions(precision=5)
 
 #================ import library ========================#
-from utils.ros_interfaces import RobotModel
+from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from motion_planning import Ref
 

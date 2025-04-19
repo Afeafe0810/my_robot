@@ -9,7 +9,7 @@ import pinocchio as pin
 from itertools import accumulate
 #================ import other code =====================#
 from utils.config import Config
-from utils.ros_interfaces import RobotModel
+from utils.robot_model import RobotModel
 from utils.signal_process import Dsp
 #========================================================#
 
