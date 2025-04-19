@@ -196,11 +196,11 @@ class RobotModel:
         #=========建立機器人模型===========#
         self._meshrobot = self._loadMeshcatModel("/bipedal_floating.pin.urdf") #Pinnocchio藍色的機器人
 
-        self.bipedal_floating = SimpleModel("/bipedal_floating.xacro")  #從骨盆建下來的模擬模型
-        self.stance_l         = SimpleModel("/stance_l.xacro")          #從左腳掌往上建的左單腳
-        self.stance_r         = SimpleModel("/stance_r_gravity.xacro")  #從右腳掌往上建的右單腳
-        self.bipedal_l        = SimpleModel("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
-        self.bipedal_r        = SimpleModel("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
+        self.bipedal_from_pel = BipedalFromPel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
+        self.bipedal_from_lf = BipedalFromLF("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
+        self.bipedal_from_rf = BipedalFromRF("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
+        self.single_lf = SingleLeftLeg("/stance_l.xacro") #從左腳掌往上建的左單腳
+        self.single_rf = SingleRightLeg("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
         
         #=========可視化msehcat===========#
         self._viz = self._meshcatVisualize(self._meshrobot)
@@ -235,16 +235,29 @@ class RobotModel:
 
         return viz
 
-class SimpleModel:
+class _SimpleModel:
     '''基礎動力學模型, 用來算重力矩和質心位置'''
     def __init__(self, urdf_path: str):
-        self.model, self.data = self._loadSimpleModel(urdf_path)
-    
-    @staticmethod
-    def _loadSimpleModel(urdf_path: str):
-        urdf_filename = Config.ROBOT_MODEL_DIR + urdf_path if len(argv)<2 else argv[1]
-        model = pin.buildModelFromUrdf(urdf_filename)
+        urdf = Config.ROBOT_MODEL_DIR + urdf_path
+        model = pin.buildModelFromUrdf(urdf)
         print(f'{model.name = }')
-        model_data = model.createData()
         
-        return model, model_data
+        self.model, self.data = model, model.createData()
+    
+class BipedalFromPel(_SimpleModel):
+    def com(self, jp: np.ndarray) -> np.ndarray:
+        # TODO 學長有用其他模型建立, 不知道會不會有差, 但我目前是覺得就算有差也不可能差多少啦
+        pin.centerOfMass(self.model, self.data, jp)
+        return self.data.com[0].reshape(3,1)
+
+class BipedalFromLF(_SimpleModel):
+    pass
+
+class BipedalFromRF(_SimpleModel):
+    pass
+
+class SingleLeftLeg(_SimpleModel):
+    pass
+
+class SingleRightLeg(_SimpleModel):
+    pass
