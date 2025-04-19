@@ -211,6 +211,38 @@ class RobotModel:
         config = pink.Configuration(self._meshrobot.model, self._meshrobot.data, jp)
         self._viz.display(config.q)
         return config
+    
+    def gravity(self, jp: np.ndarray, state: float, stance: list[str], pa_lfTOpel_in_pf: np.ndarray, pa_rfTOpel_in_pf: np.ndarray) -> np.ndarray:
+        
+        def weighted(x, x0, x1, g0, g1) -> np.ndarray:
+            return g0 +(g1-g0)/(x1-x0)*(x-x0)
+            
+        #==========半邊單腳模型==========#
+        g_from_both_single_ft = np.vstack((
+            self.single_lf.gravity(jp),
+            self.single_rf.gravity(jp)
+        ))
+        
+        #==========腳底建起的模型==========#
+        g_from_bipedal_ft = {
+            'lf': self.bipedal_from_lf.gravity(jp),
+            'rf': self.bipedal_from_rf.gravity(jp)
+        }
+        
+        match state:
+            case 0 | 1 | 2:
+                y_ftTOpel = {'lf': abs(pa_lfTOpel_in_pf[1,0]), 'rf': abs(pa_rfTOpel_in_pf[1,0])}
+                
+                #雙腳平衡時, 用距離判斷重心腳
+                cf = 'lf' if y_ftTOpel['lf'] <= y_ftTOpel['rf'] else 'rf'
+                
+                return weighted(y_ftTOpel[cf], *[0, 0.1], *[g_from_bipedal_ft[cf], g_from_both_single_ft])
+                
+            case 30:
+                cf, sf = stance
+                
+                return 0.3 * g_from_both_single_ft + 0.75* g_from_bipedal_ft[cf]
+        
         
     @staticmethod
     def _loadMeshcatModel(urdf_path: str):
@@ -257,6 +289,9 @@ class _SimpleModel:
         """「方陣」置換矩陣的反函數 = 轉置"""
         return self._joint_permutation().T
     
+    def gravity(self, jp: np.ndarray) -> np.ndarray:
+        return self.inv_permut @ np.vstack(pin.computeGeneralizedGravity(self.model, self.data, self.permut@jp))
+    
 class BipedalFromPel(_SimpleModel):
     def com(self, jp: np.ndarray) -> np.ndarray:
         # TODO 學長有用其他模型建立, 不知道會不會有差, 但我目前是覺得就算有差也不可能差多少啦
@@ -272,7 +307,6 @@ class BipedalFromLF(_SimpleModel):
         I = np.eye(6,6)
         return np.block([[P, O], [O, I]])
     
-
 class BipedalFromRF(_SimpleModel):
     @staticmethod
     def _joint_permutation()-> np.ndarray:

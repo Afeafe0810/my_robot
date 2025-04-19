@@ -104,58 +104,7 @@ class RobotFrame:
             'y': np.vstack(( p_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
         }
         return deepcopy(var)
-    
-    def calculate_gravity(self, robot: RobotModel, jp: np.ndarray, state: float, stance: list[str]) -> tuple[np.ndarray] :
-
-        jp_ = {
-            'lf': jp[:6],
-            'rf': jp[6:]
-        }
-        jp_from_ft = {
-            'lf': np.vstack(( -jp_['lf'][::-1], jp_['rf'] )),
-            'rf': np.vstack(( -jp_['rf'][::-1], jp_['lf'] ))
-        }
-        jv_single = ja_single = np.zeros(( 6,1))
-        jv_double = ja_double = np.zeros((12,1))
-        
-        #==========半邊單腳模型==========#
-        _gravity_single_ft = {
-            'lf': -pin.rnea(robot.single_lf.model, robot.single_lf.data, -jp_['lf'][::-1], jv_single, (ja_single))[::-1],
-            'rf': -pin.rnea(robot.single_rf.model, robot.single_rf.data, -jp_['rf'][::-1], jv_single, (ja_single))[::-1]
-        }
-        gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
-        
-        #==========腳底建起的模型==========#
-        _gravity_from_ft = {
-            'lf': pin.rnea(robot.bipedal_from_lf.model, robot.bipedal_from_lf.data, jp_from_ft['lf'], jv_double, (ja_double)),
-            'rf': pin.rnea(robot.bipedal_from_rf.model, robot.bipedal_from_rf.data, jp_from_ft['rf'], jv_double, (ja_double)),
-        }
-        gravity_from_ft = {
-            'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),
-            'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
-        }
-        
-        #==========加權==========#
-        weighted = lambda x, x0, x1, g0, g1 :\
-            g0 +(g1-g0)/(x1-x0)*(x-x0)
-        
-        pa_lfTOpel_in_pf, pa_rfTOpel_in_pf = self.get_posture()
-
-        match state:
-            case 0 | 1 | 2:
-                Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
-                              weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
-                              gravity_single
-            case 30:
-                cf, sf = stance
-                
-                Leg_gravity = 0.3 * gravity_single + 0.75* gravity_from_ft[cf]
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        return l_leg_gravity, r_leg_gravity
-    
+     
     @staticmethod
     def rotMat_to_euler(r_to_frame: np.ndarray) -> np.ndarray:
         """ 回傳a_in_frame, 以roll, pitch, yaw的順序(x,y,z), 以column vector"""

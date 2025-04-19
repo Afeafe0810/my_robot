@@ -10,9 +10,7 @@ def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray) -> np.ndar
     ref_jp = np.zeros((12,1))
     kp = np.vstack([ 2, 2, 4, 6, 6, 4 ]*2)
     
-    tauG_lf, tauG_rf = frame.calculate_gravity(robot, jp, 0, ['lf', 'rf'])
-    
-    tauG = np.vstack(( tauG_lf, tauG_rf ))
+    tauG = robot.gravity(jp, 0, ['lf', 'rf'], *frame.get_posture())
     
     torque = kp * (ref_jp-jp) + tauG
     
