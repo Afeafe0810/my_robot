@@ -242,7 +242,20 @@ class _SimpleModel:
         model = pin.buildModelFromUrdf(urdf)
         print(f'{model.name = }')
         
+        #機器人模型
         self.model, self.data = model, model.createData()
+        
+        #關節順序的轉換
+        self.permut: np.ndarray = self._joint_permutation()
+        self.inv_permut: np.ndarray = self._joint_inverse_permutation()
+        
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        return np.array([[]])
+    
+    def _joint_inverse_permutation(self)-> np.ndarray:
+        """「方陣」置換矩陣的反函數 = 轉置"""
+        return self._joint_permutation().T
     
 class BipedalFromPel(_SimpleModel):
     def com(self, jp: np.ndarray) -> np.ndarray:
@@ -251,13 +264,51 @@ class BipedalFromPel(_SimpleModel):
         return self.data.com[0].reshape(3,1)
 
 class BipedalFromLF(_SimpleModel):
-    pass
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        """關節順序轉成5-0、6-11, 反轉須反向"""
+        P = _pure_permute()
+        O = np.zeros((6,6))
+        I = np.eye(6,6)
+        return np.block([[P, O], [O, I]])
+    
 
 class BipedalFromRF(_SimpleModel):
-    pass
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        """關節順序轉成11-6、0-5, 反轉須反向"""
+        P = _pure_permute()
+        O = np.zeros((6,6))
+        I = np.eye(6,6)
+        return np.block([[O, P], [I, O]])
 
 class SingleLeftLeg(_SimpleModel):
-    pass
-
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        """關節順序轉成5-0, 反轉須反向"""
+        P = _pure_permute()
+        O = np.zeros((6,6))
+        return np.block([P, O])
+    
+    @staticmethod
+    def _joint_inverse_permutation():
+        return _pure_permute()
+    
 class SingleRightLeg(_SimpleModel):
-    pass
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        """關節順序轉成11-6, 反轉須反向"""
+        P = _pure_permute()
+        O = np.zeros((6,6))
+        return np.block([O, P])
+    
+    @staticmethod
+    def _joint_inverse_permutation():
+        return _pure_permute()
+
+def _pure_permute():
+    """6*6的純置換矩陣, 反轉且反向"""
+    permut = np.zeros((6,6))
+    for i,j in [(0,5), (1,4), (2,3), (3,2), (4,1), (5,0)]:
+        permut[i,j] = -1
+    return permut
