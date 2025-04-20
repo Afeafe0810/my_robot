@@ -68,7 +68,24 @@ class RobotModel:
                 cf, sf = stance
                 
                 return 0.3 * g_from_both_single_ft + 0.75* g_from_bipedal_ft[cf]
+    
+    def inertia(self, jp: np.ndarray, stance: list[str]) -> np.ndarray:
+        cf, sf = stance
+        inertia_from_ft = {'lf': self.bipedal_from_lf.inertia, 'rf': self.bipedal_from_rf.inertia}
+        return inertia_from_ft[cf](jp)
+    
+    def pure_knee_inertia(self, jp: np.ndarray, stance: list[str]) -> np.ndarray:
+        total_inertia = self.inertia(jp, stance)
         
+        the_knee = [0, 1, 2, 3, 6, 7, 8, 9]
+        the_ankle = [4, 5, 10, 11]
+        
+        H_kneeTOknee = total_inertia[np.ix_(the_knee, the_knee)]
+        H_ankleTOknee = total_inertia[np.ix_(the_knee, the_ankle)]
+        H_kneeTOankle = total_inertia[np.ix_(the_ankle, the_knee)]
+        H_ankleTOankle = total_inertia[np.ix_(the_ankle, the_ankle)]
+        
+        return H_kneeTOknee - H_ankleTOknee @ np.linalg.pinv(H_ankleTOankle) @ H_kneeTOankle
         
     @staticmethod
     def _loadMeshcatModel(urdf_path: str):
@@ -117,6 +134,9 @@ class _SimpleModel:
     
     def gravity(self, jp: np.ndarray) -> np.ndarray:
         return self.inv_permut @ np.vstack(pin.computeGeneralizedGravity(self.model, self.data, self.permut@jp))
+    
+    def inertia(self, jp: np.ndarray) -> np.ndarray:
+        return self.inv_permut @ pin.crba(self.model, self.data, self.permut@jp) @ self.permut
     
 class BipedalFromPel(_SimpleModel):
     def com(self, jp: np.ndarray) -> np.ndarray:

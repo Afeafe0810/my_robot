@@ -18,8 +18,10 @@ class KneeLoop:
         endVel = self._endErr_to_endVel(frame, ref)
         _cmd_jv= self._endVel_to_jv(frame, endVel, jv, state, stance)
         cmd_jv = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
+        
         #==========內環==========#
         tauG = robot.gravity(jp, state, stance, *frame.get_posture())
+        matM = robot.pure_knee_inertia(jp, stance)
         kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
         
         kp = np.vstack(( kl,kr ))
