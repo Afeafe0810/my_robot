@@ -20,17 +20,19 @@ class KneeLoop:
         cmd_jv = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
         
         #==========內環==========#
-        tauG = robot.gravity(jp, state, stance, *frame.get_posture())
-        matM = robot.pure_knee_inertia(jp, stance)
-        kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
+        the_knee = [0, 1, 2, 3, 6, 7, 8, 9]
         
-        kp = np.vstack(( kl,kr ))
-
-        torque = kp * (cmd_jv - jv) + tauG
+        matM = robot.pure_knee_inertia(jp, stance)
+        kv = self._get_innerloop_K(state, stance, is_firmly)
+        
+        tauI = kv * (cmd_jv - jv)[the_knee]
+        
+        tauG = robot.gravity(jp, state, stance, *frame.get_posture())[the_knee]
+        torque = tauI + tauG
 
         return {
-            'lf': torque[:6],
-            'rf': torque[6:]
+            'lf': np.vstack((torque[:4])),
+            'rf': np.vstack((torque[4:]))
         }
 
     @staticmethod           
@@ -115,46 +117,25 @@ class KneeLoop:
     @staticmethod
     def _get_innerloop_K(state: float, stance: list[str], is_firmly: dict[str, bool]) -> tuple[np.ndarray]:
         # HACK 之後gain要改
-        cf, sf = stance
-        # if cf == 'rf':
-        #     if r_contact == 1:
-        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #     if l_contact == 1:
-        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-        
-        # elif cf == 'lf':
-        #     if r_contact == 1:
-        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #     if l_contact == 1:
-        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-
         match state:
             case 1:
-                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                return kl, kr
+                kl = np.vstack([0.5, 0.5, 0.5, 0.5])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5])
+                return np.vstack((kl, kr))
         
             case 2:
-                kl = np.vstack([1.5, 1.5, 1.5, 1.5, 0, 0])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                return kl, kr
+                kl = np.vstack([1.5, 1.5, 1.5, 1.5])
+                kr = np.vstack([0.5, 0.5, 0.5, 0.5])
+                return np.vstack((kl, kr))
                 
             case 30:
-                k = {'lf': None, 'rf': None}
-                k[sf] = np.vstack(( 1.3, 1.3, 1.3, 1.3, 0, 0 ))
+                cf, sf = stance
                 
-                k[cf] = np.vstack((1.5, 1.5, 1.5, 1.5, 0, 0)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2, 0, 0))
+                k = {'lf': None, 'rf': None}
+                k[sf] = np.vstack(( 1.3, 1.3, 1.3, 1.3))
+                
+                k[cf] = np.vstack((1.5, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
+                        np.vstack((1.2, 1.2, 1.2, 1.2))
                         
-                return k['lf'], k['rf']
+                return np.vstack((k['lf'], k['rf']))
                 

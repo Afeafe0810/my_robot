@@ -30,12 +30,12 @@ class TorqueControl:
                 return balance_ctrl(frame, robot, jp)
             case 1 | 2 | 30:
                 #雙腳膝蓋
-                torque = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
+                torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 
-                #擺動腳腳踝
-                torque[sf][4:6] = anklePD_ctrl(frame, sf)
+                #雙腳腳踝
+                torque_ankle = {
+                    sf : anklePD_ctrl(frame, sf),
+                    cf : self.alip.ctrl(frame, stance, stance_past, ref.var)
+                }
                 
-                #支撐腳腳踝
-                torque[cf][4:6] = self.alip.ctrl(frame, stance, stance_past, ref.var)
-                
-                return np.vstack(( torque['lf'], torque['rf'] ))
+                return np.vstack(( torque_knee['lf'], torque_ankle['lf'], torque_knee['rf'], torque_ankle['rf'] ))
