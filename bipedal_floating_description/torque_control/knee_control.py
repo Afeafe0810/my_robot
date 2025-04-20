@@ -3,6 +3,7 @@ import numpy as np; np.set_printoptions(precision=5)
 
 #================ import library ========================#
 from utils.frame_kinermatic import RobotFrame
+from utils.robot_model import RobotModel
 from motion_planning import Ref
 
 #TODO 感覺這邊可以重構, 沒有self property, 且所有method幾乎都是static method
@@ -11,17 +12,16 @@ class KneeLoop:
     def __init__(self):
         pass
     
-    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotFrame, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str], is_firmly: dict[str, bool]) -> dict[str, np.ndarray]:
+    def ctrl(self, ref: Ref, frame: RobotFrame, robot: RobotModel, jp: np.ndarray, jv: np.ndarray,state: float, stance: list[str], is_firmly: dict[str, bool]) -> dict[str, np.ndarray]:
         
         #==========外環==========#
         endVel = self._endErr_to_endVel(frame, ref)
         _cmd_jv= self._endVel_to_jv(frame, endVel, jv, state, stance)
         cmd_jv = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
         #==========內環==========#
-        tauG_lf, tauG_rf= frame.calculate_gravity(robot, jp, state, stance)
+        tauG = robot.gravity(jp, state, stance, *frame.get_posture())
         kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
         
-        tauG = np.vstack(( tauG_lf, tauG_rf ))
         kp = np.vstack(( kl,kr ))
 
         torque = kp * (cmd_jv - jv) + tauG

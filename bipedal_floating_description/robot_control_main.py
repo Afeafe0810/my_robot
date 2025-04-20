@@ -7,7 +7,7 @@ from copy import deepcopy
 #================ import other code =====================#
 from utils.config import Config
 from utils.ros_interfaces import ROSInterfaces as ROS
-from utils.ros_interfaces import RobotModel
+from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from motion_planning import Trajatory
 from torque_control import TorqueControl

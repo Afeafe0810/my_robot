@@ -9,7 +9,7 @@ import pinocchio as pin
 from itertools import accumulate
 #================ import other code =====================#
 from utils.config import Config
-from utils.ros_interfaces import RobotModel
+from utils.robot_model import RobotModel
 from utils.signal_process import Dsp
 #========================================================#
 
@@ -104,58 +104,7 @@ class RobotFrame:
             'y': np.vstack(( p_ftTocom_in_wf[cf][1], L_com_in_ft[cf]['x'])),
         }
         return deepcopy(var)
-    
-    def calculate_gravity(self, robot: RobotModel, jp: np.ndarray, state: float, stance: list[str]) -> tuple[np.ndarray] :
-
-        jp_ = {
-            'lf': jp[:6],
-            'rf': jp[6:]
-        }
-        jp_from_ft = {
-            'lf': np.vstack(( -jp_['lf'][::-1], jp_['rf'] )),
-            'rf': np.vstack(( -jp_['rf'][::-1], jp_['lf'] ))
-        }
-        jv_single = ja_single = np.zeros(( 6,1))
-        jv_double = ja_double = np.zeros((12,1))
-        
-        #==========半邊單腳模型==========#
-        _gravity_single_ft = {
-            'lf': -pin.rnea(robot.stance_l.model, robot.stance_l.data, -jp_['lf'][::-1], jv_single, (ja_single))[::-1],
-            'rf': -pin.rnea(robot.stance_r.model, robot.stance_r.data, -jp_['rf'][::-1], jv_single, (ja_single))[::-1]
-        }
-        gravity_single = np.vstack(( *_gravity_single_ft['lf'], *_gravity_single_ft['rf'] ))
-        
-        #==========腳底建起的模型==========#
-        _gravity_from_ft = {
-            'lf': pin.rnea(robot.bipedal_l.model, robot.bipedal_l.data, jp_from_ft['lf'], jv_double, (ja_double)),
-            'rf': pin.rnea(robot.bipedal_r.model, robot.bipedal_r.data, jp_from_ft['rf'], jv_double, (ja_double)),
-        }
-        gravity_from_ft = {
-            'lf': np.vstack(( *-_gravity_from_ft['lf'][5::-1], *_gravity_from_ft['lf'][6:]    )),
-            'rf': np.vstack(( *_gravity_from_ft['rf'][6:]   , *-_gravity_from_ft['rf'][5::-1] )),
-        }
-        
-        #==========加權==========#
-        weighted = lambda x, x0, x1, g0, g1 :\
-            g0 +(g1-g0)/(x1-x0)*(x-x0)
-        
-        pa_lfTOpel_in_pf, pa_rfTOpel_in_pf = self.get_posture()
-
-        match state:
-            case 0 | 1 | 2:
-                Leg_gravity = weighted(pa_lfTOpel_in_pf[1,0], *[0, -0.1], *[gravity_from_ft['lf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) < abs(pa_rfTOpel_in_pf[1,0]) else\
-                              weighted(pa_rfTOpel_in_pf[1,0], *[0,  0.1], *[gravity_from_ft['rf'], gravity_single]) if abs(pa_lfTOpel_in_pf[1,0]) > abs(pa_rfTOpel_in_pf[1,0]) else\
-                              gravity_single
-            case 30:
-                cf, sf = stance
-                
-                Leg_gravity = 0.3 * gravity_single + 0.75* gravity_from_ft[cf]
-
-        l_leg_gravity = np.reshape(Leg_gravity[0:6,0],(6,1))
-        r_leg_gravity = np.reshape(Leg_gravity[6:,0],(6,1))
-
-        return l_leg_gravity, r_leg_gravity
-    
+     
     @staticmethod
     def rotMat_to_euler(r_to_frame: np.ndarray) -> np.ndarray:
         """ 回傳a_in_frame, 以roll, pitch, yaw的順序(x,y,z), 以column vector"""
@@ -216,7 +165,7 @@ class RobotFrame:
         self.p_RankX_in_pf,  self.r_RankX_to_pf  = self.__getOneInPf(config, "r_foot_1")
         self.p_rf_in_pf,     self.r_rf_to_pf     = self.__getOneInPf(config, "r_foot")
         
-        self.p_com_in_pf = self.__get_comInPf(robot, jp)
+        self.p_com_in_pf = robot.bipedal_from_pel.com(jp)
         
         self.pa_pel_in_pf = np.vstack(( self.p_pel_in_pf, self.rotMat_to_euler(self.r_pel_to_pf) ))
         self.pa_lf_in_pf  = np.vstack(( self.p_lf_in_pf , self.rotMat_to_euler(self.r_lf_to_pf)  ))
@@ -335,15 +284,6 @@ class RobotFrame:
         p_in_pf = np.reshape( htm.translation, (3,1) )
         r_to_pf = np.reshape( htm.rotation, (3,3) )
         return p_in_pf, r_to_pf 
-    
-    def __get_comInPf(self, robot: RobotModel, jp: np.ndarray):
-        # TODO 學長有用其他模型建立, 不知道會不會有差, 但我目前是覺得就算有差也不可能差多少啦
-        pin.centerOfMass(
-            robot.bipedal_floating.model, robot.bipedal_floating.data, jp
-        )
-        
-        p_com_in_pf = np.reshape(robot.bipedal_floating.data.com[0],(3,1))
-        return p_com_in_pf
     
     @staticmethod
     def __get_axis_rotMat(axis: str, theta:float)->np.ndarray:

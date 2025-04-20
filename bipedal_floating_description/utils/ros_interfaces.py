@@ -1,9 +1,6 @@
 import numpy as np; np.set_printoptions(precision=2)
 from rclpy.node import Node
 from typing import Callable
-import pinocchio as pin #2.6.21
-import pink #2.1.0
-from sys import argv
 from copy import deepcopy
 from scipy.spatial.transform import Rotation as R
 
@@ -179,72 +176,3 @@ class ROSInterfaces:
         
         cls._force_rf = np.vstack(( force.x, force.y, force.z ))
         cls._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
-    
-class RobotModel:
-    """
-    一個使用 Pinocchio 和 Meshcat 進行可視化的機器人模型處理類別。
-    - 屬性:
-        - bipedal_floating: 從骨盆建下來的模擬模型。
-        - stance_l: 從左腳掌往上建的左單腳。
-        - stance_r: 從右腳掌往上建的右單腳。
-        - bipedal_l: 從左腳掌建起的雙腳。
-        - bipedal_r: 從右腳掌建起的雙腳。
-    - 方法:
-        - update_VizAndMesh: 給定關節轉角，更新機器人模型，回傳機器人的 configuration。
-    """
-    def __init__(self):
-        #=========建立機器人模型===========#
-        self._meshrobot = self._loadMeshcatModel("/bipedal_floating.pin.urdf") #Pinnocchio藍色的機器人
-
-        self.bipedal_floating = SimpleModel("/bipedal_floating.xacro")  #從骨盆建下來的模擬模型
-        self.stance_l         = SimpleModel("/stance_l.xacro")          #從左腳掌往上建的左單腳
-        self.stance_r         = SimpleModel("/stance_r_gravity.xacro")  #從右腳掌往上建的右單腳
-        self.bipedal_l        = SimpleModel("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
-        self.bipedal_r        = SimpleModel("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
-        
-        #=========可視化msehcat===========#
-        self._viz = self._meshcatVisualize(self._meshrobot)
-        self.update_VizAndMesh(self._meshrobot.q0) #可視化模型的初始關節角度
-        
-    def update_VizAndMesh(self, jp: np.ndarray) -> pink.Configuration:
-        '''給定關節轉角, 更新機器人模型, 回傳機器人的configuration'''
-        config = pink.Configuration(self._meshrobot.model, self._meshrobot.data, jp)
-        self._viz.display(config.q)
-        return config
-        
-    @staticmethod
-    def _loadMeshcatModel(urdf_path: str):
-        '''高級動力學模型'''
-        robot = pin.RobotWrapper.BuildFromURDF(
-            filename = Config.ROBOT_MODEL_DIR + urdf_path,
-            package_dirs = ["."],
-            root_joint=None,
-        )
-        print(f"URDF description successfully loaded in {robot}")
-        print(robot.model)
-        print(robot.q0)
-        return robot
-    
-    @staticmethod
-    def  _meshcatVisualize(meshrobot: pin.RobotWrapper):
-        '''可視化高級動力學模型'''
-        viz = pin.visualize.MeshcatVisualizer( meshrobot.model, meshrobot.collision_model, meshrobot.visual_model )
-        meshrobot.setVisualizer(viz, init=False)
-        viz.initViewer(open=True)
-        viz.loadViewerModel()
-
-        return viz
-
-class SimpleModel:
-    '''基礎動力學模型, 用來算重力矩和質心位置'''
-    def __init__(self, urdf_path: str):
-        self.model, self.data = self._loadSimpleModel(urdf_path)
-    
-    @staticmethod
-    def _loadSimpleModel(urdf_path: str):
-        urdf_filename = Config.ROBOT_MODEL_DIR + urdf_path if len(argv)<2 else argv[1]
-        model = pin.buildModelFromUrdf(urdf_filename)
-        print(f'{model.name = }')
-        model_data = model.createData()
-        
-        return model, model_data
