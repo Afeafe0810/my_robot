@@ -18,17 +18,22 @@ class KneeLoop:
         endVel = self._endErr_to_endVel(frame, ref)
         _cmd_jv= self._endVel_to_jv(frame, endVel, jv, state, stance)
         cmd_jv = np.vstack(( _cmd_jv['lf'], _cmd_jv['rf'] ))
-        #==========內環==========#
-        tauG = robot.gravity(jp, state, stance, *frame.get_posture())
-        kl, kr  = self._get_innerloop_K(state, stance, is_firmly)
         
-        kp = np.vstack(( kl,kr ))
-
-        torque = kp * (cmd_jv - jv) + tauG
+        #==========內環==========#
+        the_knee = [0, 1, 2, 3, 6, 7, 8, 9]
+        
+        matM = robot.pure_knee_inertia(jp, stance)
+        kv = self._get_innerloop_K(state, stance, is_firmly)
+        
+        tauI = matM @ kv @ (cmd_jv - jv)[the_knee]
+        
+        tauG = robot.gravity(jp, state, stance, *frame.get_posture())[the_knee]
+        
+        torque = tauI + tauG
 
         return {
-            'lf': torque[:6],
-            'rf': torque[6:]
+            'lf': np.vstack((torque[:4])),
+            'rf': np.vstack((torque[4:]))
         }
 
     @staticmethod           
@@ -47,7 +52,7 @@ class KneeLoop:
         err_pa_pelTOrf_in_pf = ref_pa_pelTOrf_in_pf - pa_pelTOrf_in_pf
 
         #========經P gain作為微分========#
-        derr_pa_pelTOlf_in_pf = 20 * err_pa_pelTOlf_in_pf #HACK 外環kp之後要改
+        derr_pa_pelTOlf_in_pf = 25 * err_pa_pelTOlf_in_pf
         derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
         
         #========歐拉角速度轉幾何角速度========#
@@ -113,46 +118,25 @@ class KneeLoop:
     @staticmethod
     def _get_innerloop_K(state: float, stance: list[str], is_firmly: dict[str, bool]) -> tuple[np.ndarray]:
         # HACK 之後gain要改
-        cf, sf = stance
-        # if cf == 'rf':
-        #     if r_contact == 1:
-        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #     if l_contact == 1:
-        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-        
-        # elif cf == 'lf':
-        #     if r_contact == 1:
-        #         kr = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kr = np.array([[1],[1],[1],[1],[1],[1]])
-        #     if l_contact == 1:
-        #         kl = np.array([[1.2],[1.2],[1.2],[1.2],[1.2],[1.2]])
-        #     else:
-        #         kl = np.array([[1],[1],[1],[1],[1],[1]])
-
-
         match state:
             case 1:
-                kl = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                return kl, kr
+                kl = np.array([1, 1, 1, 1])*60
+                kr = np.array([1, 1, 1, 1])*50
+                return np.diag(np.hstack((kl, kr)))
         
             case 2:
-                kl = np.vstack([1.5, 1.5, 1.5, 1.5, 0, 0])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5, 0, 0])
-                return kl, kr
+                kl = np.array([1.5, 1.5, 1.5, 1.5])
+                kr = np.array([0.5, 0.5, 0.5, 0.5])
+                return np.diag(np.hstack((kl, kr)))
                 
             case 30:
-                k = {'lf': None, 'rf': None}
-                k[sf] = np.vstack(( 1.3, 1.3, 1.3, 1.3, 0, 0 ))
+                cf, sf = stance
                 
-                k[cf] = np.vstack((1.5, 1.5, 1.5, 1.5, 0, 0)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2, 0, 0))
-                        
-                return k['lf'], k['rf']
+                k_sf = np.array(( 1.3, 1.3, 1.3, 1.3))
+                
+                k_cf = np.array((1.5, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
+                       np.array((1.2, 1.2, 1.2, 1.2))
+                
+                k = {cf: k_cf, sf: k_sf}        
+                return np.diag(np.hstack((k['lf'], k['rf'])))
                 
