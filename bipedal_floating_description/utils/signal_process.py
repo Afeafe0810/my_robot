@@ -87,17 +87,14 @@ class Dsp:
     # DIFFTER_P_PEL_IN_RF = Diffter()
     
     #====================濾波器====================#
-    tf_15Hz = butter2(15)
-    tf_30Hz = butter2(30)
-    tf_5Hz =  butter2(15)
-    tf_4Hz =  butter2(4)
+    tf_end = butter2(15)
     
+    FILTER_JP = Filter(*butter2(15))
+    FILTER_JV = Filter(*butter2(30))
     
-    FILTER_JP = Filter(*tf_15Hz)
-    FILTER_p = Filter(*tf_15Hz)
-    FILTER_P_LF_IN_WF = Filter(*tf_15Hz)
-    FILTER_P_RF_IN_WF = Filter(*tf_15Hz)
+    FILTER_P_PEL_IN_WF = Filter(*tf_end)
+    FILTER_P_LF_IN_WF = Filter(*tf_end)
+    FILTER_P_RF_IN_WF = Filter(*tf_end)
     
-    FILTER_JV = Filter(*tf_30Hz)
-    FILTER_V_COM_IN_WF = Filter(*tf_30Hz)
+    FILTER_V_COM_IN_WF = Filter(*tf_end)
     

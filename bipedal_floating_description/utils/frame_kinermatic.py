@@ -182,7 +182,7 @@ class RobotFrame:
         def rotat_to_pfToWf(r_to_pf: np.ndarray) -> np.ndarray:
             return r_pf_to_wf @ r_to_pf
         
-        self.p_pel_in_wf = place_in_pfToWf(self.p_pel_in_pf)
+        _p_pel_in_wf = place_in_pfToWf(self.p_pel_in_pf)
         self.p_com_in_wf = place_in_pfToWf(self.p_com_in_pf)
         self.p_LhipX_in_wf = place_in_pfToWf(self.p_LhipX_in_pf) 
         self.p_LhipZ_in_wf = place_in_pfToWf(self.p_LhipZ_in_pf) 
@@ -203,6 +203,7 @@ class RobotFrame:
         self.r_lf_to_wf = rotat_to_pfToWf(self.r_lf_to_pf)
         self.r_rf_to_wf = rotat_to_pfToWf(self.r_rf_to_pf)
         
+        self.p_pel_in_wf = Dsp.FILTER_P_PEL_IN_WF.filt(_p_pel_in_wf)
         self.p_lf_in_wf = Dsp.FILTER_P_LF_IN_WF.filt(_p_lf_in_wf)
         self.p_rf_in_wf = Dsp.FILTER_P_RF_IN_WF.filt(_p_rf_in_wf)
         
