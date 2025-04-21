@@ -25,7 +25,7 @@ class KneeLoop:
         matM = robot.pure_knee_inertia(jp, stance)
         kv = self._get_innerloop_K(state, stance, is_firmly)
         
-        tauI = kv @ (cmd_jv - jv)[the_knee]
+        tauI = matM @ kv @ (cmd_jv - jv)[the_knee]
         
         tauG = robot.gravity(jp, state, stance, *frame.get_posture())[the_knee]
         
@@ -52,7 +52,7 @@ class KneeLoop:
         err_pa_pelTOrf_in_pf = ref_pa_pelTOrf_in_pf - pa_pelTOrf_in_pf
 
         #========經P gain作為微分========#
-        derr_pa_pelTOlf_in_pf = 20 * err_pa_pelTOlf_in_pf #HACK 外環kp之後要改
+        derr_pa_pelTOlf_in_pf = 25 * err_pa_pelTOlf_in_pf
         derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
         
         #========歐拉角速度轉幾何角速度========#
@@ -120,8 +120,8 @@ class KneeLoop:
         # HACK 之後gain要改
         match state:
             case 1:
-                kl = np.array([0.5, 0.5, 0.5, 0.5])
-                kr = np.array([0.5, 0.5, 0.5, 0.5])
+                kl = np.array([1, 1, 1, 1])*60
+                kr = np.array([1, 1, 1, 1])*50
                 return np.diag(np.hstack((kl, kr)))
         
             case 2:
