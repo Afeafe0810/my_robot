@@ -25,9 +25,10 @@ class KneeLoop:
         matM = robot.pure_knee_inertia(jp, stance)
         kv = self._get_innerloop_K(state, stance, is_firmly)
         
-        tauI = kv * (cmd_jv - jv)[the_knee]
+        tauI = kv @ (cmd_jv - jv)[the_knee]
         
         tauG = robot.gravity(jp, state, stance, *frame.get_posture())[the_knee]
+        
         torque = tauI + tauG
 
         return {
@@ -119,23 +120,23 @@ class KneeLoop:
         # HACK 之後gain要改
         match state:
             case 1:
-                kl = np.vstack([0.5, 0.5, 0.5, 0.5])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5])
-                return np.vstack((kl, kr))
+                kl = np.array([0.5, 0.5, 0.5, 0.5])
+                kr = np.array([0.5, 0.5, 0.5, 0.5])
+                return np.diag(np.hstack((kl, kr)))
         
             case 2:
-                kl = np.vstack([1.5, 1.5, 1.5, 1.5])
-                kr = np.vstack([0.5, 0.5, 0.5, 0.5])
-                return np.vstack((kl, kr))
+                kl = np.array([1.5, 1.5, 1.5, 1.5])
+                kr = np.array([0.5, 0.5, 0.5, 0.5])
+                return np.diag(np.hstack((kl, kr)))
                 
             case 30:
                 cf, sf = stance
                 
-                k = {'lf': None, 'rf': None}
-                k[sf] = np.vstack(( 1.3, 1.3, 1.3, 1.3))
+                k_sf = np.array(( 1.3, 1.3, 1.3, 1.3))
                 
-                k[cf] = np.vstack((1.5, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
-                        np.vstack((1.2, 1.2, 1.2, 1.2))
-                        
-                return np.vstack((k['lf'], k['rf']))
+                k_cf = np.array((1.5, 1.5, 1.5, 1.5)) if is_firmly[cf] else\
+                       np.array((1.2, 1.2, 1.2, 1.2))
+                
+                k = {cf: k_cf, sf: k_sf}        
+                return np.diag(np.hstack((k['lf'], k['rf'])))
                 
