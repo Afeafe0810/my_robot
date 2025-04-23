@@ -33,7 +33,7 @@ class AlipTraj:
     
     @property
     def t(self) -> float:
-        return self.T_n * Config.TIMER_PERIOD
+        return self.T_n * Config.Ts
     
     def plan(self, frame: RobotFrame, des_vx_com_in_wf_2T: float, is_firmly: dict[str, bool], stance: list[str]) -> Ref:
         '''演算法對外的接口

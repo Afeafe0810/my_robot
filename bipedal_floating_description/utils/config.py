@@ -7,7 +7,7 @@ class Config:
     '''機器人的參數、常數'''
     
     #取樣頻率
-    TIMER_PERIOD = 0.01
+    Ts = 0.01
     
     #訂閱到的關節順序，是錯的
     JNT_ORDER_SUB = (
@@ -32,7 +32,7 @@ class Config:
     
     #行走每步時間?
     STEP_TIMELENGTH = 0.5
-    STEP_SAMPLELENGTH : int = int(STEP_TIMELENGTH / TIMER_PERIOD)
+    STEP_SAMPLELENGTH : int = int(STEP_TIMELENGTH / Ts)
     
     #機器人的物理模型
     MASS = 9

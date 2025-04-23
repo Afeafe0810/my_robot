@@ -6,7 +6,7 @@ from numbers import Number
 #========================================================#
 def butter2(fn) -> tuple[np.ndarray]:
     '''回傳z^-1的轉移函數係數 num, den'''
-    fs = 1 / Config.TIMER_PERIOD
+    fs = 1 / Config.Ts
     wn_nml = fn * 2 / fs
     return butter(2, wn_nml)
     
@@ -74,7 +74,7 @@ class Diffter:
             self.__isStarted = False
             self.__u_p = 0*u
             
-        y = ( u - self.__u_p ) / Config.TIMER_PERIOD
+        y = ( u - self.__u_p ) / Config.Ts
         self.__u_p = u
         return  y
     

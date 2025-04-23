@@ -12,7 +12,7 @@ class LeftLegBalance:
         
     def plan(self):
         T = Config.DDT
-        Ts = Config.TIMER_PERIOD
+        Ts = Config.Ts
                         
         #==========線性移動==========#
         def linearMove(x0, x1, t0, t1):
