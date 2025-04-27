@@ -65,3 +65,9 @@ class Ref:
         updated_records.to_csv("real_planning.csv")
         
         return updated_records
+
+def linear_move(Tk: int, T0: int, T1: int, p0: float | np.ndarray, p1: float | np.ndarray) -> float | np.ndarray:
+    if Tk < T1:
+        return p0 + (p1-p0) * (Tk-T0)/(T1-T0)
+    else:
+        return p1

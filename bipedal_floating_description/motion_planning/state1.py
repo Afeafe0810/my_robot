@@ -1,6 +1,6 @@
 import numpy as np; np.set_printoptions(precision=2)
 #================ import library ========================#
-from motion_planning.utils import Ref
+from motion_planning.utils import Ref, linear_move
 from utils.frame_kinermatic import RobotFrame
 from utils.config import Config
 #========================================================#
@@ -9,21 +9,32 @@ from utils.config import Config
 class BipedalBalance:
     def __init__(self):
         self.is_just_started = True
-        self.t = 0.0
+        self.Tk = 0
         
         self.pel0 : np.ndarray = None
         self.lf0  : np.ndarray = None
         self.rf0  : np.ndarray = None
 
     def plan(self, frame: RobotFrame) -> Ref:
-        """回傳雙腳支撐時的參考值"""
+        """左右腳都保持初值, 骨盆線性移動到0.55的高度"""
+        
+        #剛開始讀取初值
         if self.is_just_started:
-            self.pel0, self.lf0, self.rf0 = frame.p_pel_in_wf, frame.p_lf_in_wf, frame.p_rf_in_wf
+            self.pel0 = frame.p_pel_in_wf
+            self.lf0 = frame.p_lf_in_wf
+            self.rf0 = frame.p_rf_in_wf
+            
             self.is_just_started = False
         
+        #骨盆高度線性移動
+        H = Config.IDEAL_Z_PEL_IN_WF
+        z_pel = linear_move(self.Tk, 0, Config.TL_BALANCE, self.pel0[2,0], H)
+        
+        if self.Tk < Config.TL_BALANCE:
+            self.Tk += 1
+        
         return Ref(
-            pel := np.vstack((self.pel0, 0, 0, 0)),
-            
+            pel := np.vstack((self.pel0[:2], z_pel, 0, 0, 0)),
             lf  := np.vstack((self.lf0, 0, 0, 0)),
             rf   = np.vstack((self.rf0, 0, 0, 0)),
             var  = Ref._generate_var_insteadOf_com(pel, lf)
