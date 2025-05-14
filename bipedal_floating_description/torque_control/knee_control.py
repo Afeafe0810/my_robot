@@ -1,5 +1,5 @@
 #================ import library ========================#
-import numpy as np; np.set_printoptions(precision=3, suppress=True)
+import numpy as np; np.set_printoptions(precision=5)
 
 #================ import library ========================#
 from utils.frame_kinermatic import RobotFrame
@@ -31,8 +31,6 @@ class KneeLoop:
         
         torque = tauI + tauG
 
-        if state == 1:
-            torque = np.vstack([0.5, 0.5, 0.5, 0.5]*2) * (cmd_jv - jv)[the_knee] + tauG
         return {
             'lf': np.vstack((torque[:4])),
             'rf': np.vstack((torque[4:]))
