@@ -5,10 +5,11 @@ import numpy as np; np.set_printoptions(precision=5)
 from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
 from motion_planning import Ref
+from utils.config import Config
 
 from torque_control.knee_control import KneeLoop
-from torque_control.initial_balance import balance_ctrl
-from torque_control.alip_control import AlipControl
+from torque_control.initial_balance import balance_ctrl, cf_anklePD_Ax, cf_anklePD
+from torque_control.alip_control import AlipControl, AlipX
 from torque_control.ankle_control import anklePD_ctrl
 
 
@@ -19,6 +20,7 @@ class TorqueControl:
     def __init__(self):
         self.knee = KneeLoop()
         self.alip = AlipControl()
+        self.alipx = AlipX()
         
     def update_torque(self, frame: RobotFrame, robot: RobotModel, ref: Ref, state: float,
                       stance: list[str], stance_past: list[str], is_firmly: dict[str, bool], jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
@@ -28,7 +30,21 @@ class TorqueControl:
         match state:
             case 0:
                 return balance_ctrl(frame, robot, jp)
-            case 1 | 2 | 30:
+            case 1:
+                #雙腳膝蓋
+                torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
+                torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
+                torque_ankle_ax = cf_anklePD_Ax(frame, robot, jp, jv)
+                #雙腳腳踝
+                torque_ankle = {
+                    sf : anklePD_ctrl(frame, sf),
+                    cf : np.vstack((torque_ankle_ay, torque_ankle_ax))
+                    # cf : cf_anklePD(frame, robot, jp, jv)
+                }
+                
+                return np.vstack(( torque_knee['lf'], torque_ankle['lf'], torque_knee['rf'], torque_ankle['rf'] ))
+            
+            case 2 | 30:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 
