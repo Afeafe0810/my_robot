@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from typing import TypeVar
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 
 @dataclass
@@ -66,7 +68,8 @@ class Ref:
         
         return updated_records
 
-def linear_move(Tk: int, T0: int, T1: int, p0: float | np.ndarray, p1: float | np.ndarray) -> float | np.ndarray:
+FloatOrArray = TypeVar('FloatOrArray', float, NDArray)
+def linear_move(Tk: int, T0: int, T1: int, p0: FloatOrArray, p1: FloatOrArray) -> FloatOrArray:
     if Tk < T1:
         return p0 + (p1-p0) * (Tk-T0)/(T1-T0)
     else:

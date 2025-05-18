@@ -1,9 +1,14 @@
 import numpy as np
+from numpy.typing import NDArray
+from numbers import Number
+from typing import TypeVar
 from scipy.signal import butter
 #================ import library ========================#
 from utils.config import Config
-from numbers import Number
 #========================================================#
+
+NumberOrArray = TypeVar('NumberOrArray', Number, NDArray[np.float_])
+
 def butter2(fn) -> tuple[np.ndarray]:
     '''回傳z^-1的轉移函數係數 num, den'''
     fs = 1 / Config.Ts
@@ -27,21 +32,21 @@ class Filter:
     
     def __init__(self, num: list, den: list):
         '''num, den 是以z^-1的係數'''
-        self.__num : np.ndarray = np.vstack(( num )) / den[0]
-        self.__den : np.ndarray = np.vstack(( den )) / den[0]
+        self.__num : NDArray = np.vstack(( num )) / den[0]
+        self.__den : NDArray = np.vstack(( den )) / den[0]
 
         self.__isStarted : bool = True
         
         # pasts從左到右是新到舊 k, k-1, k-2
-        self.__u_pasts : np.ndarray = None
-        self.__y_pasts : np.ndarray = None
+        self.__u_pasts : NDArray = None
+        self.__y_pasts : NDArray = None
 
         
-    def filt(self, u: Number|np.ndarray) -> float|np.ndarray :
+    def filt(self, input: NumberOrArray) -> NumberOrArray :
         ''' u只接受是column vector或num '''
-        is_u_num = isinstance(u, Number)
-        if  is_u_num:
-            u = np.array( [[u]] )
+        is_input_num = isinstance(input, Number)
+        u : NDArray = np.array([[input]]) if is_input_num else input
+
         if self.__isStarted:
             self.__isStarted = False
             self.__u_pasts = np.zeros(( len(u), len(self.__num)-1 ))
@@ -51,7 +56,7 @@ class Filter:
         self.__y_pasts = np.hstack(( y, self.__y_pasts[:,:-1] ))
         self.__u_pasts = np.hstack(( u, self.__u_pasts[:,:-1] ))
         
-        return y.item() if is_u_num else\
+        return y.item() if is_input_num else\
                y
 
 class Diffter:
@@ -69,7 +74,7 @@ class Diffter:
         self.__isStarted = True
         self.__u_p = None
         
-    def diff(self, u : np.ndarray | float ) ->  np.ndarray | float:
+    def diff(self, u : NumberOrArray ) ->  NumberOrArray:
         if self.__isStarted:
             self.__isStarted = False
             self.__u_p = 0*u
