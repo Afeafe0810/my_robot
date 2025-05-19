@@ -22,11 +22,11 @@ def cf_anklePD_Ax(frame: RobotFrame, robot:RobotModel, jp: np.ndarray, jv: np.nd
     """在剛開機狀態直接用關節角度的 單環 來平衡"""
     ref_ankle_jp = 0
     kp = 4*1
-    kd = 4*1
+    kd = 3
     tauG = robot.gravity(jp, 0, ['lf', 'rf'], *frame.get_posture())
     
-    # torque = kp * (ref_ankle_jp-jp[4:6]) - kd * jv[4:6]
-    torque = kp * (ref_ankle_jp-jp[5])
+    torque = kp * (ref_ankle_jp-jp[5]) - kd * jv[5]
+    # torque = kp * (ref_ankle_jp-jp[5])
     
     return np.clip(torque, -Config.ANKLE_AX_LIMIT, Config.ANKLE_AX_LIMIT)
 
