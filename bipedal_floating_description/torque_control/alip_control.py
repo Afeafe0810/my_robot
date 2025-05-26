@@ -58,7 +58,7 @@ class _Abstract_Alip_NoEstimate:
         
         return -u
     
-class AlipX(_Abstract_Alip_NoEstimate):
+class AlipX(_Abstract_Alip_EstimateBias):
     def __init__(self):
         super().__init__(
             A = np.array([[1, 0.00247], [0.8832, 1]]),
