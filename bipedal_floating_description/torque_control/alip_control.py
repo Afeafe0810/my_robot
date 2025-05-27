@@ -74,14 +74,15 @@ class AlipY(_Abstract_Alip_NoEstimate):
         super().__init__(
             A = np.array([[1, -0.00247],[-0.8832, 1]]),
             B = np.vstack((0, 0.01)),
-            K = np.array([[-150, 15]]),
+            # K = np.array([[-150, 15]]),
             # K = np.array([-177.059600, 9.601400]),
             # K = np.array([-185.618059, 9.804615]),
-            # K = np.array([-127.045296, 6.185515]),
+            K = np.array([-127.045296, 6.185515])*0.8,
             L = np.vstack((3.274146, -40.792358)),
             L_bias = -2.730338
         )
     def ctrl(self, frame: RobotFrame, stance: list[str], stance_past: list[str], var: NDArray, ref_var: NDArray, limit: float) -> float:
+        ref_var = np.vstack((0, 0))
         u = super().ctrl(stance, stance_past, var, ref_var, limit)
         print(pd.Series({
             "com": var[0, 0],
@@ -103,7 +104,34 @@ class AlipY1(_Abstract_Alip_EstimateBias):
             L = np.vstack((0.680529, -11.882289)),
             L_bias = -0.395041
         )
+        self.bias_e = 0.02
     def ctrl(self, frame: RobotFrame, stance: list[str], stance_past: list[str], var: NDArray, ref_var: NDArray, limit: float) -> float:
+        
+        ref_var = np.vstack((0.005, 0))
+        
+        if stance != stance_past or self.is_ctrl_first_time:
+            self.is_ctrl_first_time = False
+            self.var_e = np.vstack((-0.04, 0))
+
+        #==========全狀態回授(飽和)==========#
+        _u = -self.K @ (self.var_e + np.vstack((self.bias_e, 0))- ref_var) 
+        u = np.clip(_u, -limit, limit)
+        data = {
+            "com_e": self.var_e[0, 0],
+            "com": var[0, 0],
+            "pel_e": self.var_e[0, 0] + self.bias_e,
+            "pel": frame.p_pel_in_wf[1, 0]-frame.p_lf_in_wf[1, 0],
+            "L_e": self.var_e[1, 0],
+            "L": var[1, 0]
+        }
+        print(pd.Series(data))
+        #==========估測回授==========#
+        err_e = (frame.p_pel_in_wf[1, 0]-frame.p_lf_in_wf[1, 0]) - self.var_e[0, 0] - self.bias_e
+        self.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
+        self.bias_e = self.bias_e + self.L_bias * err_e
+        
+        return -u
+        
         if self.var_e is not None:
             data_estimate = {
                 "com_e": self.var_e[0, 0],
