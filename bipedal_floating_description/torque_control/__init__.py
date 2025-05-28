@@ -1,6 +1,6 @@
 #================ import library ========================#
 import numpy as np; np.set_printoptions(precision=5)
-
+import pandas as pd
 #================ import library ========================#
 from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
@@ -36,7 +36,7 @@ class TorqueControl:
             case 1:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
-                torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
+                torque_ankle_ay = self.alipx.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
                 torque_ankle_ax = cf_anklePD_Ax(frame, robot, jp, jv)
                 #雙腳腳踝
                 torque_ankle = {

@@ -80,7 +80,7 @@ class UpperLevelController(Node):
         self.stance_past = self.stance
         print("torque: \n", torque[0:6, 0], '\n', torque[6:12, 0])
         print("jp: ", jp.flatten())
-        if state == 2:
+        if state == 1:
             
             print("force_rf: ", force_ft['rf'])
             print("tau_rf: ", tau_ft['rf'].flatten())

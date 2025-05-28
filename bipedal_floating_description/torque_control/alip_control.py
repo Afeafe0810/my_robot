@@ -1,5 +1,6 @@
 #================ import library ========================#
 import numpy as np; np.set_printoptions(precision=5)
+from utils.ros_interfaces import ROSInterfaces as ROS
 from numpy.typing import NDArray
 import pandas as pd
 #================ import library ========================#
@@ -18,24 +19,36 @@ class _Abstract_Alip_EstimateBias:
         self.L_bias = L_bias
         
         #估測狀態
-        self.var_e: NDArray = None
-        self.bias_e: float = 0.0
+        # self.var_e: NDArray = np.vstack((0.02, 0))
+        self.bias_e: float = 0
     
-    def ctrl(self, stance: list[str], stance_past: list[str], var: NDArray, ref_var: NDArray, limit: float) -> float:
+    def ctrl(self, frame: RobotFrame ,stance: list[str], stance_past: list[str], var: NDArray, ref_var: NDArray, limit: float) -> float:
         """回傳支撐腳腳踝扭矩"""
+        ref_var = np.vstack((0.005, 0))
+        var = np.vstack((frame.p_pel_in_wf[0, 0] - frame.p_lf_in_wf[0, 0], 0))
         if stance != stance_past or self.is_ctrl_first_time:
             self.is_ctrl_first_time = False
             self.var_e = var
 
         #==========全狀態回授(飽和)==========#
-        _u = -self.K @ (self.var_e - ref_var) 
+        _u = -self.K @ (self.var_e + np.vstack((self.bias_e, 0))- ref_var) 
         u = np.clip(_u, -limit, limit)
         
         #==========估測回授==========#
         err_e = var[0, 0] - self.var_e[0, 0] - self.bias_e
         self.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
         self.bias_e = self.bias_e + self.L_bias * err_e
-        
+        ROS.publishers.pel_e.publish(np.array([self.var_e[0, 0] + self.bias_e]))
+        ROS.publishers.pel.publish(np.array([frame.p_pel_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]]))
+        ROS.publishers.com_e.publish(np.array([self.var_e[0, 0]]))
+        ROS.publishers.com.publish(np.array([frame.p_com_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]]))
+        print(pd.Series({
+            'com_e': self.var_e[0, 0],
+            'com': frame.p_com_in_wf[0, 0] - frame.p_lf_in_wf[0, 0],
+            'pel_e': self.var_e[0, 0] + self.bias_e,
+            'pel': frame.p_pel_in_wf[0, 0] - frame.p_lf_in_wf[0, 0],
+            'ref_var': ref_var[0, 0]
+        }))
         return -u
 
 class _Abstract_Alip_NoEstimate:
