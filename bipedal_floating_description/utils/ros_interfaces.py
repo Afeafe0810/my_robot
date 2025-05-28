@@ -39,6 +39,10 @@ class MyPublishers:
     def __init__(self, node: Node):
         # 控制命令
         self.effort = MyPublisher(node, '/effort_controllers/commands')
+        self.pel_e = MyPublisher(node, 'pel_e')
+        self.pel = MyPublisher(node, 'pel')
+        self.com_e = MyPublisher(node, 'com_e')
+        self.com = MyPublisher(node, 'com')
         
         #只是用來追蹤數據
         # self.position = MyPublisher(node, '/position_controller/commands')
@@ -69,7 +73,7 @@ class MyPublisher:
         self._publisher = node.create_publisher(msg_type, topic, qos_profile)
         
     def publish(self, msg):
-        """目前只支援 Float64MultiArray 直接 publish"""
+        """目前只支援 Float64MultiArray 直接用 msg: list 發布"""
         if self._msg_type == Float64MultiArray:
             self._publisher.publish(self._msg_type(data = msg))
         else:

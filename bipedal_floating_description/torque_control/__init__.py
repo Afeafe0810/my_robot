@@ -1,6 +1,6 @@
 #================ import library ========================#
 import numpy as np; np.set_printoptions(precision=5)
-
+import pandas as pd
 #================ import library ========================#
 from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
@@ -9,7 +9,7 @@ from utils.config import Config
 
 from torque_control.knee_control import KneeLoop
 from torque_control.initial_balance import balance_ctrl, cf_anklePD_Ax, cf_anklePD, cf_anklePD_Ax2
-from torque_control.alip_control import AlipX, AlipY
+from torque_control.alip_control import AlipX, AlipY, AlipY1
 from torque_control.ankle_control import anklePD_ctrl
 
 
@@ -22,6 +22,8 @@ class TorqueControl:
         #self.alip = AlipControl()
         self.alipx = AlipX()
         self.alipy = AlipY()
+        self.alipy1 = AlipY1()
+        self.alipT = 0
         
     def update_torque(self, frame: RobotFrame, robot: RobotModel, ref: Ref, state: float,
                       stance: list[str], stance_past: list[str], is_firmly: dict[str, bool], jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
@@ -34,7 +36,7 @@ class TorqueControl:
             case 1:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
-                torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
+                torque_ankle_ay = self.alipx.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
                 torque_ankle_ax = cf_anklePD_Ax(frame, robot, jp, jv)
                 #雙腳腳踝
                 torque_ankle = {
@@ -61,7 +63,7 @@ class TorqueControl:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
-                torque_ankle_ax = self.alipy.ctrl(stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'], Config.ANKLE_AX_LIMIT)
+                torque_ankle_ax = self.alipy1.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'], Config.ANKLE_AX_LIMIT)
                 #雙腳腳踝
                 torque_ankle = {
                     sf : anklePD_ctrl(frame, sf),
