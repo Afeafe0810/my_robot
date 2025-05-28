@@ -8,7 +8,7 @@ from motion_planning import Ref
 from utils.config import Config
 
 from torque_control.knee_control import KneeLoop
-from torque_control.initial_balance import balance_ctrl, cf_anklePD_Ax, cf_anklePD, cf_anklePD_Ax2
+from torque_control.pd_control import balance_ctrl, cf_anklePD_Ax, cf_anklePD, cf_anklePD_Ax2
 from torque_control.alip_control import AlipX, AlipY, AlipY1
 from torque_control.ankle_control import anklePD_ctrl
 
