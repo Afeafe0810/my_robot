@@ -45,7 +45,7 @@ class UpperLevelController(Node):
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
-        p_base_in_wf, r_base_to_wf, state, is_contact, jp, jv, force_ft, tau_ft = ROS.returnSubData()
+        p_base_in_wf, r_base_to_wf, state, is_contact, jp, jv, force_ft, tau_ft = ROS.subscribers.return_data()
         
         #==========更新可視化的機器人==========#
         config = self.robot.update_VizAndMesh(jp)
@@ -68,7 +68,7 @@ class UpperLevelController(Node):
             
         #========扭矩控制========#
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
-        ROS.publisher['effort'].publish( Float64MultiArray(data = torque) )
+        ROS.publishers.effort.publish(torque)
         self.stance_past = self.stance
 
     def _set_stance(self, state):

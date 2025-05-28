@@ -9,17 +9,17 @@ class Config:
     #取樣頻率
     Ts = 0.01
     
-    #訂閱到的關節順序，是錯的
-    JNT_ORDER_SUB = (
-        'L_Hip_Z', 'L_Hip_Y', 'L_Knee_Y', 'L_Ankle_Y', 'L_Ankle_X', 'R_Hip_X', 
-        'R_Hip_Z', 'R_Knee_Y', 'R_Hip_Y', 'R_Ankle_Y', 'L_Hip_X', 'R_Ankle_X'
-    )
+    # JointStates的最可能的順序, 順序無法改！！！！！
+    # JNT_ORDER_SUB = (
+    #     'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll',
+    #     'R_Hip_Yaw', 'R_Knee_Pitch', 'R_Hip_Pitch', 'R_Ankle_Pitch', 'L_Hip_Roll', 'R_Ankle_Roll' )
 
-    #實際上的關節順序
-    JNT_ORDER_LITERAL = [
-        'L_Hip_X', 'L_Hip_Z', 'L_Hip_Y', 'L_Knee_Y', 'L_Ankle_Y', 'L_Ankle_X',
-        'R_Hip_X', 'R_Hip_Z', 'R_Hip_Y', 'R_Knee_Y', 'R_Ankle_Y', 'R_Ankle_X'
-    ]
+    #實際上URDF的關節順序以及effort controller的順序
+    JNT_ORDER_LITERAL = (
+        'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 'L_Ankle_Pitch', 'L_Ankle_Roll',
+        'R_Hip_Roll', 'R_Hip_Yaw', 'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
+    )
+    #(X, Z, Y, Y, Y, X)
     
     #URDF檔的路徑
     ROBOT_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
@@ -27,6 +27,9 @@ class Config:
     #骨盆相對base的座標
     P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
     
+    #雙腳平衡sample
+    TL_BALANCE = 100
+
     #單腳支撐時間?
     DDT = 2
     

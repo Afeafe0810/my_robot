@@ -11,10 +11,10 @@ class RobotModel:
     一個使用 Pinocchio 和 Meshcat 進行可視化的機器人模型處理類別。
     - 屬性:
         - bipedal_floating: 從骨盆建下來的模擬模型。
-        - stance_l: 從左腳掌往上建的左單腳。
-        - stance_r: 從右腳掌往上建的右單腳。
-        - bipedal_l: 從左腳掌建起的雙腳。
-        - bipedal_r: 從右腳掌建起的雙腳。
+        - single_lf: 從左腳掌往上建的左單腳。
+        - single_rf: 從右腳掌往上建的右單腳。
+        - bipedal_from_lf: 從左腳掌建起的雙腳。
+        - bipedal_from_rf: 從右腳掌建起的雙腳。
     - 方法:
         - update_VizAndMesh: 給定關節轉角，更新機器人模型，回傳機器人的 configuration。
     """
@@ -110,15 +110,13 @@ class RobotModel:
 
         return viz
 
-class _SimpleModel:
-    '''基礎動力學模型, 用來算重力矩和質心位置'''
+class _AbstractSimpleModel:
+    '''基礎運動學模型, 用來算重力矩和質心位置'''
     def __init__(self, urdf_path: str):
-        urdf = Config.ROBOT_MODEL_DIR + urdf_path
-        model = pin.buildModelFromUrdf(urdf)
-        print(f'{model.name = }')
-        
         #機器人模型
-        self.model, self.data = model, model.createData()
+        self.model = pin.buildModelFromUrdf(Config.ROBOT_MODEL_DIR + urdf_path)
+        self.data = self.model.createData()
+        print(f'model: {self.model.name}')
         
         #關節順序的轉換
         self.permut: np.ndarray = self._joint_permutation()
@@ -126,10 +124,14 @@ class _SimpleModel:
         
     @staticmethod
     def _joint_permutation()-> np.ndarray:
-        return np.array([[]])
+        """要實作把關節順序/方向轉成urdf的順序"""
+        raise NotImplementedError
     
     def _joint_inverse_permutation(self)-> np.ndarray:
-        """「方陣」置換矩陣的反函數 = 轉置"""
+        """把urdf的順序轉成關節順序/方向
+        
+        預設是12->12, 置換「方陣」的反函數為轉置, 非12->12需要重做"""
+        
         return self._joint_permutation().T
     
     def gravity(self, jp: np.ndarray) -> np.ndarray:
@@ -138,13 +140,17 @@ class _SimpleModel:
     def inertia(self, jp: np.ndarray) -> np.ndarray:
         return self.inv_permut @ pin.crba(self.model, self.data, self.permut@jp) @ self.permut
     
-class BipedalFromPel(_SimpleModel):
+class BipedalFromPel(_AbstractSimpleModel):
+    @staticmethod
+    def _joint_permutation()-> np.ndarray:
+        return np.eye(12)
+    
     def com(self, jp: np.ndarray) -> np.ndarray:
         # TODO 學長有用其他模型建立, 不知道會不會有差, 但我目前是覺得就算有差也不可能差多少啦
         pin.centerOfMass(self.model, self.data, jp)
         return self.data.com[0].reshape(3,1)
 
-class BipedalFromLF(_SimpleModel):
+class BipedalFromLF(_AbstractSimpleModel):
     @staticmethod
     def _joint_permutation()-> np.ndarray:
         """關節順序轉成5-0、6-11, 反轉須反向"""
@@ -153,7 +159,7 @@ class BipedalFromLF(_SimpleModel):
         I = np.eye(6,6)
         return np.block([[P, O], [O, I]])
     
-class BipedalFromRF(_SimpleModel):
+class BipedalFromRF(_AbstractSimpleModel):
     @staticmethod
     def _joint_permutation()-> np.ndarray:
         """關節順序轉成11-6、0-5, 反轉須反向"""
@@ -162,7 +168,7 @@ class BipedalFromRF(_SimpleModel):
         I = np.eye(6,6)
         return np.block([[O, P], [I, O]])
 
-class SingleLeftLeg(_SimpleModel):
+class SingleLeftLeg(_AbstractSimpleModel):
     @staticmethod
     def _joint_permutation()-> np.ndarray:
         """關節順序轉成5-0, 反轉須反向"""
@@ -174,7 +180,7 @@ class SingleLeftLeg(_SimpleModel):
     def _joint_inverse_permutation():
         return _pure_permute()
     
-class SingleRightLeg(_SimpleModel):
+class SingleRightLeg(_AbstractSimpleModel):
     @staticmethod
     def _joint_permutation()-> np.ndarray:
         """關節順序轉成11-6, 反轉須反向"""

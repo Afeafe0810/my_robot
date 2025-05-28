@@ -1,4 +1,5 @@
 import numpy as np; np.set_printoptions(precision=2)
+from numpy.typing import NDArray
 from rclpy.node import Node
 from typing import Callable
 from copy import deepcopy
@@ -21,158 +22,167 @@ class ROSInterfaces:
     """
     負責處理ROS節點的訂閱與發佈, 設做全局的class
     
-    - 使用方法, 需要先init一次, 在各個模組內只要import就好
+    - 使用方法:
+        - 需要先init一次, 在各個模組內只要import就好
     
     - 屬性:
-        - publisher (dict)
-        - subscriber (dict)
-        
-    - 方法:
-        - returnSubData: 回傳訂閱器的數據，並進行速度微分和濾波, 包含:
-            - base的位置與旋轉矩陣
-            - 機器人控制模式state
-            - 左右腳是否有接觸地面 (未必有踩穩)
-            - 關節角度 (同時也每五次呼叫主程式的main_callback)
+        - publishers
+        - subscribers
     """
 
     @classmethod
     def init(cls, node: Node, main_callback: Callable ):
-        
-        #=========初始化===========#
-        cls._p_base_in_wf = cls._r_base_to_wf = cls._jp = None
-        cls._state = 0.0
-        cls._is_contact_lf = cls._is_contact_rf = True
-        cls._force_lf = cls._tau_lf = None
-        cls._force_rf = cls._tau_rf = None
+        cls.publishers = MyPublishers(node)
+        cls.subscribers = MySubscribers(node, main_callback)
 
+class MyPublishers:
+    def __init__(self, node: Node):
+        # 控制命令
+        self.effort = MyPublisher(node, '/effort_controllers/commands')
         
-        cls._callback_count = 0 #每5次會呼叫一次maincallback
-        cls._main_callback = main_callback #引入main_callback來持續呼叫
+        #只是用來追蹤數據
+        # self.position = MyPublisher(node, '/position_controller/commands')
+        # self.velocity = MyPublisher(node, '/velocity_controller/commands')
+        # self.vcmd = MyPublisher(node, '/velocity_command/commands')
+        # self.gravity_l = MyPublisher(node, '/l_gravity')
+        # self.gravity_r = MyPublisher(node, '/r_gravity')
+        # self.alip_x = MyPublisher(node, '/alip_x_data')
+        # self.alip_y = MyPublisher(node, '/alip_y_data')
+        # self.torque_l = MyPublisher(node, '/torqueL_data')
+        # self.torque_r = MyPublisher(node, '/torqueR_data')
+        # self.ref = MyPublisher(node, '/ref_data')
+        # self.pel = MyPublisher(node, '/px_data')
+        # self.com = MyPublisher(node, '/com_data')
+        # self.lf = MyPublisher(node, '/lx_data')
+        # self.rf = MyPublisher(node, '/rx_data')
         
-        #=========ROS的訂閱與發布===========#
-        
-        cls.publisher = cls._createPublishers(node)
-        cls.subscriber = cls._createSubscribers(node)
+        # self.joint_trajectory_controller = MyPublisher(node, '/joint_trajectory_controller/joint_trajectory', JointTrajectory)
+
+class MyPublisher:
+    """發佈器
     
-    #=========對外主要接口===========#
-    @classmethod
-    def returnSubData(cls) -> tuple[np.ndarray, np.ndarray, float, dict[str, bool], np.ndarray, np.ndarray, dict[str, float], dict[str, float]]:
-        '''回傳訂閱器的data'''
+    - method:
+        - publish(msg): 目前只支援 Float64MultiArray 直接 publish
+    """
+    def __init__(self, node: Node, topic: str, msg_type: type = Float64MultiArray, qos_profile: int = 10):
+        self._msg_type = msg_type
+        self._publisher = node.create_publisher(msg_type, topic, qos_profile)
         
+    def publish(self, msg):
+        """目前只支援 Float64MultiArray 直接 publish"""
+        if self._msg_type == Float64MultiArray:
+            self._publisher.publish(self._msg_type(data = msg))
+        else:
+            raise NotImplementedError
+
+class MySubscribers:
+    """ 訂閱了base, state, contact, ft force, joint angle/velocity """
+    def __init__(self, node: Node, main_callback: Callable):
+        self.base = BaseSubscriber(node)
+        self.state = StateSubsciber(node)
+        self.lf_contact = ContactSubscriber(node, '/l_foot/bumper_demo')
+        self.rf_contact = ContactSubscriber(node, '/r_foot/bumper_demo')
+        self.lf_force = ForceSubscriber(node, '/lf_sensor/wrench')
+        self.rf_force = ForceSubscriber(node, '/rf_sensor/wrench')
+        self.jp = JointSubsciber(node, main_callback)
+
+    def return_data(self) -> list[NDArray, NDArray, float, dict[str, bool], NDArray, NDArray, dict[str, float], dict[str, NDArray]]:
         #微分得到速度(飽和)，並濾波
-        jp = Dsp.FILTER_JP.filt(cls._jp)
+        jp = Dsp.FILTER_JP.filt(self.jp.jp)
         _jv = np.clip( Dsp.DIFFTER_JP.diff(jp), -0.75, 0.75)
         jv = Dsp.FILTER_JV.filt(_jv)
         
-        is_contact = {'lf' : cls._is_contact_lf, 'rf' : cls._is_contact_rf}
-        force_ft = {'lf' : cls._force_lf[2,0], 'rf' : cls._force_rf[2,0]}
-        tau_ft = {'lf' : cls._tau_lf, 'rf' : cls._tau_rf}
+        is_contact_ft = {'lf' : self.lf_contact.is_contact, 'rf' : self.rf_contact.is_contact}
+        force_ft = {'lf' : self.lf_force.force[2,0], 'rf' : self.rf_force.force[2,0]}
+        tau_ft = {'lf' : self.lf_force.tau, 'rf' : self.rf_force.tau}
         
         return list( map( deepcopy,
             [ 
-                cls._p_base_in_wf,
-                cls._r_base_to_wf,
-                cls._state,
-                is_contact,
+                self.base.p_base_in_wf,
+                self.base.r_base_to_wf,
+                self.state.state,
+                is_contact_ft,
                 jp, 
-                jv, 
+                jv,
                 force_ft, 
                 tau_ft
             ]
         ))
-    
-    #=========發布器, 訂閱器建立===========#
-    @staticmethod
-    def _createPublishers(node: Node):
-        '''
-        建立發布器, 其中effort publisher是ROS2-control的力矩, 負責控制各個關節的力矩
-            ->我們所有程式目的就是為了pub關節扭矩
-        '''
-        return {
-            #只有effort才是真正的控制命令，其他只是用來追蹤數據
-            "effort"    : node.create_publisher( Float64MultiArray , '/effort_controllers/commands',  10),
-            
-            "position"  : node.create_publisher( Float64MultiArray , '/position_controller/commands', 10),
-            "velocity"  : node.create_publisher( Float64MultiArray , '/velocity_controller/commands', 10),
-            "vcmd"      : node.create_publisher( Float64MultiArray , '/velocity_command/commands',    10),
-            "gravity_l" : node.create_publisher( Float64MultiArray , '/l_gravity',                    10),
-            "gravity_r" : node.create_publisher( Float64MultiArray , '/r_gravity',                    10),
-            "alip_x"    : node.create_publisher( Float64MultiArray , '/alip_x_data',                  10),
-            "alip_y"    : node.create_publisher( Float64MultiArray , '/alip_y_data',                  10),
-            "torque_l"  : node.create_publisher( Float64MultiArray , '/torqueL_data',                 10),
-            "torque_r"  : node.create_publisher( Float64MultiArray , '/torqueR_data',                 10),
-            "ref"       : node.create_publisher( Float64MultiArray , '/ref_data',                     10),
-            "joint_trajectory_controller" : node.create_publisher(
-                JointTrajectory , '/joint_trajectory_controller/joint_trajectory', 10
-            ),
-            "pel"       : node.create_publisher( Float64MultiArray , '/px_data',                      10),
-            "com"       : node.create_publisher( Float64MultiArray , '/com_data',                     10),
-            "lf"        : node.create_publisher( Float64MultiArray , '/lx_data',                      10),
-            "rf"        : node.create_publisher( Float64MultiArray , '/rx_data',                      10),
-        }
 
-    @classmethod
-    def _createSubscribers(cls, node: Node):
-        '''主要是為了訂閱base, joint_states, state
+class _AbstractSubscriber:
+    def __init__(self, node: Node, msg_type: type, topic: str):
+        self._subsciber = node.create_subscription(msg_type, topic, self._callback, 10)
         
-        main_callback是和joint_states同步
-        '''
-        return{
-            "base"         : node.create_subscription( Odometry,          '/odom',               cls._update_baseInWf_callback,  10 ),
-            "state"        : node.create_subscription( Float64MultiArray, 'state_topic',         cls._update_state_callback,     10 ),
-            "lf_contact"   : node.create_subscription( ContactsState,     '/l_foot/bumper_demo', cls._update_contact_callback,   10 ),
-            "rf_contact"   : node.create_subscription( ContactsState,     '/r_foot/bumper_demo', cls._update_contact_callback,   10 ),
-            "joint_states" : node.create_subscription( JointState,        '/joint_states',       cls._update_jpAndMain_callback, 10 ),
-            "lf_force"     : node.create_subscription( WrenchStamped,     '/lf_sensor/wrench',   cls._update_lfForce_callback,   10 ),
-            "rf_force"     : node.create_subscription( WrenchStamped,     '/rf_sensor/wrench',   cls._update_rfForce_callback,   10 ),
-        }
-
-    #=========訂閱Callback===========#
-    @classmethod
-    def _update_baseInWf_callback(cls, msg:Odometry):
+    def _callback(self, msg):
+        raise NotImplementedError
+        
+class BaseSubscriber(_AbstractSubscriber):
+    """來自 bipedal_floation.xacro 的<libgazebo_ros_p3d.so>"""
+    
+    def __init__(self, node: Node):
+        self.p_base_in_wf = None
+        self.r_base_to_wf = None
+        super().__init__(node, Odometry, '/odom')
+                                                    
+    def _callback(self, msg: Odometry):
         p = msg.pose.pose.position
         q = msg.pose.pose.orientation #四元數法
-        cls._p_base_in_wf = np.vstack(( p.x, p.y, p.z ))
-        cls._r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
+        self.p_base_in_wf = np.vstack(( p.x, p.y, p.z ))
+        self.r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
+        
+class StateSubsciber(_AbstractSubscriber):
+    '''state是我們控制策略, 用pub與subscribe來控制, 來自於我們手動pub'''
     
-    @classmethod
-    def _update_state_callback(cls, msg:Float64MultiArray):
-        '''state是我們控制的模式, 用pub與subscibe來控制'''
-        cls._state = msg.data[0]
-  
-    @classmethod
-    def _update_contact_callback(cls, msg:ContactsState ):
-        '''可以判斷是否『接觸』, 無法判斷是否『踩穩』'''
-        if msg.header.frame_id == 'l_foot_1':
-            cls._is_contact_lf = len(msg.states)>=1
-        elif msg.header.frame_id == 'r_foot_1':
-            cls._is_contact_rf = len(msg.states)>=1
-            
-    @classmethod
-    def _update_jpAndMain_callback(cls, msg:JointState ):
+    def __init__(self, node: Node):
+        
+        self.state = 0.0
+        super().__init__(node, Float64MultiArray, 'state_topic')
+        
+    def _callback(self, msg: Float64MultiArray):
+        self.state = msg.data[0]
+
+class ContactSubscriber(_AbstractSubscriber):
+    '''可以判斷是否『接觸』, 無法判斷是否『踩穩』, 來自bipedal_floating.gazebo的 <libgazebo_ros_bumper.so>'''
+    
+    def __init__(self, node: Node, topic: str):
+        self.is_contact = True
+        super().__init__(node, ContactsState, topic)
+        
+    def _callback(self, msg: ContactsState):
+        self.is_contact = bool(msg.states)
+
+class ForceSubscriber(_AbstractSubscriber):
+    """來自bipedal_floation.xacro的插件 <libgazebo_ros_ft_sensor.so>"""
+    
+    def __init__(self, node: Node, topic: str):
+        self.force = None
+        self.tau = None
+        super().__init__(node, WrenchStamped, topic)
+        
+    def _callback(self, msg: WrenchStamped):
+        force = msg.wrench.force
+        torque = msg.wrench.torque
+        
+        self.force = np.vstack(( force.x, force.y, force.z ))
+        self.tau = np.vstack(( torque.x, torque.y, torque.z ))
+
+class JointSubsciber(_AbstractSubscriber):
+    """來自bipedal_floation.xacro的插件 <libgazebo_ros2_control.so>, effort_controller.yaml"""
+    
+    def __init__(self, node: Node, main_callback: Callable):
+        self.main_callback = main_callback #引入main_callback來持續呼叫
+        self.callback_count = 0 #每5次會呼叫一次maincallback
+        self.jp = None
+        super().__init__(node, JointState, '/joint_states')
+        
+    def _callback(self, msg: JointState):
         '''訂閱jp, callback主程式'''
-        if len(msg.position) == 12:
-            jp_pair = {jnt: value for jnt,value in zip( Config.JNT_ORDER_SUB, msg.position) }
-            cls._jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
+        if len(msg.name) == 12:
+            # JointState不會按照順序訂閱也無法改，一定要比對 msg.name
+            jp_pair = {jnt: value for jnt, value in zip( msg.name, msg.position) }
+            self.jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
 
-        cls._callback_count += 1
-        if cls._callback_count == 5:
-            cls._callback_count = 0
-            cls._main_callback()
-    
-    @classmethod
-    def _update_lfForce_callback(cls, msg: WrenchStamped):
-        force = msg.wrench.force
-        torque = msg.wrench.torque
-        
-        cls._force_lf = np.vstack(( force.x, force.y, force.z ))
-        cls._tau_lf = np.vstack(( torque.x, torque.y, torque.z ))
-
-    @classmethod
-    def _update_rfForce_callback(cls, msg: WrenchStamped):
-        """ 處理右腳感測器數據 """
-        force = msg.wrench.force
-        torque = msg.wrench.torque
-        
-        cls._force_rf = np.vstack(( force.x, force.y, force.z ))
-        cls._tau_rf = np.vstack(( torque.x, torque.y, torque.z ))
+        self.callback_count += 1
+        if self.callback_count == 5:
+            self.callback_count = 0 
+            self.main_callback()
