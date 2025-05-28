@@ -1,6 +1,6 @@
 #================ import library ========================#
 import numpy as np; np.set_printoptions(precision=5)
-import pandas as pd
+
 #================ import library ========================#
 from utils.robot_model import RobotModel
 from utils.frame_kinermatic import RobotFrame
@@ -8,8 +8,8 @@ from motion_planning import Ref
 from utils.config import Config
 
 from torque_control.knee_control import KneeLoop
-import torque_control.pd_control as PD
-from torque_control.alip_control import AlipX, AlipY1
+from torque_control.initial_balance import balance_ctrl, cf_anklePD_Ax, cf_anklePD, cf_anklePD_Ax2
+from torque_control.alip_control import AlipX, AlipY, AlipY1
 from torque_control.ankle_control import anklePD_ctrl
 
 
@@ -21,7 +21,7 @@ class TorqueControl:
         self.knee = KneeLoop()
         #self.alip = AlipControl()
         self.alipx = AlipX()
-        # self.alipy = AlipY()
+        self.alipy = AlipY()
         self.alipy1 = AlipY1()
         self.alipT = 0
         
@@ -32,12 +32,12 @@ class TorqueControl:
         
         match state:
             case 0:
-                return PD.initial_balance(frame, robot, jp, jv)
+                return balance_ctrl(frame, robot, jp)
             case 1:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
-                torque_ankle_ax = PD.ankle_ax1_cf(frame, robot, jp, jv)
+                torque_ankle_ax = cf_anklePD_Ax(frame, robot, jp, jv)
                 #雙腳腳踝
                 torque_ankle = {
                     sf : anklePD_ctrl(frame, sf),
@@ -50,7 +50,7 @@ class TorqueControl:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'], Config.ANKLE_AY_LIMIT)
-                torque_ankle_ax = PD.ankle_ax2_cf(frame, robot, jp, jv, ref.ax)
+                torque_ankle_ax = cf_anklePD_Ax2(frame, robot, ref.ax, jp, jv, ref.var['y'][0, 0])
                 #雙腳腳踝
                 torque_ankle = {
                     sf : anklePD_ctrl(frame, sf),
