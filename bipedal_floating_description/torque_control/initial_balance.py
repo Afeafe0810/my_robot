@@ -20,7 +20,7 @@ def balance_ctrl(frame: RobotFrame, robot:RobotModel, jp: np.ndarray) -> np.ndar
 
 def cf_anklePD_Ax(frame: RobotFrame, robot:RobotModel, jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
     """在剛開機狀態直接用關節角度的 單環 來平衡"""
-    ref_ankle_jp = 0
+    ref_ankle_jp = 0.02
     kp = 4*1
     kd = 3
     tauG = robot.gravity(jp, 0, ['lf', 'rf'], *frame.get_posture())
@@ -41,3 +41,15 @@ def cf_anklePD(frame: RobotFrame, robot:RobotModel, jp: np.ndarray, jv: np.ndarr
     torque = kp * (ref_ankle_jp-jp[4:6])
     
     return torque.clip(np.vstack((-Config.ANKLE_AY_LIMIT, -Config.ANKLE_AX_LIMIT)), np.vstack((Config.ANKLE_AY_LIMIT, Config.ANKLE_AX_LIMIT)))
+
+def cf_anklePD_Ax2(frame: RobotFrame, robot:RobotModel, ref_jp: float, jp: np.ndarray, jv: np.ndarray, ref_y_cfTOpel: float) -> np.ndarray:
+    
+    print("ref_jp: ", ref_jp)
+    kp = 4*1
+    kd = 3
+    # tauG = robot.gravity(jp, 0, ['lf', 'rf'], *frame.get_posture())
+    
+    torque = kp * (ref_jp-jp[5]) - kd * jv[5]
+    # torque = kp * (ref_ankle_jp-jp[5])
+    
+    return np.clip(torque, -Config.ANKLE_AX_LIMIT, Config.ANKLE_AX_LIMIT)

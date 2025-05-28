@@ -33,6 +33,10 @@ class KneeLoop:
 
         if state == 1:
             torque = np.vstack([0.5, 0.5, 0.5, 0.5]*2) * (cmd_jv - jv)[the_knee] + tauG
+        if state == 2:
+            torque = np.vstack([1.5, 1.5, 1.5, 1.5] + [0.5, 0.5, 0.5, 0.5]) * (cmd_jv - jv)[the_knee] + tauG
+        if state == 3:
+            torque = np.vstack([1.5, 1.5, 1.5, 1.5] + [0.5, 0.5, 0.5, 0.5]) * (cmd_jv - jv)[the_knee] + tauG
         return {
             'lf': np.vstack((torque[:4])),
             'rf': np.vstack((torque[4:]))
@@ -90,7 +94,7 @@ class KneeLoop:
             #         'rf': np.linalg.pinv(J['rf']) @ endVel['rf']
             #     }
 
-            case 1 | 2| 30:
+            case 1 | 2 | 3 | 30:
                 # 支撐腳膝上四關節: 控骨盆z, axyz  ；  擺動腳膝上四關節: 控落點xyz, az
                 ctrlVel = {
                     cf: endVel[cf][2:],
@@ -126,7 +130,7 @@ class KneeLoop:
                 kr = np.array([1, 1, 1, 1])*50
                 return np.diag(np.hstack((kl, kr)))
         
-            case 2:
+            case 2 | 3:
                 kl = np.array([1.5, 1.5, 1.5, 1.5])
                 kr = np.array([0.5, 0.5, 0.5, 0.5])
                 return np.diag(np.hstack((kl, kr)))
