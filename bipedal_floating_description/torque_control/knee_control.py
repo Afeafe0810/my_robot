@@ -61,6 +61,9 @@ class KneeLoop:
         derr_pa_pelTOlf_in_pf = 25 * err_pa_pelTOlf_in_pf
         derr_pa_pelTOrf_in_pf = 20 * err_pa_pelTOrf_in_pf
         
+        print("err_pa_pelTOlf_in_pf: ", err_pa_pelTOlf_in_pf.flatten()*np.array([100, 100, 100, 180/np.pi, 180/np.pi, 180/np.pi]))
+        print("err_pa_pelTOrf_in_pf: ", err_pa_pelTOrf_in_pf.flatten()*np.array([100, 100, 100, 180/np.pi, 180/np.pi, 180/np.pi]))
+        
         #========歐拉角速度轉幾何角速度========#
         w_pelTOlf_in_pf = frame.eularToGeo['lf'] @ derr_pa_pelTOlf_in_pf[3:]
         w_pelTOrf_in_pf = frame.eularToGeo['rf'] @ derr_pa_pelTOrf_in_pf[3:]

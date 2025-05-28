@@ -20,7 +20,7 @@ class FancyStand:
             
         z_sf  = linearMove(*[0, 0.05], *[1*T, 1.4*T])
         # z_sf  = 0.0
-        
+        print("z_sf: ", z_sf)
         if self.t < 2 * T:
             print(f"LeftLegBalance.t = {self.t:.2f}")
             self.t += Ts
