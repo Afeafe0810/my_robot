@@ -2,9 +2,9 @@ import numpy as np; np.set_printoptions(precision=5)
 from numpy.typing import NDArray
 from typing import TypeVar
 #================ import library ========================#
-from utils.robot_model import RobotModel
-from utils.frame_kinermatic import RobotFrame
-from utils.config import Config
+from bipedal_floating_description.utils.robot_model import RobotModel
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.utils.config import Config
 #========================================================#
 FA = TypeVar('FloatOrArray', float, NDArray[np.float_])
 

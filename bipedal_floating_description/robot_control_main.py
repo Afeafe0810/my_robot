@@ -5,12 +5,12 @@ import numpy as np; np.set_printoptions(precision=2)
 import pandas as pd
 from copy import deepcopy
 #================ import other code =====================#
-from utils.config import Config
-from utils.ros_interfaces import ROSInterfaces as ROS
-from utils.robot_model import RobotModel
-from utils.frame_kinermatic import RobotFrame
-from motion_planning import Trajatory
-from torque_control import TorqueControl
+from bipedal_floating_description.utils.config import Config
+from bipedal_floating_description.utils.ros_interfaces import ROSInterfaces as ROS
+from bipedal_floating_description.utils.robot_model import RobotModel
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.motion_planning import Trajatory
+from bipedal_floating_description.torque_control import TorqueControl
 #========================================================#
 """
 #TODO 

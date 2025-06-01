@@ -1,10 +1,10 @@
 #================ import library ========================#
-from utils.frame_kinermatic import RobotFrame
-from motion_planning.utils import Ref
-from motion_planning.state1 import BipedalBalance
-from motion_planning.state2 import LeftLegBalance
-from motion_planning.state3 import FancyStand
-from motion_planning.state30 import AlipTraj
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.motion_planning.utils import Ref
+from bipedal_floating_description.motion_planning.state1 import BipedalBalance
+from bipedal_floating_description.motion_planning.state2 import LeftLegBalance
+from bipedal_floating_description.motion_planning.state3 import FancyStand
+from bipedal_floating_description.motion_planning.state30 import AlipTraj
 #========================================================#
 class Trajatory:
     def __init__(self):

@@ -1,16 +1,15 @@
-#================ import library ========================#
 import numpy as np; np.set_printoptions(precision=5)
 import pandas as pd
 #================ import library ========================#
-from utils.robot_model import RobotModel
-from utils.frame_kinermatic import RobotFrame
-from motion_planning import Ref
-from utils.config import Config
+from bipedal_floating_description.utils.robot_model import RobotModel
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.motion_planning import Ref
+from bipedal_floating_description.utils.config import Config
 
-from torque_control.knee_control import KneeLoop
-import torque_control.pd_control as PD
-from torque_control.alip_control import AlipX, AlipY
-
+from bipedal_floating_description.torque_control.knee_control import KneeLoop
+import bipedal_floating_description.torque_control.pd_control as PD
+from bipedal_floating_description.torque_control.alip_control import AlipX, AlipY
+#========================================================#
 
 # TODO 碰撞偵測：正常的力 - 碰撞的力，再經過低通濾波器
 class TorqueControl:

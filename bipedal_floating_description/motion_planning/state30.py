@@ -2,9 +2,9 @@ import numpy as np; np.set_printoptions(precision=2)
 from math import cosh, sinh, cos, sin, pi
 from copy import deepcopy
 #================ import library ========================#
-from motion_planning.utils import Ref
-from utils.frame_kinermatic import RobotFrame
-from utils.config import Config
+from bipedal_floating_description.motion_planning.utils import Ref
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.utils.config import Config
 #========================================================#
 
 # state 30

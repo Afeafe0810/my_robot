@@ -4,7 +4,7 @@ from numbers import Number
 from typing import TypeVar
 from scipy.signal import butter
 #================ import library ========================#
-from utils.config import Config
+from bipedal_floating_description.utils.config import Config
 #========================================================#
 
 NumberOrArray = TypeVar('NumberOrArray', Number, NDArray[np.float_])

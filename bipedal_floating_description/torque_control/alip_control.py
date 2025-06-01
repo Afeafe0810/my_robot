@@ -2,9 +2,9 @@ import numpy as np; np.set_printoptions(precision=5)
 from numpy.typing import NDArray
 import pandas as pd
 #================ import library ========================#
-from utils.ros_interfaces import ROSInterfaces as ROS
-from utils.frame_kinermatic import RobotFrame
-from utils.config import Config
+from bipedal_floating_description.utils.ros_interfaces import ROSInterfaces as ROS
+from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
+from bipedal_floating_description.utils.config import Config
 
 class AlipX:
     def __init__(self):

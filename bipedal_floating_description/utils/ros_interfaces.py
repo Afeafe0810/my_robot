@@ -13,8 +13,8 @@ from trajectory_msgs.msg import JointTrajectory
 from geometry_msgs.msg import WrenchStamped
 
 #================ import other code =====================#
-from utils.config import Config
-from utils.signal_process import Dsp
+from bipedal_floating_description.utils.config import Config
+from bipedal_floating_description.utils.signal_process import Dsp
 #========================================================#
 
 
