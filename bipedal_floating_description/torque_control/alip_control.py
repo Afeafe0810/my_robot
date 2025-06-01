@@ -32,10 +32,11 @@ class AlipX:
         
         if stance != stance_past or self.is_ctrl_first_time:
             self.is_ctrl_first_time = False
-            self.var_e = np.vstack((mea_pel, 0))
+            self.var_e = np.vstack((0, 0))
+            self.bias_e = -0.02
 
         #==========全狀態回授(飽和)==========# HACK 用估測的骨盆位置來進行回授
-        _u = -self.K @ (np.vstack((mea_pel, mea_L)) - ref_var)
+        _u = -self.K @ (np.vstack((self.var_e[0, 0] + self.bias_e, mea_L)) - ref_var)
         # _u = -self.K @ (self.var_e - ref_var)
         u = np.clip(_u, -self.limit, self.limit)
         
