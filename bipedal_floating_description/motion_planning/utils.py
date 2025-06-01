@@ -11,6 +11,7 @@ class Ref:
     rf  : np.ndarray
     var : dict[str, np.ndarray]
     com : np.ndarray = None #[x,y]由cf腳踝ALIP #不重要, 只是用來畫圖, 功能由var取代
+    ax: float  = None
     
     @property
     def x(self):

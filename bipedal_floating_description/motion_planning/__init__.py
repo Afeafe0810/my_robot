@@ -3,6 +3,7 @@ from utils.frame_kinermatic import RobotFrame
 from motion_planning.utils import Ref
 from motion_planning.state1 import BipedalBalance
 from motion_planning.state2 import LeftLegBalance
+from motion_planning.state3 import FancyStand
 from motion_planning.state30 import AlipTraj
 #========================================================#
 class Trajatory:
@@ -11,6 +12,8 @@ class Trajatory:
         self.bipedalBalance = BipedalBalance()
         #state 2
         self.lf_stand = LeftLegBalance()
+        # state 3
+        self.fancy_stand = FancyStand()
         #state 30
         self.aliptraj = AlipTraj()
     
@@ -24,6 +27,9 @@ class Trajatory:
 
             case 2: #左腳站立
                 return self.lf_stand.plan()
+            
+            case 3: #花式擺腿
+                return self.fancy_stand.plan()
                      
             case 30:#步行
                 return self.aliptraj.plan(frame, 0, is_firmly, stance)

@@ -12,7 +12,15 @@ from utils.frame_kinermatic import RobotFrame
 from motion_planning import Trajatory
 from torque_control import TorqueControl
 #========================================================#
-
+"""
+#TODO 
+    1. 根據state設計物件導向：因為這樣每次擴充功能都要找if子句，太容易錯了
+        main: set_stance
+        robot model gravity
+        motion planning
+        knee control
+    2. urdf檔的initial angle
+"""
 class UpperLevelController(Node):
 
     def __init__(self):
@@ -73,7 +81,7 @@ class UpperLevelController(Node):
 
     def _set_stance(self, state):
         """掌管state 0, 1, 2的支撐腳邏輯"""
-        if state in [0, 1, 2]:
+        if state in [0, 1, 2, 3]:
             #(這邊不能用return寫，否則state30會是None)
             self.stance = ['lf', 'rf']
         if state == 30:

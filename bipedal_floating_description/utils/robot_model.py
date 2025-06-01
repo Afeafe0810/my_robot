@@ -56,7 +56,7 @@ class RobotModel:
         }
         
         match state:
-            case 0 | 1 | 2:
+            case 0 | 1 | 2 | 3:
                 y_ftTOpel = {'lf': abs(pa_lfTOpel_in_pf[1,0]), 'rf': abs(pa_rfTOpel_in_pf[1,0])}
                 
                 #雙腳平衡時, 用距離判斷重心腳
