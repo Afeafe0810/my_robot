@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <robot name="bipedal_floating" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-<xacro:include filename="/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/materials.xacro" />
-<xacro:include filename="/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.trans" />
-<xacro:include filename="/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf/bipedal_floating.gazebo" />
+<xacro:include filename="$(find bipedal_floating_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.trans" />
+<xacro:include filename="$(find bipedal_floating_description)/urdf/bipedal_floating.gazebo" />
 
 
 <link name="pelvis_link"/>
@@ -37,14 +37,14 @@
   <visual>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -58,14 +58,14 @@
   <visual>
     <origin xyz="-0.0 -0.049 -0.598" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.0 -0.049 -0.598" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -79,14 +79,14 @@
   <visual>
     <origin xyz="-0.007 -0.049 -0.5565" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 -0.049 -0.5565" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -100,14 +100,14 @@
   <visual>
     <origin xyz="-0.007 -0.081 -0.5015" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_thigh_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_thigh_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 -0.081 -0.5015" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_thigh_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_thigh_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -121,14 +121,14 @@
   <visual>
     <origin xyz="-0.007 -0.1 -0.2815" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_shank_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_shank_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 -0.1 -0.2815" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_shank_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_shank_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -142,14 +142,14 @@
   <visual>
     <origin xyz="-0.007 -0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_ankle_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_ankle_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 -0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_ankle_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_ankle_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -163,14 +163,14 @@
   <visual>
     <origin xyz="-0.007 -0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_foot_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_foot_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 -0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/l_foot_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/l_foot_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -184,14 +184,14 @@
   <visual>
     <origin xyz="-0.0 0.049 -0.598" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.0 0.049 -0.598" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_hip_yaw_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -205,14 +205,14 @@
   <visual>
     <origin xyz="-0.007 0.049 -0.5565" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 0.049 -0.5565" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_hip_pitch_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -226,14 +226,14 @@
   <visual>
     <origin xyz="-0.007 0.081 -0.5015" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_thigh_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_thigh_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 0.081 -0.5015" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_thigh_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_thigh_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -247,14 +247,14 @@
   <visual>
     <origin xyz="-0.007 0.1 -0.2815" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_shank_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_shank_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 0.1 -0.2815" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_shank_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_shank_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -268,14 +268,14 @@
   <visual>
     <origin xyz="-0.007 0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_ankle_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_ankle_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_ankle_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_ankle_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -289,14 +289,14 @@
   <visual>
     <origin xyz="-0.007 0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_foot_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_foot_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     
   </visual>
   <collision>
     <origin xyz="-0.007 0.1 -0.026" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="file:///home/ldsc/ros2_ws/src/bipedal_floating_description/meshes/r_foot_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://bipedal_floating_description/meshes/r_foot_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
