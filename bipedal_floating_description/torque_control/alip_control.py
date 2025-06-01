@@ -25,16 +25,30 @@ class AlipX:
     def ctrl(self, frame: RobotFrame, stance: list[str], stance_past: list[str], mea_pel: float, ref_var: NDArray) -> float:
         """回傳支撐腳腳踝扭矩"""
         
-        ref_var = np.vstack((0, 0))
+        ref_var = np.vstack((-0.02, 0))
         mea_pel = frame.p_pel_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]
         mea_com = frame.p_com_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]
         
         if stance != stance_past or self.is_ctrl_first_time:
             self.is_ctrl_first_time = False
+            self.var_e = np.vstack((mea_pel, 0))
 
         #==========全狀態回授(飽和)==========# HACK 用估測的骨盆位置來進行回授
-        _u = -self.K @ (np.vstack((mea_com, 0)) - ref_var) 
+        _u = -self.K @ (np.vstack((mea_pel, 0)) - ref_var)
+        # _u = -self.K @ (self.var_e - ref_var)
         u = np.clip(_u, -self.limit, self.limit)
+        
+        datax = {
+            'com_e': self.var_e[0, 0],
+            'com': mea_com,
+            'pel_e': self.var_e[0, 0] + self.bias_e,
+            'pel': mea_pel
+        }
+        print(pd.Series(datax))
+        #==========估測回授==========#
+        err_e = mea_pel - self.var_e[0, 0] - self.bias_e
+        self.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
+        self.bias_e = self.bias_e + self.L_bias * err_e
         
         return -u
     
