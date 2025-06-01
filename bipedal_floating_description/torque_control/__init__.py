@@ -9,7 +9,7 @@ from utils.config import Config
 
 from torque_control.knee_control import KneeLoop
 import torque_control.pd_control as PD
-from torque_control.alip_control import AlipX, AlipY1
+from torque_control.alip_control import AlipX, AlipY
 from torque_control.ankle_control import anklePD_ctrl
 
 
@@ -22,8 +22,7 @@ class TorqueControl:
         #self.alip = AlipControl()
         self.alipx = AlipX()
         # self.alipy = AlipY()
-        self.alipy1 = AlipY1()
-        self.alipT = 0
+        self.alipy = AlipY()
         
     def update_torque(self, frame: RobotFrame, robot: RobotModel, ref: Ref, state: float,
                       stance: list[str], stance_past: list[str], is_firmly: dict[str, bool], jp: np.ndarray, jv: np.ndarray) -> np.ndarray:
@@ -63,7 +62,7 @@ class TorqueControl:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'])
-                torque_ankle_ax = self.alipy1.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'])
+                torque_ankle_ax = self.alipy.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'])
                 #雙腳腳踝
                 torque_ankle = {
                     sf : anklePD_ctrl(frame, sf),
