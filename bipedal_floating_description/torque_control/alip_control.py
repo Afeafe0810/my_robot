@@ -27,6 +27,7 @@ class AlipX:
         
         ref_var = np.vstack((-0.02, 0))
         mea_pel = frame.p_pel_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]
+        mea_L = frame.L_com_in_lf['y']
         mea_com = frame.p_com_in_wf[0, 0] - frame.p_lf_in_wf[0, 0]
         
         if stance != stance_past or self.is_ctrl_first_time:
@@ -34,7 +35,7 @@ class AlipX:
             self.var_e = np.vstack((mea_pel, 0))
 
         #==========全狀態回授(飽和)==========# HACK 用估測的骨盆位置來進行回授
-        _u = -self.K @ (np.vstack((mea_pel, 0)) - ref_var)
+        _u = -self.K @ (np.vstack((mea_pel, mea_L)) - ref_var)
         # _u = -self.K @ (self.var_e - ref_var)
         u = np.clip(_u, -self.limit, self.limit)
         
