@@ -10,7 +10,6 @@ from utils.config import Config
 from torque_control.knee_control import KneeLoop
 import torque_control.pd_control as PD
 from torque_control.alip_control import AlipX, AlipY
-from torque_control.ankle_control import anklePD_ctrl
 
 
 # TODO 碰撞偵測：正常的力 - 碰撞的力，再經過低通濾波器
@@ -39,7 +38,7 @@ class TorqueControl:
                 torque_ankle_ax = PD.ankle_ax1_cf(frame, robot, jp, jv)
                 #雙腳腳踝
                 torque_ankle = {
-                    sf : anklePD_ctrl(frame, sf),
+                    sf : PD.ankle_ax_sf(frame, sf),
                     cf : np.vstack((torque_ankle_ay, torque_ankle_ax))
                     # cf : cf_anklePD(frame, robot, jp, jv)
                 }
@@ -53,7 +52,7 @@ class TorqueControl:
                 torque_ankle_ax = PD.ankle_ax2_cf(frame, robot, jp, jv, ref.ax)
                 #雙腳腳踝
                 torque_ankle = {
-                    sf : anklePD_ctrl(frame, sf),
+                    sf : PD.ankle_ax_sf(frame, sf),
                     cf : np.vstack((torque_ankle_ay, torque_ankle_ax))
                     # cf : cf_anklePD(frame, robot, jp, jv)
                 }
@@ -67,7 +66,7 @@ class TorqueControl:
                 torque_ankle_ax = self.alipy.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'])
                 #雙腳腳踝
                 torque_ankle = {
-                    sf : anklePD_ctrl(frame, sf),
+                    sf : PD.ankle_ax_sf(frame, sf),
                     cf : np.vstack((torque_ankle_ay, torque_ankle_ax))
                     # cf : cf_anklePD(frame, robot, jp, jv)
                 }
