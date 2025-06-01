@@ -39,28 +39,18 @@ class MyPublishers:
     def __init__(self, node: Node):
         # 控制命令
         self.effort = MyPublisher(node, '/effort_controllers/commands')
-        self.pel_e = MyPublisher(node, 'pel_e')
-        self.pel = MyPublisher(node, 'pel')
-        self.com_e = MyPublisher(node, 'com_e')
-        self.com = MyPublisher(node, 'com')
         
-        #只是用來追蹤數據
-        # self.position = MyPublisher(node, '/position_controller/commands')
-        # self.velocity = MyPublisher(node, '/velocity_controller/commands')
-        # self.vcmd = MyPublisher(node, '/velocity_command/commands')
-        # self.gravity_l = MyPublisher(node, '/l_gravity')
-        # self.gravity_r = MyPublisher(node, '/r_gravity')
-        # self.alip_x = MyPublisher(node, '/alip_x_data')
-        # self.alip_y = MyPublisher(node, '/alip_y_data')
-        # self.torque_l = MyPublisher(node, '/torqueL_data')
-        # self.torque_r = MyPublisher(node, '/torqueR_data')
-        # self.ref = MyPublisher(node, '/ref_data')
-        # self.pel = MyPublisher(node, '/px_data')
-        # self.com = MyPublisher(node, '/com_data')
-        # self.lf = MyPublisher(node, '/lx_data')
-        # self.rf = MyPublisher(node, '/rx_data')
+        self.pel_e_x = MyPublisher(node, '/pel_etm/x')
+        self.pel_e_y = MyPublisher(node, '/pel_etm/y')
         
-        # self.joint_trajectory_controller = MyPublisher(node, '/joint_trajectory_controller/joint_trajectory', JointTrajectory)
+        self.pel_x = MyPublisher(node, '/pel_mea/x')
+        self.pel_y = MyPublisher(node, 'pel_mea/y')
+        
+        self.com_e_x = MyPublisher(node, '/com_etm/x')
+        self.com_e_y = MyPublisher(node, '/com_etm/y')
+        
+        self.com_x = MyPublisher(node, '/com_mea/x')
+        self.com_y = MyPublisher(node, '/com_mea/y')
 
 class MyPublisher:
     """發佈器

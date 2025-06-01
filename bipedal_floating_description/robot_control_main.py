@@ -78,13 +78,6 @@ class UpperLevelController(Node):
         torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
         ROS.publishers.effort.publish(torque)
         self.stance_past = self.stance
-        print("torque: \n", torque[0:6, 0], '\n', torque[6:12, 0])
-        print("jp: ", jp.flatten())
-        if state == 1:
-            
-            print("force_rf: ", force_ft['rf'])
-            print("tau_rf: ", tau_ft['rf'].flatten())
-            print("------")
 
     def _set_stance(self, state):
         """掌管state 0, 1, 2的支撐腳邏輯"""

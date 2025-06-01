@@ -49,6 +49,7 @@ class TorqueControl:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'])
+                self.alipx.K  = np.array([[290.3274, 15.0198]])*0.5
                 torque_ankle_ax = PD.ankle_ax2_cf(frame, robot, jp, jv, ref.ax)
                 #雙腳腳踝
                 torque_ankle = {
@@ -62,6 +63,7 @@ class TorqueControl:
                 #雙腳膝蓋
                 torque_knee = self.knee.ctrl(ref, frame, robot, jp, jv, state, stance, is_firmly)
                 torque_ankle_ay = self.alipx.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['x'], ref.var['x'])
+                self.alipx.K  = np.array([[290.3274, 15.0198]])*0.8
                 torque_ankle_ax = self.alipy.ctrl(frame, stance, stance_past, frame.get_alipVar(stance)['y'], ref.var['y'])
                 #雙腳腳踝
                 torque_ankle = {
