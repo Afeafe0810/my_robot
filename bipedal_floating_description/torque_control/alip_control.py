@@ -6,6 +6,9 @@ from bipedal_floating_description.utils.ros_interfaces import ROSInterfaces as R
 from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
 from bipedal_floating_description.utils.config import Config
 
+yc_e_collect = np.array([])
+yc_collect = np.array([])
+
 class AlipX:
     def __init__(self):
         self.is_ctrl_first_time = True
@@ -76,9 +79,13 @@ class AlipY:
         #估測狀態
         self.var_e: NDArray
         self.bias_e: float = 0.02
+        
+        self.T = 0
     
     def ctrl(self, frame: RobotFrame, stance: list[str], stance_past: list[str], mea_pel: float, ref_var: NDArray) -> float:
         """回傳支撐腳腳踝扭矩"""
+        global yc_e_collect
+        global yc_collect
         ref_var = np.vstack((0.01, 0))
         mea_pel = frame.p_pel_in_wf[1, 0] - frame.p_lf_in_wf[1, 0]
         mea_com = frame.p_com_in_wf[1, 0] - frame.p_lf_in_wf[1, 0]
@@ -88,9 +95,13 @@ class AlipY:
             self.is_ctrl_first_time = False
             self.var_e = np.vstack((-0.04, 0))
 
-        #==========全狀態回授(飽和)==========# HACK 用估測的骨盆位置來進行回授
-        _u = -self.K @ (self.var_e + np.vstack((self.bias_e, 0))- ref_var) 
-        u = np.clip(_u, -self.limit, self.limit)
+        if self.T <= 600:
+            self.T+=1
+            #==========全狀態回授(飽和)==========# HACK 用估測的骨盆位置來進行回授
+            _u = -self.K @ (self.var_e + np.vstack((self.bias_e, 0))- ref_var) 
+            u = np.clip(_u, -self.limit, self.limit)
+        else:
+            u = 0
         
         data_y = {
             'com_e_y': self.var_e[0, 0],
@@ -106,6 +117,11 @@ class AlipY:
         ROS.publishers.com_e_y.publish([data_y['com_e_y']])
         ROS.publishers.com_y.publish([data_y['com_y']])
         
+        if self.T > 600:
+            yc_collect = np.hstack((yc_collect, data_y['com_y']))
+            yc_e_collect = np.hstack((yc_e_collect, data_y['com_e_y']))
+            pd.DataFrame({'yc_e': yc_e_collect, 'yc': yc_collect}).to_csv('yc.csv')
+    
         #==========估測回授==========#
         err_e = mea_pel - self.var_e[0, 0] - self.bias_e
         self.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
