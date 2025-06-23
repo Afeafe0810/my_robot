@@ -34,6 +34,12 @@ class RobotModel:
         
     def update_VizAndMesh(self, jp: np.ndarray) -> pink.Configuration:
         '''給定關節轉角, 更新機器人模型, 回傳機器人的configuration'''
+        pin.forwardKinematics(self._meshrobot.model, self._meshrobot.data, jp)
+        
+        robots: list[_AbstractSimpleModel] = [self.bipedal_from_pel, self.bipedal_from_lf, self.bipedal_from_rf, self.single_lf, self.single_rf]
+        for onerobot in robots:
+            onerobot.update_data(jp)
+
         config = pink.Configuration(self._meshrobot.model, self._meshrobot.data, jp)
         self._viz.display(config.q)
         return config
@@ -121,6 +127,9 @@ class _AbstractSimpleModel:
         #關節順序的轉換
         self.permut: np.ndarray = self._joint_permutation()
         self.inv_permut: np.ndarray = self._joint_inverse_permutation()
+
+    def update_data(self, jp: np.ndarray):
+        pin.forwardKinematics(self.model, self.data, self.permut @ jp)
         
     @staticmethod
     def _joint_permutation()-> np.ndarray:
