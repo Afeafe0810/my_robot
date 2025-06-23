@@ -38,6 +38,11 @@ class RobotFrame:
             'lf': self.__eularToGeometry(self.pa_lf_in_pf[3:]),
             'rf': self.__eularToGeometry(self.pa_rf_in_pf[3:])
         }
+        
+        print(self.get_jacobian_of_cfTOLhipyaw())
+        print(self.get_jacobian_of_cfTORhipyaw())
+        print(self.get_jacobian_of_cfTOLthigh())
+        print(self.get_jacobian_of_cfTORthigh())
     
     def get_posture(self) -> tuple[np.ndarray] :
         
@@ -211,6 +216,7 @@ class RobotFrame:
         JR = np.vstack(( Jp_R, Ja_R ))
         
         return JL, JR
+    
     
     @property
     def p_ft_in_wf(self):
