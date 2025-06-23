@@ -47,12 +47,12 @@ class RobotFrame:
         return pa_lfTOpel_in_pf, pa_rfTOpel_in_pf
  
     def get_jacobian(self):
-        Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_LhipX_in_pf ), axis = 0 )
-        Jp2_L = np.cross( self.axis_2L_in_pf, (self.p_lf_in_pf - self.p_LhipZ_in_pf ), axis = 0 )
-        Jp3_L = np.cross( self.axis_3L_in_pf, (self.p_lf_in_pf - self.p_LhipY_in_pf ), axis = 0 )
-        Jp4_L = np.cross( self.axis_4L_in_pf, (self.p_lf_in_pf - self.p_LkneeY_in_pf), axis = 0 )
-        Jp5_L = np.cross( self.axis_5L_in_pf, (self.p_lf_in_pf - self.p_LankY_in_pf ), axis = 0 )
-        Jp6_L = np.cross( self.axis_6L_in_pf, (self.p_lf_in_pf - self.p_LankX_in_pf ), axis = 0 )
+        Jp1_L = np.cross( self.axis_1L_in_pf, (self.p_lf_in_pf - self.p_jLhipX_in_pf ), axis = 0 )
+        Jp2_L = np.cross( self.axis_2L_in_pf, (self.p_lf_in_pf - self.p_jLhipZ_in_pf ), axis = 0 )
+        Jp3_L = np.cross( self.axis_3L_in_pf, (self.p_lf_in_pf - self.p_jLhipY_in_pf ), axis = 0 )
+        Jp4_L = np.cross( self.axis_4L_in_pf, (self.p_lf_in_pf - self.p_jLkneeY_in_pf), axis = 0 )
+        Jp5_L = np.cross( self.axis_5L_in_pf, (self.p_lf_in_pf - self.p_jLankleY_in_pf ), axis = 0 )
+        Jp6_L = np.cross( self.axis_6L_in_pf, (self.p_lf_in_pf - self.p_jLankleX_in_pf ), axis = 0 )
         
         Jp_L = np.hstack(( Jp1_L, Jp2_L, Jp3_L, Jp4_L, Jp5_L, Jp6_L ))
         Ja_L = np.hstack(( 
@@ -62,17 +62,150 @@ class RobotFrame:
         
         JL = np.vstack(( Jp_L, Ja_L ))
         
-        Jp1_R = np.cross( self.axis_1R_in_pf, (self.p_rf_in_pf - self.p_RhipX_in_pf ), axis = 0 )
-        Jp2_R = np.cross( self.axis_2R_in_pf, (self.p_rf_in_pf - self.p_RhipZ_in_pf ), axis = 0 )
-        Jp3_R = np.cross( self.axis_3R_in_pf, (self.p_rf_in_pf - self.p_RhipY_in_pf ), axis = 0 )
-        Jp4_R = np.cross( self.axis_4R_in_pf, (self.p_rf_in_pf - self.p_RkneeY_in_pf), axis = 0 )
-        Jp5_R = np.cross( self.axis_5R_in_pf, (self.p_rf_in_pf - self.p_RankY_in_pf ), axis = 0 )
-        Jp6_R = np.cross( self.axis_6R_in_pf, (self.p_rf_in_pf - self.p_RankX_in_pf ), axis = 0 )
+        Jp1_R = np.cross( self.axis_1R_in_pf, (self.p_rf_in_pf - self.p_jRhipX_in_pf ), axis = 0 )
+        Jp2_R = np.cross( self.axis_2R_in_pf, (self.p_rf_in_pf - self.p_jRhipZ_in_pf ), axis = 0 )
+        Jp3_R = np.cross( self.axis_3R_in_pf, (self.p_rf_in_pf - self.p_jRhipY_in_pf ), axis = 0 )
+        Jp4_R = np.cross( self.axis_4R_in_pf, (self.p_rf_in_pf - self.p_jRkneeY_in_pf), axis = 0 )
+        Jp5_R = np.cross( self.axis_5R_in_pf, (self.p_rf_in_pf - self.p_jRankleY_in_pf ), axis = 0 )
+        Jp6_R = np.cross( self.axis_6R_in_pf, (self.p_rf_in_pf - self.p_jRankleX_in_pf ), axis = 0 )
         
         Jp_R = np.hstack(( Jp1_R, Jp2_R, Jp3_R, Jp4_R, Jp5_R, Jp6_R ))
         Ja_R = np.hstack(( 
             self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf,
             self.axis_4R_in_pf, self.axis_5R_in_pf, self.axis_6R_in_pf
+        ))
+        
+        JR = np.vstack(( Jp_R, Ja_R ))
+        
+        return JL, JR
+    
+    def get_jacobian_of_cfTOLhipyaw(self):
+        Jp1_L = np.cross( self.axis_6L_in_pf, (self.p_LhipZ_in_pf - self.p_jLankleX_in_pf), axis = 0 )
+        Jp2_L = np.cross( self.axis_5L_in_pf, (self.p_LhipZ_in_pf - self.p_jLankleY_in_pf), axis = 0 )
+        Jp3_L = np.cross( self.axis_4L_in_pf, (self.p_LhipZ_in_pf - self.p_jLkneeY_in_pf), axis = 0 )
+        Jp4_L = np.cross( self.axis_3L_in_pf, (self.p_LhipZ_in_pf - self.p_jLhipY_in_pf), axis = 0 )
+        
+        Jp_L = np.column_stack(( Jp1_L, Jp2_L, Jp3_L, Jp4_L))
+        Ja_L = np.column_stack(( 
+            self.axis_6L_in_pf, self.axis_5L_in_pf, self.axis_4L_in_pf, self.axis_3L_in_pf
+        ))
+        
+        JL = np.vstack(( Jp_L, Ja_L ))
+        
+        
+        Jp1_R = np.cross( self.axis_6R_in_pf, (self.p_LhipZ_in_pf - self.p_jRankleX_in_pf), axis = 0 )
+        Jp2_R = np.cross( self.axis_5R_in_pf, (self.p_LhipZ_in_pf - self.p_jRankleY_in_pf), axis = 0 )
+        Jp3_R = np.cross( self.axis_4R_in_pf, (self.p_LhipZ_in_pf - self.p_jRkneeY_in_pf), axis = 0 )
+        Jp4_R = np.cross( self.axis_3R_in_pf, (self.p_LhipZ_in_pf - self.p_jRhipY_in_pf), axis = 0 )
+        Jp5_R = np.cross( self.axis_2R_in_pf, (self.p_LhipZ_in_pf - self.p_jRhipZ_in_pf), axis = 0 )
+        Jp6_R = np.cross( self.axis_1R_in_pf, (self.p_LhipZ_in_pf - self.p_jRhipX_in_pf), axis = 0 )
+        
+        Jp_R = np.column_stack(( Jp1_R, Jp2_R, Jp3_R, Jp4_R, Jp5_R, Jp6_R ))
+        Ja_R = np.column_stack(( 
+            self.axis_6R_in_pf, self.axis_5R_in_pf, self.axis_4R_in_pf,
+            self.axis_3R_in_pf, self.axis_2R_in_pf, self.axis_1R_in_pf
+        ))
+        
+        JR = np.vstack(( Jp_R, Ja_R ))
+        
+        return JL, JR
+    
+    def get_jacobian_of_cfTOLthigh(self):
+        thigh = self.p_LhipY_in_pf
+        Jp1_L = np.cross( self.axis_6L_in_pf, (thigh - self.p_jLankleX_in_pf), axis = 0 )
+        Jp2_L = np.cross( self.axis_5L_in_pf, (thigh - self.p_jLankleY_in_pf), axis = 0 )
+        Jp3_L = np.cross( self.axis_4L_in_pf, (thigh - self.p_jLkneeY_in_pf), axis = 0 )
+        
+        Jp_L = np.column_stack(( Jp1_L, Jp2_L, Jp3_L))
+        Ja_L = np.column_stack(( 
+            self.axis_6L_in_pf, self.axis_5L_in_pf, self.axis_4L_in_pf
+        ))
+        
+        JL = np.vstack(( Jp_L, Ja_L ))
+        
+        
+        Jp1_R = np.cross( self.axis_6R_in_pf, (thigh - self.p_jRankleX_in_pf), axis = 0 )
+        Jp2_R = np.cross( self.axis_5R_in_pf, (thigh - self.p_jRankleY_in_pf), axis = 0 )
+        Jp3_R = np.cross( self.axis_4R_in_pf, (thigh - self.p_jRkneeY_in_pf), axis = 0 )
+        Jp4_R = np.cross( self.axis_3R_in_pf, (thigh - self.p_jRhipY_in_pf), axis = 0 )
+        Jp5_R = np.cross( self.axis_2R_in_pf, (thigh - self.p_jRhipZ_in_pf), axis = 0 )
+        Jp6_R = np.cross( self.axis_1R_in_pf, (thigh - self.p_jRhipX_in_pf), axis = 0 )
+        
+        Jp7_R = np.cross( self.axis_1L_in_pf, (thigh - self.p_jLhipX_in_pf), axis = 0 )
+        Jp8_R = np.cross( self.axis_2L_in_pf, (thigh - self.p_jLhipZ_in_pf), axis = 0 )
+        Jp9_R = np.cross( self.axis_3L_in_pf, (thigh - self.p_jLhipY_in_pf), axis = 0 )
+        
+        Jp_R = np.column_stack(( Jp1_R, Jp2_R, Jp3_R, Jp4_R, Jp5_R, Jp6_R, Jp7_R, Jp8_R, Jp9_R ))
+        Ja_R = np.column_stack(( 
+            self.axis_6R_in_pf, self.axis_5R_in_pf, self.axis_4R_in_pf,
+            self.axis_3R_in_pf, self.axis_2R_in_pf, self.axis_1R_in_pf,
+            self.axis_1L_in_pf, self.axis_2L_in_pf, self.axis_3L_in_pf
+        ))
+        
+        JR = np.vstack(( Jp_R, Ja_R ))
+        
+        return JL, JR
+    
+    def get_jacobian_of_cfTORhipyaw(self):
+        Jp1_L = np.cross( self.axis_6L_in_pf, (self.p_RhipZ_in_pf - self.p_jLankleX_in_pf), axis = 0 )
+        Jp2_L = np.cross( self.axis_5L_in_pf, (self.p_RhipZ_in_pf - self.p_jLankleY_in_pf), axis = 0 )
+        Jp3_L = np.cross( self.axis_4L_in_pf, (self.p_RhipZ_in_pf - self.p_jLkneeY_in_pf), axis = 0 )
+        Jp4_L = np.cross( self.axis_3L_in_pf, (self.p_RhipZ_in_pf - self.p_jLhipY_in_pf), axis = 0 )
+        Jp5_L = np.cross( self.axis_2L_in_pf, (self.p_RhipZ_in_pf - self.p_jLhipZ_in_pf), axis = 0 )
+        Jp6_L = np.cross( self.axis_1L_in_pf, (self.p_RhipZ_in_pf - self.p_jLhipX_in_pf), axis = 0 )
+        
+        Jp_L = np.column_stack(( Jp1_L, Jp2_L, Jp3_L, Jp4_L, Jp5_L, Jp6_L ))
+        Ja_L = np.column_stack(( 
+            self.axis_6L_in_pf, self.axis_5L_in_pf, self.axis_4L_in_pf,
+            self.axis_3L_in_pf, self.axis_2L_in_pf, self.axis_1L_in_pf
+        ))
+        
+        JL = np.vstack(( Jp_L, Ja_L ))
+        
+        
+        Jp1_R = np.cross( self.axis_6R_in_pf, (self.p_RhipZ_in_pf - self.p_jRankleX_in_pf), axis = 0 )
+        Jp2_R = np.cross( self.axis_5R_in_pf, (self.p_RhipZ_in_pf - self.p_jRankleY_in_pf), axis = 0 )
+        Jp3_R = np.cross( self.axis_4R_in_pf, (self.p_RhipZ_in_pf - self.p_jRkneeY_in_pf), axis = 0 )
+        Jp4_R = np.cross( self.axis_3R_in_pf, (self.p_RhipZ_in_pf - self.p_jRhipY_in_pf), axis = 0 )
+        
+        Jp_R = np.column_stack(( Jp1_R, Jp2_R, Jp3_R, Jp4_R))
+        Ja_R = np.column_stack(( 
+            self.axis_6R_in_pf, self.axis_5R_in_pf, self.axis_4R_in_pf, self.axis_3R_in_pf
+        ))
+        
+        JR = np.vstack(( Jp_R, Ja_R ))        
+        return JL, JR
+    
+    def get_jacobian_of_cfTORthigh(self):
+        thigh = self.p_RhipY_in_pf
+        
+        Jp1_L = np.cross( self.axis_6L_in_pf, (thigh - self.p_jLankleX_in_pf), axis = 0 )
+        Jp2_L = np.cross( self.axis_5L_in_pf, (thigh - self.p_jLankleY_in_pf), axis = 0 )
+        Jp3_L = np.cross( self.axis_4L_in_pf, (thigh - self.p_jLkneeY_in_pf), axis = 0 )
+        Jp4_L = np.cross( self.axis_3L_in_pf, (thigh - self.p_jLhipY_in_pf), axis = 0 )
+        Jp5_L = np.cross( self.axis_2L_in_pf, (thigh - self.p_jLhipZ_in_pf), axis = 0 )
+        Jp6_L = np.cross( self.axis_1L_in_pf, (thigh - self.p_jLhipX_in_pf), axis = 0 )
+        
+        Jp7_L = np.cross( self.axis_1R_in_pf, (thigh - self.p_jRhipX_in_pf), axis = 0 )
+        Jp8_L = np.cross( self.axis_2R_in_pf, (thigh - self.p_jRhipZ_in_pf), axis = 0 )
+        Jp9_L = np.cross( self.axis_3R_in_pf, (thigh - self.p_jRhipY_in_pf), axis = 0 )
+        
+        Jp_L = np.column_stack(( Jp1_L, Jp2_L, Jp3_L, Jp4_L, Jp5_L, Jp6_L, Jp7_L, Jp8_L, Jp9_L ))
+        Ja_L = np.column_stack(( 
+            self.axis_6L_in_pf, self.axis_5L_in_pf, self.axis_4L_in_pf,
+            self.axis_3L_in_pf, self.axis_2L_in_pf, self.axis_1L_in_pf,
+            self.axis_1R_in_pf, self.axis_2R_in_pf, self.axis_3R_in_pf
+        ))
+        
+        JL = np.vstack(( Jp_L, Ja_L ))
+        
+        Jp1_R = np.cross( self.axis_6R_in_pf, (thigh - self.p_jRankleX_in_pf), axis = 0 )
+        Jp2_R = np.cross( self.axis_5R_in_pf, (thigh - self.p_jRankleY_in_pf), axis = 0 )
+        Jp3_R = np.cross( self.axis_4R_in_pf, (thigh - self.p_jRkneeY_in_pf), axis = 0 )
+        
+        Jp_R = np.column_stack(( Jp1_R, Jp2_R, Jp3_R))
+        Ja_R = np.column_stack(( 
+            self.axis_6R_in_pf, self.axis_5R_in_pf, self.axis_4R_in_pf
         ))
         
         JR = np.vstack(( Jp_R, Ja_R ))
@@ -149,6 +282,8 @@ class RobotFrame:
     
     def __update_pfFrame(self, config: pink.Configuration, robot: RobotModel, jp: np.ndarray):
         '''可以得到各部位在pink frame下的資訊'''
+        
+        #各連桿的質心
         self.p_pel_in_pf,    self.r_pel_to_pf    = self.__getOneInPf(config, "pelvis_link")
         self.p_LhipX_in_pf,  self.r_LhipX_to_pf  = self.__getOneInPf(config, "l_hip_yaw_1") #確認沒錯
         self.p_LhipZ_in_pf,  self.r_LhipZ_to_pf  = self.__getOneInPf(config, "l_hip_pitch_1")
@@ -165,12 +300,29 @@ class RobotFrame:
         self.p_RankX_in_pf,  self.r_RankX_to_pf  = self.__getOneInPf(config, "r_foot_1")
         self.p_rf_in_pf,     self.r_rf_to_pf     = self.__getOneInPf(config, "r_foot")
         
+        #各關節的位置
+        self.p_jLhipX_in_pf, self.r_jLhipX_to_pf = self.__getOneInPf(config, "L_Hip_Roll")
+        self.p_jLhipY_in_pf, self.r_jLhipY_to_pf = self.__getOneInPf(config, "L_Hip_Pitch")
+        self.p_jLhipZ_in_pf, self.r_jLhipZ_to_pf = self.__getOneInPf(config, "L_Hip_Yaw")
+        self.p_jLkneeY_in_pf, self.r_jLkneeY_to_pf = self.__getOneInPf(config, "L_Knee_Pitch")
+        self.p_jLankleY_in_pf, self.r_jLankleY_to_pf = self.__getOneInPf(config, "L_Ankle_Pitch")
+        self.p_jLankleX_in_pf, self.r_jLankleX_to_pf = self.__getOneInPf(config, "L_Ankle_Roll")
+        
+        self.p_jRhipX_in_pf, self.r_jRhipX_to_pf = self.__getOneInPf(config, "R_Hip_Roll")
+        self.p_jRhipY_in_pf, self.r_jRhipY_to_pf = self.__getOneInPf(config, "R_Hip_Pitch")
+        self.p_jRhipZ_in_pf, self.r_jRhipZ_to_pf = self.__getOneInPf(config, "R_Hip_Yaw")
+        self.p_jRkneeY_in_pf, self.r_jRkneeY_to_pf = self.__getOneInPf(config, "R_Knee_Pitch")
+        self.p_jRankleY_in_pf, self.r_jRankleY_to_pf = self.__getOneInPf(config, "R_Ankle_Pitch")
+        self.p_jRankleX_in_pf, self.r_jRankleX_to_pf = self.__getOneInPf(config, "R_Ankle_Roll")
+        
+        #整個機器人的質心位置
         self.p_com_in_pf = robot.bipedal_from_pel.com(jp)
         
         self.pa_pel_in_pf = np.vstack(( self.p_pel_in_pf, self.rotMat_to_euler(self.r_pel_to_pf) ))
         self.pa_lf_in_pf  = np.vstack(( self.p_lf_in_pf , self.rotMat_to_euler(self.r_lf_to_pf)  ))
         self.pa_rf_in_pf  = np.vstack(( self.p_rf_in_pf , self.rotMat_to_euler(self.r_rf_to_pf)  ))
-              
+
+    
     def __update_wfFrame(self, p_base_in_wf: np.ndarray, r_base_to_wf: np.ndarray):
         '''得到各點在world frame下的資訊'''
         
