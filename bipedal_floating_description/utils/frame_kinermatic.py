@@ -1,5 +1,6 @@
 from std_msgs.msg import Float64MultiArray 
 import numpy as np; np.set_printoptions(precision=2)
+from numpy.typing import NDArray
 import pandas as pd
 from copy import deepcopy
 from math import cos, sin
@@ -12,7 +13,159 @@ from bipedal_floating_description.utils.config import Config
 from bipedal_floating_description.utils.robot_model import RobotModel
 from bipedal_floating_description.utils.signal_process import Dsp
 #========================================================#
+def zyx_to_geometry(ay: float, az: float) -> NDArray:
+    """
+    將以 zyx 方法的歐拉角微分 [dax,day,daz] 轉成幾何角動量(座標和輸入的旋轉矩陣的基底座標相同)
+    
+    原理:  
+    az 繞 z1, 方向為 [0, 0, 1]  
+    ay 繞 y2, 方向為 Rz1的第二column  
+    ax 繞 x3, 方向為 Ry2*Rz1的第一column
+    """
+    daz_to_w = np.array([0, 0, 1])
+    day_to_w = np.array([-sin(az), cos(az), 0])
+    dax_to_w = np.array([cos(az)*cos(ay), sin(az)*cos(ay), -sin(ay)])
+    
+    return np.column_stack([dax_to_w, day_to_w, daz_to_w])
 
+def rotationMat_to_euler(rotationMat: NDArray) -> NDArray:
+    """將旋轉矩陣以 zyx 方法的歐拉角回傳 [ax, ay, az]的順序"""
+    return R.from_matrix(rotationMat).as_euler('zyx', degrees = False)[::-1]
+
+def rotationMat_of_axis(axe: str, theta: float) -> NDArray:
+    """給定x, y, z的旋轉軸方向, 得到 cos, sin 旋轉矩陣"""
+    match axe:
+        case 'x':
+            axe_vec = np.array([1, 0, 0])
+        case 'y':
+            axe_vec = np.array([0, 1, 0])
+        case 'z':
+            axe_vec = np.array([0, 0, 1])
+            
+    return R.from_rotvec(axe_vec * theta).as_matrix()
+
+class PinkFrame:
+    """
+    PinkFrame 的座標和機器人的 config 的 base 為基準, 而我們輸入的 config 來自於 meshrobot,  
+    因此 pf 為平行於骨盆的 base frame
+    
+    方法是透過 pink 的 get_transform_frame_to_world(), 可以得到對 pf 的 HMT 矩陣
+    
+    """
+    def __init__(self, config: pink.Configuration, robot: RobotModel, jp: NDArray):
+        get = lambda name: self._get_OneFrame_in_pf(config, name)
+        get_p = lambda name: self._get_OneFrame_in_pf(config, name, 'p')
+        
+        # 骨盆
+        self.p_pel, self.r_from_pel = get("pelvis_link")
+        
+        # 質心
+        self.p_com = robot.bipedal_from_pel.com(jp)
+        
+        # 左腳連桿
+        self.p_hipLower_L, self.r_from_hipLower_L = get("l_hip_yaw_1")
+        self.p_hipUpper_L, self.r_from_hipUpper_L = get("l_hip_pitch_1")
+        self.p_thigh_L,    self.r_from_thigh_L = get("l_thigh_1")
+        self.p_shank_L,    self.r_from_shank_L = get("l_shank_1")
+        self.p_ankle_L,    self.r_from_ankleY_L = get("l_ankle_1")
+        _,                 self.r_from_ankleX_L = get("l_foot_1")
+        self.p_lf,         self.r_from_lf = get("l_foot")
+        
+        # 右腳連桿
+        self.p_hipLower_R, self.r_from_hipLower_R = get("r_hip_yaw_1")
+        self.p_hipUpper_R, self.r_from_hipUpper_R = get("r_hip_pitch_1")
+        self.p_thigh_R,    self.r_from_thigh_R = get("r_thigh_1")
+        self.p_shank_R,    self.r_from_shank_R = get("r_shank_1")
+        self.p_ankle_R,    self.r_from_ankleY_R = get("r_ankle_1")
+        _,                 self.r_from_ankleX_R = get("r_foot_1")
+        self.p_rf,         self.r_from_rf = get("r_foot")
+        
+        # 左關節
+        self.p_jhipX_L = get_p("L_Hip_Roll")
+        self.p_jhipY_L = get_p("L_Hip_Pitch")
+        self.p_jhipZ_L = get_p("L_Hip_Yaw")
+        self.p_jkneeY_L = get_p("L_Knee_Pitch")
+        self.p_jankleY_L = get_p("L_Ankle_Pitch")
+        self.p_jankleX_L = get_p("L_Ankle_Roll")
+        
+        # 右關節
+        self.p_jhipX_R = get_p("R_Hip_Roll")
+        self.p_jhipY_R = get_p("R_Hip_Pitch")
+        self.p_jhipZ_R = get_p("R_Hip_Yaw")
+        self.p_jkneeY_R = get_p("R_Knee_Pitch")
+        self.p_jankleY_R = get_p("R_Ankle_Pitch")
+        self.p_jankleX_R = get_p("R_Ankle_Roll")
+        
+        # 主要端末的姿態
+        self.a_pel = rotationMat_to_euler(self.r_from_pel)
+        self.a_lf = rotationMat_to_euler(self.r_from_lf)
+        self.a_rf = rotationMat_to_euler(self.r_from_rf)
+        
+        
+    @staticmethod
+    def _get_OneFrame_in_pf(config: pink.Configuration, framename: str, mode: str = None)->tuple[NDArray, NDArray]:
+        se3_htm = config.get_transform_frame_to_world(framename)
+        
+        match mode:
+            case 'p':
+                return se3_htm.translation
+            case 'r':
+                return se3_htm.rotation
+            case _:
+                return se3_htm.translation, se3_htm.rotation
+        
+class WorldFrame:
+    def __init__(self, pf: PinkFrame, p_base_in_wf: NDArray, r_base_to_wf: NDArray):
+        p_pf_in_wf, r_pf_to_wf = p_base_in_wf, r_base_to_wf
+        
+        def get_p(p_in_pf: np.ndarray) -> np.ndarray: 
+            return r_pf_to_wf @ p_in_pf + p_pf_in_wf
+        
+        def get_r(r_to_pf: np.ndarray) -> np.ndarray:
+            return r_pf_to_wf @ r_to_pf
+        
+        # 骨盆與質心
+        _p_pel = get_p(pf.p_pel)
+        self.p_com_in_wf = get_p(pf.p_com)
+        
+        # 左腳link位置
+        self.p_hipLower_L = get_p(pf.p_hipLower_L)
+        self.p_hipUpper_L = get_p(pf.p_hipUpper_L)
+        self.p_thigh_L = get_p(pf.p_thigh_L)
+        self.p_shank_L = get_p(pf.p_shank_L)
+        self.p_ankle_L = get_p(pf.p_ankle_L)
+        _p_lf = get_p(pf.p_lf)
+        
+        # 右腳link位置
+        self.p_hipLower_R = get_p(pf.p_hipLower_R)
+        self.p_hipUpper_R = get_p(pf.p_hipUpper_R)
+        self.p_thigh_R = get_p(pf.p_thigh_R)
+        self.p_shank_R = get_p(pf.p_shank_R)
+        self.p_ankle_R = get_p(pf.p_ankle_R)
+        _p_rf = get_p(pf.p_rf)
+        
+        # 主要端點的旋轉矩陣
+        self.r_from_pel = get_r(pf.r_from_pel)
+        self.r_from_lf = get_r(pf.r_from_lf)
+        self.r_from_rf = get_r(pf.r_from_rf)
+        
+        # 主要的端點(進行濾波)
+        self.p_pel_in_wf = Dsp.FILTER_P_PEL_IN_WF.filt(_p_pel)
+        self.p_lf_in_wf = Dsp.FILTER_P_LF_IN_WF.filt(_p_lf)
+        self.p_rf_in_wf = Dsp.FILTER_P_RF_IN_WF.filt(_p_rf)
+        
+        
+class Jacobian:
+    def __init__(self):
+        pass
+    
+class AllFrame:
+    def __init__(self):
+        self.wf = WorldFrame()
+        self.pf = PinkFrame()
+        self.jacobian = Jacobian()
+        
+    
 class RobotFrame:
     def __init__(self):        
         pass
@@ -438,11 +591,11 @@ class RobotFrame:
         
     #========================toolbox================================#
     @staticmethod
-    def __getOneInPf(config: pink.Configuration, link: str):
-        htm = config.get_transform_frame_to_world(link)
-        p_in_pf = np.reshape( htm.translation, (3,1) )
-        r_to_pf = np.reshape( htm.rotation, (3,3) )
-        return p_in_pf, r_to_pf 
+    # def __getOneInPf(config: pink.Configuration, link: str):
+    #     htm = config.get_transform_frame_to_world(link)
+    #     p_in_pf = np.reshape( htm.translation, (3,1) )
+    #     r_to_pf = np.reshape( htm.rotation, (3,3) )
+    #     return p_in_pf, r_to_pf 
     
     @staticmethod
     def __get_axis_rotMat(axis: str, theta:float)->np.ndarray:
