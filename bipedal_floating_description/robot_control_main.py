@@ -11,6 +11,8 @@ from bipedal_floating_description.utils.robot_model import RobotModel
 from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
 from bipedal_floating_description.motion_planning import Trajatory
 from bipedal_floating_description.torque_control import TorqueControl
+
+from bipedal_floating_description.mode.state0 import State0
 #========================================================#
 """
 #TODO 
@@ -68,14 +70,20 @@ class UpperLevelController(Node):
         #========支撐狀態切換=====#
         self._set_stance(state)
         
-        #========軌跡規劃========#
-        ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
-        if state == 30:
-            self.ref_record = ref.to_csv(self.ref_record)
-            self.measure_record = self.frame.to_csv(self.measure_record, self.stance)
-            
-        #========扭矩控制========#
-        torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
+        match state:
+            case 0:
+                model_gravity = self.robot.new_gravity(jp)
+                end_in_pf = {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()}
+                torque = State0(jp, model_gravity, end_in_pf).ctrl()
+            case _:        
+                #========軌跡規劃========#
+                ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
+                if state == 30:
+                    self.ref_record = ref.to_csv(self.ref_record)
+                    self.measure_record = self.frame.to_csv(self.measure_record, self.stance)
+                    
+                #========扭矩控制========#
+                torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
         ROS.publishers.effort.publish(torque)
         self.stance_past = self.stance
 

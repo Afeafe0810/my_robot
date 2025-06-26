@@ -69,6 +69,26 @@ class RobotModel:
                 
                 return 0.3 * g_from_both_single_ft + 0.75* g_from_bipedal_ft[cf]
     
+    def new_gravity(self, jp: np.ndarray) -> dict[str, np.ndarray]:
+            
+        #==========半邊單腳模型==========#
+        g_from_both_single_ft = np.hstack((
+            self.single_lf.gravity(jp).flatten(),
+            self.single_rf.gravity(jp).flatten()
+        ))
+        
+        #==========腳底建起的模型==========#
+        g_from_bipedal_ft = {
+            'lf': self.bipedal_from_lf.gravity(jp).flatten(),
+            'rf': self.bipedal_from_rf.gravity(jp).flatten()
+        }
+        
+        return {
+            'from_both_single_ft': g_from_both_single_ft,
+            'lf': g_from_bipedal_ft['lf'],
+            'rf': g_from_bipedal_ft['rf']
+        }
+    
     def inertia(self, jp: np.ndarray, stance: list[str]) -> np.ndarray:
         cf, sf = stance
         inertia_from_ft = {'lf': self.bipedal_from_lf.inertia, 'rf': self.bipedal_from_rf.inertia}
