@@ -75,6 +75,7 @@ class UpperLevelController(Node):
                 model_gravity = self.robot.new_gravity(jp)
                 end_in_pf = {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()}
                 torque = State0(jp, model_gravity, end_in_pf).ctrl()
+            
             case _:        
                 #========軌跡規劃========#
                 ref = self.traj.plan(state, self.frame, self.stance, is_firmly)

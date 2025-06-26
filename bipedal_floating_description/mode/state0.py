@@ -6,14 +6,15 @@ from bipedal_floating_description.utils.robot_model import RobotModel
 #========================================================#
 
 class State0:
+    ref_jp = np.zeros(12)
+    kp = np.array([ 2, 2, 4, 6, 6, 4 ]*2)
+    
     def __init__(self, jp: NDArray, model_gravity: dict[str, NDArray], end_in_pf: dict[Literal['lf', 'rf', 'pel'], NDArray]):
         self.jp = jp.flatten()
         self.tauG = self.gravity(model_gravity, end_in_pf)
         
-        self.ref_jp = np.zeros(12)
-        self.kp = np.array([ 2, 2, 4, 6, 6, 4 ]*2)
-
-    def gravity(self, model_gravity: dict[str, NDArray], end_in_pf: dict[Literal['lf', 'rf', 'pel'], NDArray]) -> NDArray:
+    @staticmethod
+    def gravity(model_gravity: dict[str, NDArray], end_in_pf: dict[Literal['lf', 'rf', 'pel'], NDArray]) -> NDArray:
         # 根據骨盆位置來判斷重心腳
         end = end_in_pf
         y_ftTOpel = {
