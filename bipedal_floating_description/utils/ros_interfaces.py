@@ -80,7 +80,7 @@ class MySubscribers:
         self.rf_force = ForceSubscriber(node, '/rf_sensor/wrench')
         self.jp = JointSubsciber(node, main_callback)
 
-    def return_data(self) -> list[NDArray, NDArray, float, dict[str, bool], NDArray, NDArray, dict[str, float], dict[str, NDArray]]:
+    def return_data(self) -> tuple[NDArray, NDArray, float, dict[str, bool], NDArray, NDArray, dict[str, float], dict[str, NDArray]]:
         #微分得到速度(飽和)，並濾波
         jp = Dsp.FILTER_JP.filt(self.jp.jp)
         _jv = np.clip( Dsp.DIFFTER_JP.diff(jp), -0.75, 0.75)
@@ -90,8 +90,7 @@ class MySubscribers:
         force_ft = {'lf' : self.lf_force.force[2,0], 'rf' : self.rf_force.force[2,0]}
         tau_ft = {'lf' : self.lf_force.tau, 'rf' : self.rf_force.tau}
         
-        return list( map( deepcopy,
-            [ 
+        return tuple(deepcopy(i) for i in [ 
                 self.base.p_base_in_wf,
                 self.base.r_base_to_wf,
                 self.state.state,
@@ -101,7 +100,7 @@ class MySubscribers:
                 force_ft, 
                 tau_ft
             ]
-        ))
+        )
 
 class _AbstractSubscriber:
     def __init__(self, node: Node, msg_type: type, topic: str):
@@ -114,8 +113,8 @@ class BaseSubscriber(_AbstractSubscriber):
     """來自 bipedal_floation.xacro 的<libgazebo_ros_p3d.so>"""
     
     def __init__(self, node: Node):
-        self.p_base_in_wf = None
-        self.r_base_to_wf = None
+        self.p_base_in_wf: NDArray
+        self.r_base_to_wf: NDArray
         super().__init__(node, Odometry, '/odom')
                                                     
     def _callback(self, msg: Odometry):
@@ -128,8 +127,7 @@ class StateSubsciber(_AbstractSubscriber):
     '''state是我們控制策略, 用pub與subscribe來控制, 來自於我們手動pub'''
     
     def __init__(self, node: Node):
-        
-        self.state = 0.0
+        self.state: float = 0.0
         super().__init__(node, Float64MultiArray, 'state_topic')
         
     def _callback(self, msg: Float64MultiArray):
@@ -139,7 +137,7 @@ class ContactSubscriber(_AbstractSubscriber):
     '''可以判斷是否『接觸』, 無法判斷是否『踩穩』, 來自bipedal_floating.gazebo的 <libgazebo_ros_bumper.so>'''
     
     def __init__(self, node: Node, topic: str):
-        self.is_contact = True
+        self.is_contact: bool = True
         super().__init__(node, ContactsState, topic)
         
     def _callback(self, msg: ContactsState):
@@ -149,8 +147,8 @@ class ForceSubscriber(_AbstractSubscriber):
     """來自bipedal_floation.xacro的插件 <libgazebo_ros_ft_sensor.so>"""
     
     def __init__(self, node: Node, topic: str):
-        self.force = None
-        self.tau = None
+        self.force: NDArray
+        self.tau: NDArray
         super().__init__(node, WrenchStamped, topic)
         
     def _callback(self, msg: WrenchStamped):
@@ -166,7 +164,7 @@ class JointSubsciber(_AbstractSubscriber):
     def __init__(self, node: Node, main_callback: Callable):
         self.main_callback = main_callback #引入main_callback來持續呼叫
         self.callback_count = 0 #每5次會呼叫一次maincallback
-        self.jp = None
+        self.jp: NDArray
         super().__init__(node, JointState, '/joint_states')
         
     def _callback(self, msg: JointState):

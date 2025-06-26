@@ -12,7 +12,8 @@ from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
 from bipedal_floating_description.motion_planning import Trajatory
 from bipedal_floating_description.torque_control import TorqueControl
 
-from bipedal_floating_description.mode.state0 import State0
+import bipedal_floating_description.mode.state0 as state0
+from bipedal_floating_description.mode.state1 import State1
 #========================================================#
 """
 #TODO 
@@ -73,8 +74,24 @@ class UpperLevelController(Node):
         match state:
             case 0:
                 model_gravity = self.robot.new_gravity(jp)
-                end_in_pf = {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()}
-                torque = State0(jp, model_gravity, end_in_pf).ctrl()
+                end_in_pf: state0.EndInPf = {
+                    'lf': self.frame.p_lf_in_pf.flatten(),
+                    'rf': self.frame.p_rf_in_pf.flatten(),
+                    'pel': self.frame.p_pel_in_pf.flatten()
+                }
+                torque = state0.State0(jp.flatten(), model_gravity, end_in_pf).ctrl()
+            case 1:
+                Jlf, Jrf = self.frame.get_jacobian()
+                torque = State1(
+                    {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
+                    {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
+                    {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},
+                    self.robot.new_gravity(jp),
+                    jp.flatten(),
+                    jv.flatten(),
+                    self.frame.eularToGeo,
+                    {'lf': Jlf, 'rf': Jrf}
+                ).ctrl()
             case _:        
                 #========軌跡規劃========#
                 ref = self.traj.plan(state, self.frame, self.stance, is_firmly)

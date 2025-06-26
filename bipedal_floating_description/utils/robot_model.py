@@ -1,9 +1,11 @@
+from typing import Literal
 import numpy as np; np.set_printoptions(precision=2)
+from numpy.typing import NDArray
 import pinocchio as pin #2.6.21
 import pink #2.1.0
 
 #================ import other code =====================#
-from bipedal_floating_description.utils.config import Config
+from bipedal_floating_description.utils.config import Config, GravityDict
 #========================================================#
     
 class RobotModel:
@@ -69,7 +71,7 @@ class RobotModel:
                 
                 return 0.3 * g_from_both_single_ft + 0.75* g_from_bipedal_ft[cf]
     
-    def new_gravity(self, jp: np.ndarray) -> dict[str, np.ndarray]:
+    def new_gravity(self, jp: np.ndarray) -> GravityDict:
             
         #==========半邊單腳模型==========#
         g_from_both_single_ft = np.hstack((

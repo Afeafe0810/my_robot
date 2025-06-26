@@ -1,4 +1,15 @@
+from typing import Literal, NamedTuple
+
 import numpy as np
+from numpy.typing import NDArray
+
+GravityDict = dict[Literal['lf', 'rf', 'from_both_single_ft'], NDArray]
+
+class Stance(NamedTuple):
+    cf: Literal['lf', 'rf']
+    sf: Literal['lf', 'rf']
+
+
 
 class Config:
     '''機器人的參數、常數'''
