@@ -13,6 +13,7 @@ from bipedal_floating_description.motion_planning import Trajatory
 from bipedal_floating_description.torque_control import TorqueControl
 
 from bipedal_floating_description.mode.state0 import State0
+from bipedal_floating_description.mode.state1 import State1
 #========================================================#
 """
 #TODO 
@@ -75,7 +76,14 @@ class UpperLevelController(Node):
                 model_gravity = self.robot.new_gravity(jp)
                 end_in_pf = {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()}
                 torque = State0(jp, model_gravity, end_in_pf).ctrl()
-            
+            case 1:
+                model_gravity = self.robot.new_gravity(jp)
+                end_in_pf = {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten(),
+                             'a_lf': self.frame.pa_lf_in_pf[3:,0], 'a_rf': self.frame.pa_rf_in_pf[3, 0], 'a_pel': self.frame.pa_pel_in_pf[3, 0]}
+                end_in_wf = {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()}
+                Jacobian = self.frame.get_jacobian()
+                J = {'lf': Jacobian[0], 'rf': Jacobian[1]}
+                torque = State1(end_in_pf, end_in_wf, self.frame.eularToGeo, jp, jv, J, model_gravity, self.frame).ctrl()
             case _:        
                 #========軌跡規劃========#
                 ref = self.traj.plan(state, self.frame, self.stance, is_firmly)

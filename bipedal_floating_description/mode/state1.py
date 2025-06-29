@@ -171,8 +171,9 @@ class State1:
     
     def ctrl(self):
         tau_knee = self.knee()
-        tau_ankle_Cf_ay = alipx.ctrl(self.frame, self.stance, self.stance, None, None)
+        tau_ankle_Cf_ay = alipx.ctrl(self.frame, self.stance, self.stance, None, None).flatten()
         tau_ankle_Cf_ax = PD.ankle_ax1_cf(None, None, self.jp, self.jv)
+        print(f"{tau_ankle_Cf_ay = }\n{tau_ankle_Cf_ax = }")
         tau_ankle = {
             self.stance.cf: np.hstack((tau_ankle_Cf_ay, tau_ankle_Cf_ax)),
             self.stance.sf: self.pd_sfAnkle().flatten()
