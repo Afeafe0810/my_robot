@@ -4,9 +4,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from bipedal_floating_description.utils.config import Config, Stance, GravityDict
+from bipedal_floating_description.mode.state1 import AlipX as PreAlipX
 from bipedal_floating_description.mode.utils import linear_move
 
-NL = Config.NL_BALANCE
+NL = Config.NL_MOVINGTOLF
 Hpel = Config.IDEAL_Z_PEL_IN_WF
 
 End = dict[Literal['pel', 'lf', 'rf'], NDArray]
@@ -26,7 +27,7 @@ def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     return model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
 
 @dataclass
-class State1:
+class State2:
     Tn: ClassVar[int] = 0
     is_just_started: ClassVar[bool] = True
     stance : ClassVar = Stance('lf', 'rf')
@@ -45,8 +46,10 @@ class State1:
 
     def ctrl(self):
         cf, sf = self.stance
-        
-        ref_p, ref_a, ref_varx = Plan(
+        if self.is_just_started:
+            AlipX.from_previous_alip(PreAlipX.var_e, PreAlipX.bias_e)
+
+        ref_p, ref_a, ref_varx, ref_ax_cf = Plan(
             self.Tn,
             self.is_just_started,
             self.end_in_wf
@@ -65,7 +68,7 @@ class State1:
         
         sf_ankle = PD_Sf_Ankle(self.jp[-2:])
         
-        cf_ankleX = PD_Cf_AnkleX(self.jp[5], self.jv[5])
+        cf_ankleX = PD_Cf_AnkleX(ref_ax_cf, self.jp[5], self.jv[5])
         cf_ankleY = AlipX(ref_varx, self.end_in_wf['pel'][0])
         
         tau_ankle = {
@@ -73,8 +76,9 @@ class State1:
             sf: sf_ankle.ctrl()
         }
         
-        self.__class__.Tn += 1
         self.__class__.is_just_started = False
+        if self.Tn <= NL:
+            self.__class__.Tn += 1
         
         return np.hstack((tau_knee['lf'], tau_ankle['lf'], tau_knee['rf'], tau_ankle['rf']))    
 
@@ -92,10 +96,11 @@ class Plan:
             cls.lf0 = end_in_wf['lf']
             cls.rf0 = end_in_wf['rf']
         
-    def plan(self) -> tuple[End, End, NDArray]:
-        z_pel = linear_move(self.Tn, 0, NL, self.pel0[2], Hpel)
+    def plan(self) -> tuple[End, End, NDArray, float]:
+        y_pel = linear_move(self.Tn, 0, NL, self.pel0[1], 0.09)
+        
         ref_p_end: End = {
-            'pel': np.hstack((self.pel0[:2], z_pel)),
+            'pel': np.array([self.pel0[0], y_pel, Hpel]),
             'lf': self.lf0,
             'rf': self.rf0
         }
@@ -105,8 +110,9 @@ class Plan:
             'rf': np.zeros(3)
         }
         ref_varx = np.array([0, 0])
+        ref_ax_cf = linear_move(self.Tn, 0, NL, 0.02, 0.15)
         
-        return ref_p_end, ref_a_end, ref_varx
+        return ref_p_end, ref_a_end, ref_varx, ref_ax_cf
 
 @dataclass
 class Knee:
@@ -127,7 +133,7 @@ class Knee:
             sf: [0, 1, 2, 5], # x, y, z, az
         }
         self.kout = {cf: np.array([25]), sf: np.array([20])}
-        self.kin = {cf: np.array([0.5]), sf: np.array([0.5])}
+        self.kin = {cf: np.array([1.5]), sf: np.array([0.5])}
         
     def ctrl(self)-> Ft:
         cf, sf = self.stance
@@ -194,11 +200,11 @@ class PD_Sf_Ankle:
         return self.kp * ( self.ref_ayx_jp - self.jp45_sf ) 
 
 class PD_Cf_AnkleX:
-    ref_jp: float = 0.02
     kp: float = 4
     kd: float = 3
     
-    def __init__(self, jp5_cf: float, jv5_cf: float):
+    def __init__(self, ref_jp: float, jp5_cf: float, jv5_cf: float):
+        self.ref_jp = ref_jp
         self.jp5_cf = jp5_cf
         self.jv5_cf = jv5_cf
         
@@ -208,15 +214,15 @@ class PD_Cf_AnkleX:
 class AlipX:
     A = np.array([[1, 0.00247], [0.8832, 1]])
     B = np.array([0, 0.01])
-    K = np.array([150,15.0198])*0.13
+    K = np.array([290.3274, 15.0198])*0.5
     L = np.array([1.656737, 24.448707])
     L_bias = -1.238861
     limit = Config.ANKLE_AY_LIMIT
     
-    var_e: NDArray = np.zeros(2)
-    bias_e: float = -0.02
+    var_e: NDArray
+    bias_e: float
     
-    def __init__(self, ref_var: NDArray, pel_in_wf: float ):
+    def __init__(self, ref_var: NDArray, pel_in_wf: float):
         self.ref_var = ref_var
         self.y = pel_in_wf
     
@@ -234,32 +240,10 @@ class AlipX:
         
         return -u
     
+    @classmethod
+    def from_previous_alip(cls, var_e: NDArray, bias_e: float):
+        cls.var_e = var_e
+        cls.bias_e = bias_e
+        
 if __name__ == '__main__':
     pass
-    
-    # print(repr(PD_Cf_AnkleX(2, 3).ctrl()))
-    # print(repr(PD_Sf_Ankle(np.array([1, 2])).ctrl()))
-    # print(Knee(
-    #     stance=Stance(cf='lf', sf='rf'),
-    #     ref=(
-    #         {'pel': np.array([0, 0, 0.55]), 'lf': np.array([0, 0.1, 0]), 'rf': np.array([0, -0.1, 0])},
-    #         {'pel': np.zeros(3), 'lf': np.zeros(3), 'rf': np.zeros(3)}
-    #     ),
-    #     end_in_pf=(
-    #         {'pel': np.array([0, 0, 0.45]), 'lf': np.array([0, 0.1, 0]), 'rf': np.array([0, -0.1, 0])},
-    #         {'pel': np.zeros(3), 'lf': np.zeros(3), 'rf': np.zeros(3)}
-    #     ),
-    #     w_from_Euler_to_geometry={
-    #         'lf': np.eye(3),
-    #         'rf': np.eye(3),
-    #     },
-    #     _jv=np.zeros(12),
-    #     J={
-    #         'lf': np.eye(6),
-    #         'rf': np.eye(6),
-    #     },
-    #     tau_G={
-    #         'lf': np.zeros(6),
-    #         'rf': np.zeros(6),
-    #     }
-    # ).ctrl())

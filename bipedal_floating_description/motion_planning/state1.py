@@ -28,9 +28,9 @@ class BipedalBalance:
         
         #骨盆高度線性移動
         H = Config.IDEAL_Z_PEL_IN_WF
-        z_pel = linear_move(self.Tk, 0, Config.TL_BALANCE, self.pel0[2,0], H)
+        z_pel = linear_move(self.Tk, 0, Config.NL_BALANCE, self.pel0[2,0], H)
         
-        if self.Tk < Config.TL_BALANCE:
+        if self.Tk < Config.NL_BALANCE:
             self.Tk += 1
         
         return Ref(

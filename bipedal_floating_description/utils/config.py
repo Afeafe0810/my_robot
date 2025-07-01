@@ -35,9 +35,12 @@ class Config:
     #骨盆相對base的座標
     P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
     
-    #雙腳平衡sample
-    TL_BALANCE = 100
+    #雙腳平衡sample長
+    NL_BALANCE = 100
 
+    #重心移動sample長
+    NL_MOVINGTOLF = 100
+    
     #單腳支撐時間?
     DDT = 2
     
