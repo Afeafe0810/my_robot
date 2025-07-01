@@ -15,6 +15,7 @@ from bipedal_floating_description.torque_control import TorqueControl
 import bipedal_floating_description.mode.state0 as state0
 from bipedal_floating_description.mode.state1 import State1
 from bipedal_floating_description.mode.state2 import State2
+from bipedal_floating_description.mode.state3 import State3
 
 #========================================================#
 """
@@ -97,6 +98,18 @@ class UpperLevelController(Node):
             case 2:
                 Jlf, Jrf = self.frame.get_jacobian()
                 torque = State2(
+                    {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
+                    {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
+                    {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},
+                    self.robot.new_gravity(jp),
+                    jp.flatten(),
+                    jv.flatten(),
+                    self.frame.eularToGeo,
+                    {'lf': Jlf, 'rf': Jrf}
+                ).ctrl()
+            case 3:
+                Jlf, Jrf = self.frame.get_jacobian()
+                torque = State3(
                     {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
                     {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
                     {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},

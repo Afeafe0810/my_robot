@@ -45,15 +45,15 @@ class State2:
         self.tauG = gravity(self._model_gravity, self.p_end_in_pf)
 
     def ctrl(self):
+        cls = self.__class__
         cf, sf = self.stance
-        if self.is_just_started:
-            AlipX.from_previous_alip(PreAlipX.var_e, PreAlipX.bias_e)
+        
+        if cls.is_just_started:
+            Plan.initilize(self.end_in_wf)
+            AlipX.initialize(PreAlipX.var_e, PreAlipX.bias_e)
+            cls.is_just_started = False
 
-        ref_p, ref_a, ref_varx, ref_ax_cf = Plan(
-            self.Tn,
-            self.is_just_started,
-            self.end_in_wf
-        ).plan()
+        ref_p, ref_a, ref_varx, ref_ax_cf = Plan(self.Tn).plan()
         
         tau_knee = Knee(
             self.stance,
@@ -69,14 +69,15 @@ class State2:
         sf_ankle = PD_Sf_Ankle(self.jp[-2:])
         
         cf_ankleX = PD_Cf_AnkleX(ref_ax_cf, self.jp[5], self.jv[5])
-        cf_ankleY = AlipX(ref_varx, self.end_in_wf['pel'][0])
+        
+        x_cf2pel = self.end_in_wf['pel'][0] - self.end_in_wf['lf'][0]
+        cf_ankleY = AlipX(ref_varx, x_cf2pel)
         
         tau_ankle = {
             cf: [cf_ankleY.ctrl(), cf_ankleX.ctrl()],
             sf: sf_ankle.ctrl()
         }
         
-        self.__class__.is_just_started = False
         if self.Tn <= NL:
             self.__class__.Tn += 1
         
@@ -87,14 +88,14 @@ class Plan:
     lf0: NDArray
     rf0: NDArray
     
-    def __init__(self, Tn: int, is_just_started: bool, end_in_wf: End):
-        cls = self.__class__
-        
+    def __init__(self, Tn: int):
         self.Tn = Tn
-        if is_just_started:
-            cls.pel0 = end_in_wf['pel']
-            cls.lf0 = end_in_wf['lf']
-            cls.rf0 = end_in_wf['rf']
+        
+    @classmethod
+    def initilize(cls, end_in_wf: End):
+        cls.pel0 = end_in_wf['pel']
+        cls.lf0 = end_in_wf['lf']
+        cls.rf0 = end_in_wf['rf']
         
     def plan(self) -> tuple[End, End, NDArray, float]:
         y_pel = linear_move(self.Tn, 0, NL, self.pel0[1], 0.09)
@@ -222,9 +223,9 @@ class AlipX:
     var_e: NDArray
     bias_e: float
     
-    def __init__(self, ref_var: NDArray, pel_in_wf: float):
+    def __init__(self, ref_var: NDArray, cf2pel_in_wf: float):
         self.ref_var = ref_var
-        self.y = pel_in_wf
+        self.y = cf2pel_in_wf
     
     def ctrl(self) -> float:
         #==========全狀態回授(飽和)==========#
@@ -241,7 +242,7 @@ class AlipX:
         return -u
     
     @classmethod
-    def from_previous_alip(cls, var_e: NDArray, bias_e: float):
+    def initialize(cls, var_e: NDArray, bias_e: float):
         cls.var_e = var_e
         cls.bias_e = bias_e
         
