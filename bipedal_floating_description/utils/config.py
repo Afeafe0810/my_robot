@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 GravityDict = dict[Literal['lf', 'rf', 'from_both_single_ft'], NDArray]
 End = dict[Literal['lf', 'rf', 'pel'], NDArray]
 Ft = dict[Literal['lf', 'rf'], NDArray]
-
+FtScalar = dict[Literal['lf', 'rf'], float]
 
 class Stance(NamedTuple):
     cf: Literal['lf', 'rf']
@@ -38,11 +38,10 @@ class Config:
     #骨盆相對base的座標
     P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
     
-    #雙腳平衡sample長
-    NL_BALANCE = 100
-
-    #重心移動sample長
-    NL_MOVINGTOLF = 100
+    
+    NL_BALANCE = 100 #雙腳平衡sample長
+    NL_MOVINGTOLF = 100 #重心移動sample長
+    NL_MARCHINPLACE = 50 #原地行走sample長
     
     #單腳支撐時間?
     DDT = 2
@@ -55,7 +54,7 @@ class Config:
     MASS = 9
     IDEAL_Z_COM_IN_WF = 0.45
     IDEAL_Z_PEL_IN_WF = 0.55
-    IDEAL_Y_RFTOLF_IN_WF = 0.2
+    IDEAL_Y_STEPLENGTH = 0.2
     GC = 9.81
     OMEGA = ( GC / IDEAL_Z_COM_IN_WF )**0.5
     STEP_HEIGHT = 0.02

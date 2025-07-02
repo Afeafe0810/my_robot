@@ -1,7 +1,6 @@
 import numpy as np; np.set_printoptions(precision=2)
 from numpy.typing import NDArray
 from typing import TypeVar
-from collections import namedtuple
 
 FA = TypeVar('FloatOrArray', float, NDArray)
 

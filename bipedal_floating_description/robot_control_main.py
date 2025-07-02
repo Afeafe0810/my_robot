@@ -56,6 +56,7 @@ class UpperLevelController(Node):
         
         self.ref_record     = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
         self.measure_record = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
+        self.export_data_for_senior = []
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
@@ -154,6 +155,53 @@ class UpperLevelController(Node):
         return {
             'lf': frame.p_lf_in_wf[2, 0] <= 0.01,
             'rf': frame.p_rf_in_wf[2, 0] <= 0.01,
+        }
+    def get_data(self, storage: list, torque: np.ndarray, jp: np.ndarray, jv: np.ndarray, tauG: np.ndarray):
+        data = {
+            'x_pel': self.frame.p_pel_in_wf[0, 0],
+            'y_pel': self.frame.p_pel_in_wf[1, 0],
+            'z_pel': self.frame.p_pel_in_wf[2, 0],
+            
+            'tau0': torque[0, 0],
+            'tau1': torque[1, 0],
+            'tau2': torque[2, 0],
+            'tau3': torque[3, 0],
+            'tau4': torque[4, 0],
+            'tau5': torque[5, 0],
+            'tau6': torque[6, 0],
+            'tau7': torque[7, 0],
+            'tau8': torque[8, 0],
+            'tau9': torque[9, 0],
+            'tau10': torque[10, 0],
+            'tau11': torque[11, 0],
+            
+            'jp0': jp[0, 0],
+            'jp1': jp[1, 0],
+            'jp2': jp[2, 0],
+            'jp3': jp[3, 0],
+            'jp4': jp[4, 0],
+            'jp5': jp[5, 0],
+            'jp6': jp[6, 0],
+            'jp7': jp[7, 0],
+            'jp8': jp[8, 0],
+            'jp9': jp[9, 0],
+            'jp10': jp[10, 0],
+            'jp11': jp[11, 0],
+            
+            'jv0': jv[0, 0],
+            'jv1': jv[1, 0],
+            'jv2': jv[2, 0],
+            'jv3': jv[3, 0],
+            'jv4': jv[4, 0],
+            'jv5': jv[5, 0],
+            'jv6': jv[6, 0],
+            'jv7': jv[7, 0],
+            'jv8': jv[8, 0],
+            'jv9': jv[9, 0],
+            'jv10': jv[10, 0],
+            'jv11': jv[11, 0],
+            
+            
         }
 
 def main(args=None):

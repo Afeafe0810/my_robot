@@ -25,7 +25,7 @@ def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     return model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
 
 @dataclass
-class State3:
+class State30:
     Tn: ClassVar[int] = 0
     is_just_started: ClassVar[bool] = True
     stance : ClassVar = Stance('lf', 'rf')

@@ -174,7 +174,7 @@ class AlipTraj:
         #==========機器人參數==========#
         m = Config.MASS
         H = Config.IDEAL_Z_COM_IN_WF
-        W = Config.IDEAL_Y_RFTOLF_IN_WF
+        W = Config.IDEAL_Y_STEPLENGTH
         h = Config.STEP_HEIGHT
         w = Config.OMEGA
         T = Config.STEP_TIMELENGTH
@@ -246,7 +246,7 @@ def _get_ref_timesUp_Lx(cf:str) -> float:
     
     m = Config.MASS
     H = Config.IDEAL_Z_COM_IN_WF
-    W = Config.IDEAL_Y_RFTOLF_IN_WF
+    W = Config.IDEAL_Y_STEPLENGTH
     w = Config.OMEGA
     T = Config.STEP_TIMELENGTH
     
