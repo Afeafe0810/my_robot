@@ -3,12 +3,11 @@ from numpy.typing import NDArray
 from typing import Literal
 #================ import library ========================#
 from bipedal_floating_description.utils.robot_model import RobotModel
-from bipedal_floating_description.utils.config import GravityDict
+from bipedal_floating_description.utils.config import GravityDict, End
 #========================================================#
 
-EndInPf = dict[Literal['lf', 'rf', 'pel'], NDArray]
 
-def gravity(model_gravity: GravityDict, end: EndInPf) -> NDArray:
+def gravity(model_gravity: GravityDict, end: End) -> NDArray:
     # 根據骨盆位置來判斷重心腳
     y_ftTOpel = {
         'lf': abs(end['lf'][1] - end['pel'][1]),
@@ -24,7 +23,7 @@ class State0:
     ref_jp = np.zeros(12)
     kp = np.array([ 2, 2, 4, 6, 6, 4 ]*2)
     
-    def __init__(self, jp: NDArray, model_gravity: GravityDict, end_in_pf: EndInPf):
+    def __init__(self, jp: NDArray, model_gravity: GravityDict, end_in_pf: End):
         self.jp = jp
         self.tauG = gravity(model_gravity, end_in_pf)
         

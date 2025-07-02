@@ -3,14 +3,17 @@ from typing import Literal, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
+# 資料結構體
 GravityDict = dict[Literal['lf', 'rf', 'from_both_single_ft'], NDArray]
+End = dict[Literal['lf', 'rf', 'pel'], NDArray]
+Ft = dict[Literal['lf', 'rf'], NDArray]
+
 
 class Stance(NamedTuple):
     cf: Literal['lf', 'rf']
     sf: Literal['lf', 'rf']
 
-
-
+# 參數與規格
 class Config:
     '''機器人的參數、常數'''
     

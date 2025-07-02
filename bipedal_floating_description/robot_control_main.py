@@ -5,14 +5,14 @@ import numpy as np; np.set_printoptions(precision=2)
 import pandas as pd
 from copy import deepcopy
 #================ import other code =====================#
-from bipedal_floating_description.utils.config import Config
+from bipedal_floating_description.utils.config import Config, End
 from bipedal_floating_description.utils.ros_interfaces import ROSInterfaces as ROS
 from bipedal_floating_description.utils.robot_model import RobotModel
 from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
 from bipedal_floating_description.motion_planning import Trajatory
 from bipedal_floating_description.torque_control import TorqueControl
 
-import bipedal_floating_description.mode.state0 as state0
+from bipedal_floating_description.mode.state0 import State0
 from bipedal_floating_description.mode.state1 import State1
 from bipedal_floating_description.mode.state2 import State2
 from bipedal_floating_description.mode.state3 import State3
@@ -77,12 +77,12 @@ class UpperLevelController(Node):
         match state:
             case 0:
                 model_gravity = self.robot.new_gravity(jp)
-                end_in_pf: state0.EndInPf = {
+                end_in_pf: End = {
                     'lf': self.frame.p_lf_in_pf.flatten(),
                     'rf': self.frame.p_rf_in_pf.flatten(),
                     'pel': self.frame.p_pel_in_pf.flatten()
                 }
-                torque = state0.State0(jp.flatten(), model_gravity, end_in_pf).ctrl()
+                torque = State0(jp.flatten(), model_gravity, end_in_pf).ctrl()
             case 1:
                 Jlf, Jrf = self.frame.get_jacobian()
                 torque = State1(

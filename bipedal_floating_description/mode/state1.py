@@ -3,14 +3,11 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from bipedal_floating_description.utils.config import Config, Stance, GravityDict
+from bipedal_floating_description.utils.config import Config, Stance, GravityDict, End, Ft
 from bipedal_floating_description.mode.utils import linear_move
 
 NL = Config.NL_BALANCE
 Hpel = Config.IDEAL_Z_PEL_IN_WF
-
-End = dict[Literal['pel', 'lf', 'rf'], NDArray]
-Ft = dict[Literal['lf', 'rf'], NDArray]
 
 def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     end = end_in_pf
