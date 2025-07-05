@@ -113,7 +113,7 @@ class RobotModel:
     def _loadMeshcatModel(urdf_path: str):
         '''高級動力學模型'''
         robot = pin.RobotWrapper.BuildFromURDF(
-            filename = Config.ROBOT_MODEL_DIR + urdf_path,
+            filename = Config.DIR_URDF + urdf_path,
             package_dirs = ["."],
             root_joint=None,
         )
@@ -136,7 +136,7 @@ class _AbstractSimpleModel:
     '''基礎運動學模型, 用來算重力矩和質心位置'''
     def __init__(self, urdf_path: str):
         #機器人模型
-        self.model = pin.buildModelFromUrdf(Config.ROBOT_MODEL_DIR + urdf_path)
+        self.model = pin.buildModelFromUrdf(Config.DIR_URDF + urdf_path)
         self.data = self.model.createData()
         print(f'model: {self.model.name}')
         
