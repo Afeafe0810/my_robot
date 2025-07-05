@@ -33,6 +33,7 @@ class Config:
     """ 路徑們 """
     DIR_ROS2PKG = get_ros2pkg_abspath()
     DIR_URDF = os.path.join(DIR_ROS2PKG, 'urdf')
+    DIR_OUTPUT = os.path.join(DIR_ROS2PKG, 'output')
     
     
     """ 取樣時間與不同模式設定的時間 """
