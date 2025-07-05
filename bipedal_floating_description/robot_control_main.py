@@ -206,15 +206,18 @@ class UpperLevelController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
     upper_level_controllers = UpperLevelController()
-    rclpy.spin(upper_level_controllers)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    upper_level_controllers.destroy_node()
-    rclpy.shutdown()
+    
+    try:
+        rclpy.spin(upper_level_controllers)
+        
+    except KeyboardInterrupt:
+        pass
+    
+    finally:
+        upper_level_controllers.destroy_node()
+        
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
