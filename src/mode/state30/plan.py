@@ -4,7 +4,7 @@ import numpy as np
 from numpy import cosh, sinh, cos, pi
 from numpy.typing import NDArray
 
-from bipedal_floating_description.utils.config import Config, Stance, FtScalar, Ft, End
+from src.utils.config import Config, Stance, FtScalar, Ft, End
 
 m = Config.MASS
 H = Config.IDEAL_Z_COM_IN_WF

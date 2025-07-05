@@ -1,54 +1,73 @@
 from typing import Literal, NamedTuple
+import os
 
 import numpy as np
 from numpy.typing import NDArray
 
-# 資料結構體
+
+""" All pure stucture Used """
 GravityDict = dict[Literal['lf', 'rf', 'from_both_single_ft'], NDArray]
+
 End = dict[Literal['lf', 'rf', 'pel'], NDArray]
+
 Ft = dict[Literal['lf', 'rf'], NDArray]
+
 FtScalar = dict[Literal['lf', 'rf'], float]
 
 class Stance(NamedTuple):
     cf: Literal['lf', 'rf']
     sf: Literal['lf', 'rf']
 
-# 參數與規格
+
+def get_ros2pkg_abspath():
+    """ 回傳當前電腦的ros2pkg的絕對路徑 """
+    pkg_name = 'bipedal_floating_description'
+    dir_PKG_root = os.path.abspath(__file__).rsplit(pkg_name, 1)[0] + pkg_name
+    return dir_PKG_root
+
+
 class Config:
-    '''機器人的參數、常數'''
+    """ 腳本用到的參數, 規格, 該注意的順序 """
     
-    #取樣頻率
+    
+    """ 路徑們 """
+    DIR_ROS2PKG = get_ros2pkg_abspath()
+    DIR_URDF = os.path.join(DIR_ROS2PKG, 'urdf')
+    DIR_OUTPUT = os.path.join(DIR_ROS2PKG, 'output')
+    
+    
+    """ 取樣時間與不同模式設定的時間 """
     Ts = 0.01
+    NL_BALANCE = 100 #雙腳平衡sample長
+    NL_MOVINGTOLF = 100 #重心移動sample長
+    NL_MARCHINPLACE = 50 #原地行走sample長
+    #單腳支撐時間?
+    DDT = 2
+    #行走每步時間?
+    STEP_TIMELENGTH = 0.5
+    STEP_SAMPLELENGTH : int = int(STEP_TIMELENGTH / Ts)
     
-    # JointStates的最可能的順序, 順序無法改！！！！！
+    
+    """ JointStates回傳時最可能的順序, 順序如何打亂由ROS決定, 無法改!!!! """
     # JNT_ORDER_SUB = (
     #     'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 'L_Ankle_Pitch', 'L_Ankle_Roll', 'R_Hip_Roll',
     #     'R_Hip_Yaw', 'R_Knee_Pitch', 'R_Hip_Pitch', 'R_Ankle_Pitch', 'L_Hip_Roll', 'R_Ankle_Roll' )
 
-    #實際上URDF的關節順序以及effort controller的順序
+
+    """ 實際上URDF的關節順序以及effort controller的順序 """
+    #(X, Z, Y, Y, Y, X)
     JNT_ORDER_LITERAL = (
         'L_Hip_Roll', 'L_Hip_Yaw', 'L_Hip_Pitch', 'L_Knee_Pitch', 'L_Ankle_Pitch', 'L_Ankle_Roll',
         'R_Hip_Roll', 'R_Hip_Yaw', 'R_Hip_Pitch', 'R_Knee_Pitch', 'R_Ankle_Pitch', 'R_Ankle_Roll'
     )
-    #(X, Z, Y, Y, Y, X)
     
-    #URDF檔的路徑
-    ROBOT_MODEL_DIR = "/home/ldsc/ros2_ws/src/bipedal_floating_description/urdf"
+    
     
     #骨盆相對base的座標
     P_PEL_IN_BASE = np.vstack(( 0, 0, 0.598 ))
     
     
-    NL_BALANCE = 100 #雙腳平衡sample長
-    NL_MOVINGTOLF = 100 #重心移動sample長
-    NL_MARCHINPLACE = 50 #原地行走sample長
     
-    #單腳支撐時間?
-    DDT = 2
-    
-    #行走每步時間?
-    STEP_TIMELENGTH = 0.5
-    STEP_SAMPLELENGTH : int = int(STEP_TIMELENGTH / Ts)
     
     #機器人的物理模型
     MASS = 9
@@ -76,3 +95,4 @@ class Config:
         'Ly','Lx',
         'pel_x', 'pel_y', 'pel_z',
     ]
+

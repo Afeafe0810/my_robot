@@ -8,9 +8,9 @@ import pink
 import pinocchio as pin
 from itertools import accumulate
 #================ import other code =====================#
-from bipedal_floating_description.utils.config import Config
-from bipedal_floating_description.utils.robot_model import RobotModel
-from bipedal_floating_description.utils.signal_process import Dsp
+from src.utils.config import Config
+from src.utils.robot_model import RobotModel
+from src.utils.signal_process import Dsp
 #========================================================#
 
 class RobotFrame:

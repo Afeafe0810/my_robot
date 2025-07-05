@@ -3,9 +3,9 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from bipedal_floating_description.utils.config import Config, Stance, GravityDict, End, Ft
-from bipedal_floating_description.mode.state2 import AlipX as PreAlipX
-from bipedal_floating_description.mode.utils import linear_move
+from src.utils.config import Config, Stance, GravityDict, End, Ft
+from src.mode.state2 import AlipX as PreAlipX
+from src.mode.utils import linear_move
 
 NL = Config.NL_MOVINGTOLF
 Hpel = Config.IDEAL_Z_PEL_IN_WF

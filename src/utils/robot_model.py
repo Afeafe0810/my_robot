@@ -1,11 +1,13 @@
 from typing import Literal
+import os
+
 import numpy as np; np.set_printoptions(precision=2)
 from numpy.typing import NDArray
 import pinocchio as pin #2.6.21
 import pink #2.1.0
 
 #================ import other code =====================#
-from bipedal_floating_description.utils.config import Config, GravityDict
+from src.utils.config import Config, GravityDict
 #========================================================#
     
 class RobotModel:
@@ -22,13 +24,13 @@ class RobotModel:
     """
     def __init__(self):
         #=========建立機器人模型===========#
-        self._meshrobot = self._loadMeshcatModel("/bipedal_floating.pin.urdf") #Pinnocchio藍色的機器人
+        self._meshrobot = self._loadMeshcatModel("bipedal_floating.pin.urdf") #Pinnocchio藍色的機器人
 
-        self.bipedal_from_pel = BipedalFromPel("/bipedal_floating.xacro") #從骨盆建下來的模擬模型
-        self.bipedal_from_lf = BipedalFromLF("/bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
-        self.bipedal_from_rf = BipedalFromRF("/bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
-        self.single_lf = SingleLeftLeg("/stance_l.xacro") #從左腳掌往上建的左單腳
-        self.single_rf = SingleRightLeg("/stance_r_gravity.xacro") #從右腳掌往上建的右單腳
+        self.bipedal_from_pel = BipedalFromPel("bipedal_floating.xacro") #從骨盆建下來的模擬模型
+        self.bipedal_from_lf = BipedalFromLF("bipedal_l_gravity.xacro") #從左腳掌建起的雙腳
+        self.bipedal_from_rf = BipedalFromRF("bipedal_r_gravity.xacro") #從右腳掌建起的雙腳
+        self.single_lf = SingleLeftLeg("stance_l.xacro") #從左腳掌往上建的左單腳
+        self.single_rf = SingleRightLeg("stance_r_gravity.xacro") #從右腳掌往上建的右單腳
         
         #=========可視化msehcat===========#
         self._viz = self._meshcatVisualize(self._meshrobot)
@@ -113,7 +115,7 @@ class RobotModel:
     def _loadMeshcatModel(urdf_path: str):
         '''高級動力學模型'''
         robot = pin.RobotWrapper.BuildFromURDF(
-            filename = Config.ROBOT_MODEL_DIR + urdf_path,
+            filename = os.path.join(Config.DIR_URDF, urdf_path),
             package_dirs = ["."],
             root_joint=None,
         )
@@ -136,7 +138,7 @@ class _AbstractSimpleModel:
     '''基礎運動學模型, 用來算重力矩和質心位置'''
     def __init__(self, urdf_path: str):
         #機器人模型
-        self.model = pin.buildModelFromUrdf(Config.ROBOT_MODEL_DIR + urdf_path)
+        self.model = pin.buildModelFromUrdf(os.path.join(Config.DIR_URDF, urdf_path))
         self.data = self.model.createData()
         print(f'model: {self.model.name}')
         
