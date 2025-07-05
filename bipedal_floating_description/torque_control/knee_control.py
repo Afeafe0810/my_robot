@@ -2,9 +2,9 @@
 import numpy as np; np.set_printoptions(precision=3, suppress=True)
 
 #================ import library ========================#
-from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
-from bipedal_floating_description.utils.robot_model import RobotModel
-from bipedal_floating_description.motion_planning import Ref
+from src.utils.frame_kinermatic import RobotFrame
+from src.utils.robot_model import RobotModel
+from src.motion_planning import Ref
 
 #TODO 感覺這邊可以重構, 沒有self property, 且所有method幾乎都是static method
 class KneeLoop:

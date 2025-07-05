@@ -1,8 +1,8 @@
 import numpy as np; np.set_printoptions(precision=2)
 #================ import library ========================#
-from bipedal_floating_description.motion_planning.utils import Ref, linear_move
-from bipedal_floating_description.utils.frame_kinermatic import RobotFrame
-from bipedal_floating_description.utils.config import Config
+from src.motion_planning.utils import Ref, linear_move
+from src.utils.frame_kinermatic import RobotFrame
+from src.utils.config import Config
 #========================================================#
 
 # state 0, 1

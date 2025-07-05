@@ -2,8 +2,8 @@ import numpy as np; np.set_printoptions(precision=2)
 from numpy.typing import NDArray
 from typing import Literal
 #================ import library ========================#
-from bipedal_floating_description.utils.robot_model import RobotModel
-from bipedal_floating_description.utils.config import GravityDict, End
+from src.utils.robot_model import RobotModel
+from src.utils.config import GravityDict, End
 #========================================================#
 
 

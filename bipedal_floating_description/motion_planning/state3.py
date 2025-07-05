@@ -1,7 +1,7 @@
 import numpy as np; np.set_printoptions(precision=2)
 #================ import library ========================#
-from bipedal_floating_description.motion_planning.utils import Ref
-from bipedal_floating_description.utils.config import Config
+from src.motion_planning.utils import Ref
+from src.utils.config import Config
 #========================================================#
 
 # state 2

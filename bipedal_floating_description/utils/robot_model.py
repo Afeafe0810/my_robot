@@ -5,7 +5,7 @@ import pinocchio as pin #2.6.21
 import pink #2.1.0
 
 #================ import other code =====================#
-from bipedal_floating_description.utils.config import Config, GravityDict
+from src.utils.config import Config, GravityDict
 #========================================================#
     
 class RobotModel:
