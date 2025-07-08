@@ -5,7 +5,7 @@ import numpy as np; np.set_printoptions(precision=2)
 import pandas as pd
 from copy import deepcopy
 #================ import other code =====================#
-from src.utils.config import Config, End
+from src.utils.config import Config, End, Ft
 from src.utils.ros_interfaces import ROSInterfaces as ROS
 from src.utils.robot_model import RobotModel
 from src.utils.frame_kinermatic import RobotFrame
@@ -16,6 +16,8 @@ from src.mode.state0 import State0
 from src.mode.state1 import State1
 from src.mode.state2 import State2
 from src.mode.state3 import State3
+from src.mode.state4 import State4
+from src.mode.state30.state30 import State30
 
 #========================================================#
 """
@@ -74,61 +76,90 @@ class UpperLevelController(Node):
         #========支撐狀態切換=====#
         self._set_stance(state)
         
+        
+        model_gravity = self.robot.new_gravity(jp)
+        p_end_in_pf: End = {
+            'lf': self.frame.p_lf_in_pf.flatten(),
+            'rf': self.frame.p_rf_in_pf.flatten(),
+            'pel': self.frame.p_pel_in_pf.flatten()
+        }
+        a_end_in_pf: End = {
+            'lf': self.frame.pa_lf_in_pf[3:, 0],
+            'rf': self.frame.pa_rf_in_pf[3:, 0],
+            'pel': self.frame.pa_pel_in_pf[3:, 0]
+        }
+        p_end_in_wf: End = {
+            'lf': self.frame.p_lf_in_wf.flatten(),
+            'rf': self.frame.p_rf_in_wf.flatten(),
+            'pel': self.frame.p_pel_in_wf.flatten()
+        }
+        J: Ft = {ft: compnt for ft, compnt in zip( ('lf','rf'), self.frame.get_jacobian() )}
+        eularToGeo: Ft = self.frame.eularToGeo
+        
         match state:
             case 0:
-                model_gravity = self.robot.new_gravity(jp)
-                end_in_pf: End = {
-                    'lf': self.frame.p_lf_in_pf.flatten(),
-                    'rf': self.frame.p_rf_in_pf.flatten(),
-                    'pel': self.frame.p_pel_in_pf.flatten()
-                }
-                torque = State0(jp.flatten(), model_gravity, end_in_pf).ctrl()
+                torque = State0(jp.flatten(), model_gravity, p_end_in_pf).ctrl()
             case 1:
-                Jlf, Jrf = self.frame.get_jacobian()
                 torque = State1(
-                    {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
-                    {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
-                    {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},
-                    self.robot.new_gravity(jp),
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    model_gravity,
                     jp.flatten(),
                     jv.flatten(),
-                    self.frame.eularToGeo,
-                    {'lf': Jlf, 'rf': Jrf}
+                    eularToGeo,
+                    J
                 ).ctrl()
             case 2:
-                Jlf, Jrf = self.frame.get_jacobian()
                 torque = State2(
-                    {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
-                    {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
-                    {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},
-                    self.robot.new_gravity(jp),
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    model_gravity,
                     jp.flatten(),
                     jv.flatten(),
-                    self.frame.eularToGeo,
-                    {'lf': Jlf, 'rf': Jrf}
+                    eularToGeo,
+                    J
                 ).ctrl()
             case 3:
-                Jlf, Jrf = self.frame.get_jacobian()
                 torque = State3(
-                    {'lf': self.frame.p_lf_in_wf.flatten(), 'rf': self.frame.p_rf_in_wf.flatten(), 'pel': self.frame.p_pel_in_wf.flatten()},
-                    {'lf': self.frame.p_lf_in_pf.flatten(), 'rf': self.frame.p_rf_in_pf.flatten(), 'pel': self.frame.p_pel_in_pf.flatten()},
-                    {'lf': self.frame.pa_lf_in_pf[3:,0], 'rf': self.frame.pa_rf_in_pf[0], 'pel': self.frame.pa_pel_in_pf[0]},
-                    self.robot.new_gravity(jp),
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    model_gravity,
                     jp.flatten(),
                     jv.flatten(),
-                    self.frame.eularToGeo,
-                    {'lf': Jlf, 'rf': Jrf}
+                    eularToGeo,
+                    J
                 ).ctrl()
-                
-            case _:        
-                #========軌跡規劃========#
-                ref = self.traj.plan(state, self.frame, self.stance, is_firmly)
-                if state == 30:
-                    self.ref_record = ref.to_csv(self.ref_record)
-                    self.measure_record = self.frame.to_csv(self.measure_record, self.stance)
-                    
-                #========扭矩控制========#
-                torque = self.ctrl.update_torque(self.frame, self.robot, ref, state, self.stance, self.stance_past, is_firmly, jp, jv)
+            case 4:
+                torque = State4(
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    self.frame.p_com_in_wf.flatten(),
+                    self.frame.L_com_in_lf['y'],
+                    self.frame.L_com_in_lf['x'],
+                    model_gravity,
+                    jp.flatten(),
+                    jv.flatten(),
+                    eularToGeo,
+                    J
+                ).ctrl()
+            case 30:
+                torque = State30(
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    self.frame.p_com_in_wf.flatten(),
+                    self.frame.L_com_in_lf['y'],
+                    self.frame.L_com_in_lf['x'],
+                    model_gravity,
+                    jp.flatten(),
+                    jv.flatten(),
+                    eularToGeo,
+                    J
+                ).ctrl()
         ROS.publishers.effort.publish(torque)
         self.stance_past = self.stance
 
@@ -158,15 +189,18 @@ class UpperLevelController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
     upper_level_controllers = UpperLevelController()
-    rclpy.spin(upper_level_controllers)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    upper_level_controllers.destroy_node()
-    rclpy.shutdown()
+    
+    try:
+        rclpy.spin(upper_level_controllers)
+        
+    except KeyboardInterrupt:
+        print('\nKeyboard Interrupt')
+    
+    finally:
+        upper_level_controllers.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

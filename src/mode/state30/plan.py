@@ -19,7 +19,9 @@ T = NL * Ts
 
 AlipScalarData = dict[Literal['lf', 'rf', 'com', 'cfTOcom', 'L'], float]
 
-class AlipSfHeightFitting:...
+def alipSfHeight_fitting(Tn: int):
+    return h - 4*h*(Tn/NL - 0.5)**2
+        
     
 @dataclass
 class AbstractAlipTrajOneDirection:
@@ -27,10 +29,13 @@ class AbstractAlipTrajOneDirection:
     Tn: int
     ft0: FtScalar
     com0: float
-    var0: NDArray
+    L0: float
     
     def __post_init__(self):
         self.AT = self._A(T)
+        self.cfTOcom0 = self.com0 - self.ft0[self.stance.cf]
+        self.sfTOcom0 = self.com0 - self.ft0[self.stance.sf]
+        self.var0 = np.array([self.cfTOcom0, self.L0])
     
     @staticmethod
     def _A(t: float) -> NDArray:...
@@ -53,8 +58,8 @@ class AbstractAlipTrajOneDirection:
         sf2com_T = (Ldes_2T - self.AT[1,1]*Le_1T) / self.AT[1,0]
         
         # 擬合出下一點擺動腳軌跡
-        ratio = Tn / NL
-        sfTOcom1 = 0.5 * ( (1+cos(pi*ratio))*(self.com0 - self.ft0[sf]) + (1-cos(pi*ratio))*sf2com_T )
+        ratio = self.Tn / NL
+        sfTOcom1 = 0.5 * ( (1+cos(pi*ratio))*(self.sfTOcom0) + (1-cos(pi*ratio))*sf2com_T )
         
         return {
             cf: self.ft0[cf],
@@ -72,8 +77,7 @@ class AlipTrajY(AbstractAlipTrajOneDirection):
             [ -m*H*w * sinh(w*t),  cosh(w*t)         ]
         ])
     def _Ldes_2T(self) -> float:
-        cf, sf = self.stance
-        sign = {'lf': -1, 'rf': 1}[cf]
+        sign = {'lf': -1, 'rf': 1}[self.stance.cf]
         return sign * 0.5 *m*H*W * w*sinh(w*T) / (1+cosh(w*T))
 
 class Plan:
@@ -81,26 +85,47 @@ class Plan:
     lf0: NDArray
     rf0: NDArray
     com0: NDArray
+    Ly0: float
+    Lx0: float
 
-    def __init__(self, stance: Stance, Tn: int, vary0: NDArray):
+    def __init__(self, stance: Stance, Tn: int, com: NDArray, pel: NDArray):
         self.stance = stance
         self.Tn = Tn
-        self.vary0 = vary0
+        self.com = com
+        self.pel = pel
         
     @classmethod
-    def initilize(cls, end_in_wf: End, com0: NDArray):
-        cls.pel0 = end_in_wf['pel']
-        cls.lf0 = end_in_wf['lf']
-        cls.rf0 = end_in_wf['rf']
+    def initilize(cls, end0_in_wf: End, com0: NDArray, Ly0: float, Lx0: float):
+        cls.pel0 = end0_in_wf['pel']
+        cls.lf0 = end0_in_wf['lf']
+        cls.rf0 = end0_in_wf['rf']
         cls.com0 = com0
+        cls.Ly0 = Ly0
+        cls.Lx0 = Lx0
         
-    def plan(self):
-        y0_ft: FtScalar = {
-            'rf': self.lf0[1],
-            'lf': self.rf0[1]
-        }
-        datay = AlipTrajY(self.stance, self.Tn, y0_ft, self.com0[1], self.vary0).plan()
+        
+    def plan(self) -> tuple[End, End, NDArray, NDArray]:
+        cf, sf = self.stance
+        
+        y0_ft: FtScalar = {'lf': self.lf0[1], 'rf': self.rf0[1]}
+        datay = AlipTrajY(self.stance, self.Tn, y0_ft, self.com0[1], self.Lx0).plan()
+        
+        x0_cf = {'lf': self.lf0, 'rf': self.rf0}[cf][0]
+        y_pel = datay['com'] - self.com[1] + self.pel[1]
+        z_sf = alipSfHeight_fitting(self.Tn)
         
         ref_p_end: End = {
-            'lf': np.array([0, datay['lf']])
+            cf: np.array([x0_cf, datay[cf], 0]),
+            sf: np.array([x0_cf, datay[sf], z_sf]),
+            'pel': np.array([x0_cf, y_pel, Hpel])
         }
+        
+        ref_a_end: End = {
+            'lf': np.zeros(3),
+            'rf': np.zeros(3),
+            'pel': np.zeros(3)
+        }
+        ref_varx = np.zeros(2)
+        ref_vary = np.array([datay['cfTOcom'], datay['L']])
+        
+        return ref_p_end, ref_a_end, ref_varx, ref_vary
