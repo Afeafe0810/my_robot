@@ -43,20 +43,8 @@ class UpperLevelController(Node):
         #負責量測各部位的位置與姿態
         self.frame = RobotFrame()
         
-        #負責處理軌跡
-        self.traj = Trajatory()
-        
-        #負責處理扭矩
-        self.ctrl = TorqueControl()
-        
-        #============機器人的重要參數=====================#     
-        
-        #主被動腳
-        self.stance : list[str] = ['lf', 'rf'] #第一個是支撐腳cf, 第二個是擺動腳sf
-        self.stance_past : list[str] = ['lf', 'rf'] #上個取樣時間的支撐腳與擺動腳
-        
-        self.ref_record     = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
-        self.measure_record = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
+        self.state0 = State0()
+
  
     def main_controller_callback(self):
         #==========拿取訂閱值==========#
@@ -98,7 +86,11 @@ class UpperLevelController(Node):
         print(f"===== state{state} =====")
         match state:
             case 0:
-                torque = State0(jp.flatten(), model_gravity, p_end_in_pf).ctrl()
+                torque = self.state0.ctrl(
+                    jp.flatten(),
+                    model_gravity,
+                    p_end_in_pf
+                )
             case 1:
                 torque = State1(
                     p_end_in_wf,

@@ -1,14 +1,15 @@
 import numpy as np; np.set_printoptions(precision=2)
 from numpy.typing import NDArray
-from typing import Literal
+
 #================ import library ========================#
 from src.utils.robot_model import RobotModel
 from src.utils.config import GravityDict, End
 #========================================================#
 
 
-def gravity(model_gravity: GravityDict, end: End) -> NDArray:
+def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     # 根據骨盆位置來判斷重心腳
+    end = end_in_pf
     y_ftTOpel = {
         'lf': abs(end['lf'][1] - end['pel'][1]),
         'rf': abs(end['rf'][1] - end['pel'][1])
@@ -20,12 +21,20 @@ def gravity(model_gravity: GravityDict, end: End) -> NDArray:
     return model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
 
 class State0:
+    """關節角度的單環回授, 用於剛啟動時維持平衡"""
+    
     ref_jp = np.zeros(12)
     kp = np.array([ 2, 2, 4, 6, 6, 4 ]*2)
     
-    def __init__(self, jp: NDArray, model_gravity: GravityDict, end_in_pf: End):
-        self.jp = jp
-        self.tauG = gravity(model_gravity, end_in_pf)
+    def ctrl(
+        self,
+        jp: NDArray,
+        model_gravity: GravityDict,
+        end_in_pf: End
         
-    def ctrl(self) -> NDArray:
-        return self.kp * (self.ref_jp - self.jp) + self.tauG
+    ) -> NDArray:
+
+        tauG = gravity(model_gravity, end_in_pf)
+        
+        return self.kp * (self.ref_jp - jp) + tauG
+        
