@@ -1,10 +1,13 @@
 from typing import Literal
 from dataclasses import dataclass
+
 import numpy as np
 from numpy import cosh, sinh, cos, pi
 from numpy.typing import NDArray
 
 from src.utils.config import Config, Stance, FtScalar, Ft, End
+
+storage: list = []
 
 m = Config.MASS
 H = Config.IDEAL_Z_COM_IN_WF
@@ -20,7 +23,10 @@ T = NL * Ts
 AlipScalarData = dict[Literal['lf', 'rf', 'com', 'cfTOcom', 'L'], float]
 
 def alipSfHeight_fitting(Tn: int):
-    return h - 4*h*(Tn/NL - 0.5)**2
+    if Tn < NL/2:
+        return h*1.8
+    else:
+        return h - 4*h*(Tn/NL - 0.5)**2
         
     
 @dataclass
@@ -128,4 +134,106 @@ class Plan:
         ref_varx = np.zeros(2)
         ref_vary = np.array([datay['cfTOcom'], datay['L']])
         
+        storage.append({**datay, 'z_sf': z_sf})
         return ref_p_end, ref_a_end, ref_varx, ref_vary
+    
+if __name__ == '__main__':
+    if NL == 50:
+        com0 = 0.08
+    elif NL == 25:
+        com0 = 0.05
+        
+    ft0: FtScalar = {'lf': 0.1, 'rf': -0.1}
+    stance = Stance('lf', 'rf')
+    L0 = 0
+    for Tn in range(0, NL+1):
+        alip = AlipTrajY(
+            stance,
+            Tn,
+            ft0,
+            com0,
+            L0
+        )
+        data = alip.plan()
+        storage.append(data)
+        
+        
+
+    stance = Stance(stance.sf, stance.cf)
+    ft0 = {'lf': data['lf'], 'rf': data['rf']}
+    com0 = data['com']
+    L0 = data['L']
+    for Tn in range(1, NL+1):
+        alip = AlipTrajY(
+            stance,
+            Tn,
+            ft0,
+            com0,
+            L0
+        )
+        data = alip.plan()
+        storage.append(data)
+    
+    stance = Stance(stance.sf, stance.cf)
+    ft0 = {'lf': data['lf'], 'rf': data['rf']}
+    com0 = data['com']
+    L0 = data['L']
+    for Tn in range(1, NL+1):
+        alip = AlipTrajY(
+            stance,
+            Tn,
+            ft0,
+            com0,
+            L0
+        )
+        data = alip.plan()
+        storage.append(data)
+
+    # stance = Stance(stance.sf, stance.cf)
+    # ft0 = {'lf': data['lf'], 'rf': data['rf']}
+    # com0 = data['com']
+    # L0 = data['L']
+    # for Tn in range(1, NL+1):
+    #     alip = AlipTrajY(
+    #         stance,
+    #         Tn,
+    #         ft0,
+    #         com0,
+    #         L0
+    #     )
+    #     data = alip.plan()
+    #     storage.append(data)
+    
+    # stance = Stance(stance.sf, stance.cf)
+    # ft0 = {'lf': data['lf'], 'rf': data['rf']}
+    # com0 = data['com']
+    # L0 = data['L']
+    # for Tn in range(1, NL+1):
+    #     alip = AlipTrajY(
+    #         stance,
+    #         Tn,
+    #         ft0,
+    #         com0,
+    #         L0
+    #     )
+    #     data = alip.plan()
+    #     storage.append(data)
+    
+    # stance = Stance(stance.sf, stance.cf)
+    # ft0 = {'lf': data['lf'], 'rf': data['rf']}
+    # com0 = data['com']
+    # L0 = data['L']
+    # for Tn in range(1, NL+1):
+    #     alip = AlipTrajY(
+    #         stance,
+    #         Tn,
+    #         ft0,
+    #         com0,
+    #         L0
+    #     )
+    #     data = alip.plan()
+    #     storage.append(data)
+    
+    import pandas as pd
+    import os
+    pd.DataFrame(storage).to_csv(os.path.join(Config.DIR_OUTPUT, 'Test.csv'))

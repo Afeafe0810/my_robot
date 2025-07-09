@@ -75,7 +75,7 @@ class State3:
         }
         
         if self.Tn <= 600+NL:
-            print(f"{self.Tn = }")
+            print("Tn: ", self.Tn)
             self.__class__.Tn += 1
         
         return np.hstack((tau_knee['lf'], tau_ankle['lf'], tau_knee['rf'], tau_ankle['rf']))    

@@ -24,7 +24,7 @@ def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     return model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
 
 @dataclass
-class State4:
+class State5:
     Tn: ClassVar[int] = 0
     is_just_started: ClassVar[bool] = True
     stance : ClassVar = Stance('lf', 'rf')
@@ -101,10 +101,10 @@ class Plan:
         cls.rf0 = end_in_wf['rf']
         
     def plan(self) -> tuple[End, End, NDArray, NDArray]:
-        z_pel = linear_move(self.Tn, 0, NL, self.pel0[2], Hpel)
+        y_pel = linear_move(self.Tn, 0, NL, self.pel0[1], 0.05)
         ref_p_end: End = {
             # 'pel': np.hstack((self.pel0[:2], z_pel)),
-            'pel': np.hstack((self.pel0[:2], Hpel)),
+            'pel': np.hstack((self.lf0[0], y_pel, Hpel)),
             'lf': self.lf0,
             'rf': self.rf0
         }
@@ -115,7 +115,8 @@ class Plan:
         }
         ref_varx = np.array([0, 0])
         
-        ref_vary = np.array([-0.1, 0])
+        ref_vary = np.array([y_pel - ref_p_end['lf'][1], 0])
+        print("refY_cfTOcom: ", ref_vary[0])
         
         return ref_p_end, ref_a_end, ref_varx, ref_vary
 
@@ -238,8 +239,8 @@ class AlipX1:
 class AlipY1:
     A = np.array([[1, -0.00247],[-0.8832, 1]])
     B = np.array([0, 0.01])
-    K = np.array([-177.0596, 4.6014]) * 0.15
     # K = np.array([-150, 15])
+    K = np.array([-177.0596, 4.6014]) * 0.15
 
     L = np.array([0.680529, -11.882289])
     L_bias = -0.395041

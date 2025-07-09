@@ -231,33 +231,3 @@ class AlipX:
         self.__class__.bias_e = self.bias_e + self.L_bias * err_e
         
         return -u
-    
-if __name__ == '__main__':
-    pass
-    
-    # print(repr(PD_Cf_AnkleX(2, 3).ctrl()))
-    # print(repr(PD_Sf_Ankle(np.array([1, 2])).ctrl()))
-    # print(Knee(
-    #     stance=Stance(cf='lf', sf='rf'),
-    #     ref=(
-    #         {'pel': np.array([0, 0, 0.55]), 'lf': np.array([0, 0.1, 0]), 'rf': np.array([0, -0.1, 0])},
-    #         {'pel': np.zeros(3), 'lf': np.zeros(3), 'rf': np.zeros(3)}
-    #     ),
-    #     end_in_pf=(
-    #         {'pel': np.array([0, 0, 0.45]), 'lf': np.array([0, 0.1, 0]), 'rf': np.array([0, -0.1, 0])},
-    #         {'pel': np.zeros(3), 'lf': np.zeros(3), 'rf': np.zeros(3)}
-    #     ),
-    #     w_from_Euler_to_geometry={
-    #         'lf': np.eye(3),
-    #         'rf': np.eye(3),
-    #     },
-    #     _jv=np.zeros(12),
-    #     J={
-    #         'lf': np.eye(6),
-    #         'rf': np.eye(6),
-    #     },
-    #     tau_G={
-    #         'lf': np.zeros(6),
-    #         'rf': np.zeros(6),
-    #     }
-    # ).ctrl())

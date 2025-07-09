@@ -1,9 +1,12 @@
-import rclpy; from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray 
+import os
+from copy import deepcopy
 
 import numpy as np; np.set_printoptions(precision=2)
 import pandas as pd
-from copy import deepcopy
+
+import rclpy; from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray 
+
 #================ import other code =====================#
 from src.utils.config import Config, End, Ft
 from src.utils.ros_interfaces import ROSInterfaces as ROS
@@ -17,18 +20,14 @@ from src.mode.state1 import State1
 from src.mode.state2 import State2
 from src.mode.state3 import State3
 from src.mode.state4 import State4
+from src.mode.state5 import State5
 from src.mode.state30.state30 import State30
+import src.mode.state30.plan as plan
 
 #========================================================#
-"""
-#TODO 
-    1. 根據state設計物件導向：因為這樣每次擴充功能都要找if子句，太容易錯了
-        main: set_stance
-        robot model gravity
-        motion planning
-        knee control
-    2. urdf檔的initial angle
-"""
+
+measure: list = []
+
 class UpperLevelController(Node):
 
     def __init__(self):
@@ -96,6 +95,7 @@ class UpperLevelController(Node):
         J: Ft = {ft: compnt for ft, compnt in zip( ('lf','rf'), self.frame.get_jacobian() )}
         eularToGeo: Ft = self.frame.eularToGeo
         
+        print(f"===== state{state} =====")
         match state:
             case 0:
                 torque = State0(jp.flatten(), model_gravity, p_end_in_pf).ctrl()
@@ -110,6 +110,8 @@ class UpperLevelController(Node):
                     eularToGeo,
                     J
                 ).ctrl()
+                print("Zpel: ", self.frame.p_pel_in_wf[2,0])
+                
             case 2:
                 torque = State2(
                     p_end_in_wf,
@@ -121,6 +123,8 @@ class UpperLevelController(Node):
                     eularToGeo,
                     J
                 ).ctrl()
+                print("Zpel: ", self.frame.p_pel_in_wf[2,0])
+                
             case 3:
                 torque = State3(
                     p_end_in_wf,
@@ -132,6 +136,8 @@ class UpperLevelController(Node):
                     eularToGeo,
                     J
                 ).ctrl()
+                print("Zpel: ", self.frame.p_pel_in_wf[2,0])
+                
             case 4:
                 torque = State4(
                     p_end_in_wf,
@@ -146,6 +152,24 @@ class UpperLevelController(Node):
                     eularToGeo,
                     J
                 ).ctrl()
+                print("Zpel: ", self.frame.p_pel_in_wf[2,0])
+
+            case 5:
+                torque = State5(
+                    p_end_in_wf,
+                    p_end_in_pf,
+                    a_end_in_pf,
+                    self.frame.p_com_in_wf.flatten(),
+                    self.frame.L_com_in_lf['y'],
+                    self.frame.L_com_in_lf['x'],
+                    model_gravity,
+                    jp.flatten(),
+                    jv.flatten(),
+                    eularToGeo,
+                    J
+                ).ctrl()
+                print("Zpel: ", self.frame.p_pel_in_wf[2,0])
+                print("Y_cfTOcom: ", self.frame.p_com_in_wf[1,0] - self.frame.p_lf_in_wf[1,0])
             case 30:
                 torque = State30(
                     p_end_in_wf,
@@ -160,6 +184,10 @@ class UpperLevelController(Node):
                     eularToGeo,
                     J
                 ).ctrl()
+                self.save(measure)
+                
+                
+                
         ROS.publishers.effort.publish(torque)
         self.stance_past = self.stance
 
@@ -187,6 +215,19 @@ class UpperLevelController(Node):
             'rf': frame.p_rf_in_wf[2, 0] <= 0.01,
         }
 
+    def save(self, storage: list):
+        key = ('z_pel', 'x_lf', 'y_lf', 'z_lf', 'x_rf', 'y_rf', 'z_rf', 'x_com', 'y_com', 'z_com', 'Ly', 'Lx')
+        value = (
+            self.frame.p_pel_in_wf[2, 0],
+            *self.frame.p_lf_in_wf[:,0],
+            *self.frame.p_rf_in_wf[:,0],
+            *self.frame.p_com_in_wf[:,0],
+            self.frame.L_com_in_lf['y'], self.frame.L_com_in_lf['y']
+        )
+        data = dict(zip(key, value))
+        storage.append(data)
+        
+        
 def main(args=None):
     rclpy.init(args=args)
     upper_level_controllers = UpperLevelController()
@@ -196,6 +237,10 @@ def main(args=None):
         
     except KeyboardInterrupt:
         print('\nKeyboard Interrupt')
+        
+        pd.DataFrame(plan.storage).to_csv(os.path.join(Config.DIR_OUTPUT, 'storage30.csv'))
+        pd.DataFrame(measure).to_csv(os.path.join(Config.DIR_OUTPUT, 'measure30.csv'))
+        print('save success')
     
     finally:
         upper_level_controllers.destroy_node()

@@ -22,8 +22,10 @@ class Stance(NamedTuple):
 def get_ros2pkg_abspath():
     """ 回傳當前電腦的ros2pkg的絕對路徑 """
     pkg_name = 'bipedal_floating_description'
-    dir_PKG_root = os.path.abspath(__file__).rsplit(pkg_name, 1)[0] + pkg_name
-    return dir_PKG_root
+    dir_buildedpkg = os.path.abspath(__file__).rsplit(pkg_name, 1)[0] + pkg_name
+    dir_ros2ws = os.path.dirname(os.path.dirname(dir_buildedpkg))
+    dir_pkg = os.path.join(dir_ros2ws, 'src', pkg_name)
+    return dir_pkg
 
 
 class Config:
@@ -40,7 +42,7 @@ class Config:
     Ts = 0.01
     NL_BALANCE = 100 #雙腳平衡sample長
     NL_MOVINGTOLF = 100 #重心移動sample長
-    NL_MARCHINPLACE = 50 #原地行走sample長
+    NL_MARCHINPLACE = 25 #原地行走sample長
     #單腳支撐時間?
     DDT = 2
     #行走每步時間?

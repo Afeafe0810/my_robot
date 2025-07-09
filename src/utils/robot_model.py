@@ -140,7 +140,7 @@ class _AbstractSimpleModel:
         #機器人模型
         self.model = pin.buildModelFromUrdf(os.path.join(Config.DIR_URDF, urdf_path))
         self.data = self.model.createData()
-        print(f'model: {self.model.name}')
+        print(f'===== model: {self.model.name} ======')
         
         #關節順序的轉換
         self.permut: np.ndarray = self._joint_permutation()

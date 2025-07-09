@@ -1,6 +1,7 @@
 from typing import Literal, TypeVar, ClassVar
 from dataclasses import dataclass
 import numpy as np
+from numpy import cosh, sinh, cos, pi
 from numpy.typing import NDArray
 
 from src.utils.config import Config, Stance, GravityDict, End, Ft
@@ -8,7 +9,13 @@ from src.utils.config import Config, Stance, GravityDict, End, Ft
 from src.mode.state30.plan import Plan
 
 NL = Config.NL_MARCHINPLACE
-
+Ts = Config.Ts
+m = Config.MASS
+H = Config.IDEAL_Z_COM_IN_WF
+Hpel = Config.IDEAL_Z_PEL_IN_WF
+h = Config.STEP_HEIGHT
+w = Config.OMEGA
+W = Config.IDEAL_Y_STEPLENGTH
 
 def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray: #TODO 和學長的不一樣
     end = end_in_pf
@@ -47,7 +54,7 @@ class State30:
 
     def is_sf_near_ground(self):
         '''用高度來判斷是否有踩到地面, 用力來判斷有可能會因為斜插判斷錯誤'''
-        return self.end_in_wf[self.stance.sf][2] < 0.01
+        return abs(self.end_in_wf[self.stance.sf][2]) < 0.005
             
             
     def ctrl(self):
@@ -96,6 +103,18 @@ class State30:
             sf: sf_ankle.ctrl()
         }
         
+        print("Tn: ", self.Tn)
+        print("stance: ", list(self.stance))
+        print("ref_lf: ", ref_p['lf'])
+        print("ref_rf: ", ref_p['rf'])
+        print("ref_pel: ", ref_p['pel'])
+        print("ref_vary: ", ref_vary)
+        
+        print('lf: ', self.end_in_wf['lf'])
+        print('rf: ', self.end_in_wf['rf'])
+        print('pel: ', self.end_in_wf['pel'])
+        print('vary: ', vary)
+        
         if self.Tn != NL:
             cls.Tn += 1
             
@@ -129,7 +148,7 @@ class Knee:
             cf: [2, 3, 4, 5], # z, ax, ay, az
             sf: [0, 1, 2, 5], # x, y, z, az
         }
-        self.kout = {cf: np.array([25]), sf: np.array([20])}
+        self.kout = {cf: np.array([25]), sf: np.array([25])}
         self.kin = {cf: np.array([0.5]), sf: np.array([0.5])}
         
     def ctrl(self)-> Ft:
@@ -291,16 +310,17 @@ class AlipX1:
         return -u
 
 class AlipY1:
-    A = np.array([[1, -0.00247],[-0.8832, 1]])
+    A = np.array([
+        [          cosh(w*Ts), -sinh(w*Ts)/(m*H*w) ],
+        [ -m*H*w * sinh(w*Ts),  cosh(w*Ts)         ]
+    ])
     B = np.array([0, 0.01])
-    K = np.array([-177.0596,9.6014]) * 0.15
+    K = np.array([-177.0596, 4.6014]) * 0.15
 
-    L = np.array([0.680529, -11.882289])
-    L_bias = -0.395041
+    # L = np.array([0.680529, -11.882289])
+    # L_bias = -0.395041
     limit = Config.ANKLE_AX_LIMIT
-    
-    var_e: NDArray = np.array([-0.04, 0])
-    bias_e: float = 0.02
+
     
     def __init__(self, ref_var: NDArray, var: NDArray):
         self.ref_var = ref_var

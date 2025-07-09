@@ -7,5 +7,8 @@ __pycache__/
 # 忽略工作區設定
 .vscode/
 
+# 匯出數據
+/output/
+
 real_measure.csv
 real_planning.csv
