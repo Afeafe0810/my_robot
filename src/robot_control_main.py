@@ -65,7 +65,7 @@ class UpperLevelController(Node):
         self._set_stance(state)
         
         
-        model_gravity = self.robot.new_gravity(jp)
+        model_gravity = self.robot.gravity(jp)
         p_end_in_pf: End = {
             'lf': self.frame.p_lf_in_pf.flatten(),
             'rf': self.frame.p_rf_in_pf.flatten(),
