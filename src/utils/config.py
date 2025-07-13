@@ -12,7 +12,7 @@ Vec: TypeAlias =  NDArray[np.floating]
 Mat: TypeAlias =  NDArray[np.floating]
 
 # robot_model重力矩回傳的結構
-GravityDict: TypeAlias = dict[Literal['lf', 'rf', 'from_both_single_ft'], Arr]
+GravityDict: TypeAlias = dict[Literal['lf', 'rf', 'from_both_single_ft'], Vec]
 
 End = dict[Literal['lf', 'rf', 'pel'], Arr]
 

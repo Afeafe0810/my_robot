@@ -44,6 +44,7 @@ class UpperLevelController(Node):
         self.frame = RobotFrame()
         
         self.state0 = State0()
+        self.state1 = State1()
 
  
     def main_controller_callback(self):
@@ -82,6 +83,8 @@ class UpperLevelController(Node):
         }
         J: Ft = {ft: compnt for ft, compnt in zip( ('lf','rf'), self.frame.get_jacobian() )}
         eularToGeo: Ft = self.frame.eularToGeo
+        jv_ft : Ft = {'lf': jv[:6, 0], 'rf': jv[6:, 0]}
+        jp_ft : Ft = {'lf': jp[:6, 0], 'rf': jp[6:, 0]}
         
         print(f"===== state{state} =====")
         match state:
@@ -92,16 +95,17 @@ class UpperLevelController(Node):
                     p_end_in_pf
                 )
             case 1:
-                torque = State1(
+                torque = self.state1.ctrl(
                     p_end_in_wf,
                     p_end_in_pf,
                     a_end_in_pf,
                     model_gravity,
-                    jp.flatten(),
-                    jv.flatten(),
+                    jp_ft,
+                    jv_ft,
                     eularToGeo,
                     J
-                ).ctrl()
+                )
+        
                 print("Zpel: ", self.frame.p_pel_in_wf[2,0])
                 
             case 2:

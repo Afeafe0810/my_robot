@@ -9,7 +9,7 @@ from src.mode.utils import linear_move
 NL = Config.NL_BALANCE
 Hpel = Config.IDEAL_Z_PEL_IN_WF
 
-def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
+def gravity(model_gravity: GravityDict, end_in_pf: End) -> Ft:
     end = end_in_pf
     # 根據骨盆位置來判斷重心腳
     y_ftTOpel = {
@@ -20,106 +20,71 @@ def gravity(model_gravity: GravityDict, end_in_pf: End) -> NDArray:
     gf = 'lf' if y_ftTOpel['lf'] <= y_ftTOpel['rf'] else 'rf'
     
     # 再根據重心腳距離權重
-    return model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
+    tau = model_gravity[gf] * (1 - y_ftTOpel[gf]/0.1) + model_gravity['from_both_single_ft'] * (y_ftTOpel[gf]/0.1)
+    return {'lf': tau[:6], 'rf': tau[6:]}
 
-@dataclass
-class State1:
-    Tn: ClassVar[int] = 0
-    is_just_started: ClassVar[bool] = True
-    stance : ClassVar = Stance('lf', 'rf')
-    
-    end_in_wf: End
-    p_end_in_pf: End
-    a_end_in_pf: End
-    _model_gravity: GravityDict
-    jp: NDArray
-    jv: NDArray
-    w_from_Euler_to_geometry: Ft
-    J: Ft
-    
-    def __post_init__(self):
-        self.tauG = gravity(self._model_gravity, self.p_end_in_pf)
 
-    def ctrl(self):
-        cf, sf = self.stance
-        
-        if self.is_just_started:
-            Plan.initilize(self.end_in_wf)
-            self.__class__.is_just_started = False
-            
-        ref_p, ref_a, ref_varx = Plan(self.Tn).plan()
-        
-        tau_knee = Knee(
-            self.stance,
-            {'lf': self.tauG[:6], 'rf': self.tauG[6:]},
-            self.jv,
-            (ref_p, ref_a),
-            (self.p_end_in_pf, self.a_end_in_pf),
-            self.w_from_Euler_to_geometry,
-            self.J
-        ).ctrl()
-        
-        
-        sf_ankle = PD_Sf_Ankle(self.jp[-2:])
-        
-        cf_ankleX = PD_Cf_AnkleX(self.jp[5], self.jv[5])
-        
-        x_cf2pel = self.end_in_wf['pel'][0] - self.end_in_wf['lf'][0]
-        cf_ankleY = AlipX(ref_varx, x_cf2pel)
-        
-        tau_ankle = {
-            cf: [cf_ankleY.ctrl(), cf_ankleX.ctrl()],
-            sf: sf_ankle.ctrl()
-        }
-        
-        self.__class__.Tn += 1
-        
-        return np.hstack((tau_knee['lf'], tau_ankle['lf'], tau_knee['rf'], tau_ankle['rf']))    
+class PD_Sf_Ankle:
+    ref_ayx_jp = np.zeros(2)
+    kp = np.array([0.1])
+    
+    def ctrl(self, jp45_sf: NDArray) -> NDArray:
+        """擺動腳腳踝的PD控制"""
+        #TODO 摩擦力看要不要加 # HACK 現在只用P control
+        return self.kp * ( self.ref_ayx_jp - jp45_sf ) 
 
-class Plan:
-    pel0: NDArray
-    lf0: NDArray
-    rf0: NDArray
-    
-    def __init__(self, Tn: int):
-        self.Tn = Tn
-    
-    @classmethod
-    def initilize(cls, end_in_wf: End):
-        cls.pel0 = end_in_wf['pel']
-        cls.lf0 = end_in_wf['lf']
-        cls.rf0 = end_in_wf['rf']
+
+class PD_Cf_AnkleX:
+    ref_jp: float = 0.02
+    kp: float = 4
+    kd: float = 3
         
-    def plan(self) -> tuple[End, End, NDArray]:
-        z_pel = linear_move(self.Tn, 0, NL, self.pel0[2], Hpel)
-        ref_p_end: End = {
-            'pel': np.hstack((self.pel0[:2], z_pel)),
-            'lf': self.lf0,
-            'rf': self.rf0
-        }
-        ref_a_end: End = {
-            'pel': np.zeros(3),
-            'lf': np.zeros(3),
-            'rf': np.zeros(3)
-        }
-        ref_varx = np.array([0, 0])
+    def ctrl(self, jp5_cf: float, jv5_cf: float) -> float:
+        return self.kp * (self.ref_jp - jp5_cf) - self.kd * jv5_cf
+
+
+class AlipX:
+    A = np.array([[1, 0.00247], [0.8832, 1]])
+    B = np.array([0, 0.01])
+    K = np.array([150,15.0198])*0.13
+    L = np.array([1.656737, 24.448707])
+    L_bias = -1.238861
+    limit = Config.ANKLE_AY_LIMIT
+    
+    def __init__(self):
+        self.var_e: NDArray = np.zeros(2)
+        self.bias_e: float = -0.02
+    
+    def ctrl(self, ref_var: NDArray, cf2pel_in_wf: float) -> float:
+        y = cf2pel_in_wf
         
-        return ref_p_end, ref_a_end, ref_varx
+        #==========全狀態回授(飽和)==========#
+        _u: float = (-self.K @ (self.var_e - ref_var)).item()
+        u = np.clip(_u, -self.limit, self.limit)
+        
+        y_e = self.var_e[0] + self.bias_e
+        err_e = y - y_e
+        
+        self.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
+        self.bias_e = self.bias_e + self.L_bias * err_e
+        
+        return -u
+
 
 @dataclass
 class Knee:
     stance: Stance
     tau_G: Ft
-    _jv: NDArray
+    jv: Ft
     ref: tuple[End, End]
     end_in_pf: tuple[End, End]
     w_from_Euler_to_geometry: Ft
     J: Ft
     
+    
     def __post_init__(self):
         cf, sf = self.stance
         
-        self.jv = {'lf': self._jv[:6], 'rf': self._jv[6:]}
         self.ctrltgt_idx = {
             cf: [2, 3, 4, 5], # z, ax, ay, az
             sf: [0, 1, 2, 5], # x, y, z, az
@@ -127,14 +92,7 @@ class Knee:
         self.kout = {cf: np.array([25]), sf: np.array([20])}
         self.kin = {cf: np.array([0.5]), sf: np.array([0.5])}
         
-    def ctrl(self)-> Ft:
-        cf, sf = self.stance
-        
-        return {
-            cf: self.ft_ctrl(cf),
-            sf: self.ft_ctrl(sf)
-        }
-        
+  
     def ft_ctrl(self, ft: Literal['lf', 'rf']) -> NDArray:
         """內外環的控制程式
 
@@ -178,56 +136,100 @@ class Knee:
         dq_knee = self.jv[ft][knee_idx]
         tau_G_knee = self.tau_G[ft][knee_idx]
         return self.kin[ft] * (cmd_dq_knee - dq_knee) + tau_G_knee
+    
+    
+    def ctrl(self)-> Ft:       
+        return {
+            'lf': self.ft_ctrl('lf'),
+            'rf': self.ft_ctrl('rf')
+        }
+      
 
-class PD_Sf_Ankle:
-    ref_ayx_jp = np.zeros(2)
-    kp = np.array([0.1])
+class Plan:
     
-    def __init__(self, jp45_sf: NDArray):
-        self.jp45_sf = jp45_sf
+    def __init__(self, end_in_wf: End):
+        self.pel0: NDArray = end_in_wf['pel']
+        self.lf0: NDArray = end_in_wf['lf']
+        self.rf0: NDArray = end_in_wf['rf']
+    
+    
+    def plan(self, Tn: int)-> tuple[End, End, NDArray]:
         
-    def ctrl(self) -> NDArray:
-        """擺動腳腳踝的PD控制"""
-        #TODO 摩擦力看要不要加 # HACK 現在只用P control
-        return self.kp * ( self.ref_ayx_jp - self.jp45_sf ) 
+        z_pel = linear_move(Tn, 0, NL, self.pel0[2], Hpel)
+        
+        ref_p_end: End = {
+            'pel': np.hstack((self.pel0[:2], z_pel)),
+            'lf': self.lf0,
+            'rf': self.rf0
+        }
+        ref_a_end: End = {
+            'pel': np.zeros(3),
+            'lf': np.zeros(3),
+            'rf': np.zeros(3)
+        }
+        ref_varx = np.array([0, 0])
+        
+        return ref_p_end, ref_a_end, ref_varx
 
-class PD_Cf_AnkleX:
-    ref_jp: float = 0.02
-    kp: float = 4
-    kd: float = 3
-    
-    def __init__(self, jp5_cf: float, jv5_cf: float):
-        self.jp5_cf = jp5_cf
-        self.jv5_cf = jv5_cf
-        
-    def ctrl(self) -> float:
-        return self.kp * (self.ref_jp - self.jp5_cf) - self.kd * self.jv5_cf
 
-class AlipX:
-    A = np.array([[1, 0.00247], [0.8832, 1]])
-    B = np.array([0, 0.01])
-    K = np.array([150,15.0198])*0.13
-    L = np.array([1.656737, 24.448707])
-    L_bias = -1.238861
-    limit = Config.ANKLE_AY_LIMIT
+class State1:
     
-    var_e: NDArray = np.zeros(2)
-    bias_e: float = -0.02
+    def __init__(self):
+        self.Tn: int = 0
+        self.has_run: bool = False
+        self.stance: Stance = Stance('lf', 'rf')
+        
+        self.alipx: AlipX = AlipX()
+        self.plan: Plan
     
-    def __init__(self, ref_var: NDArray, cf2pel_in_wf: float ):
-        self.ref_var = ref_var
-        self.y = cf2pel_in_wf
-    
-    def ctrl(self) -> float:
-        #==========全狀態回授(飽和)==========#
-        # _u = -self.K @ (np.vstack((self.var_e[0, 0] + self.bias_e, 0)) - ref_var)
-        _u: float = -self.K @ (self.var_e - self.ref_var)
-        u = np.clip(_u, -self.limit, self.limit)
+    def ctrl(
+        self,
+        end_in_wf: End,
+        p_end_in_pf: End,
+        a_end_in_pf: End,
+        _model_gravity: GravityDict,
+        jp: Ft,
+        jv: Ft,
+        w_from_Euler_to_geometry: Ft,
+        J: Ft
         
-        y_e = self.var_e[0] + self.bias_e
-        err_e = self.y - y_e
+    )-> NDArray:
         
-        self.__class__.var_e = self.A @ self.var_e + self.B * u + self.L * err_e
-        self.__class__.bias_e = self.bias_e + self.L_bias * err_e
+        cf, sf = self.stance
         
-        return -u
+        """ 重力矩 """
+        tauG = gravity(_model_gravity, p_end_in_pf)
+        
+        if not self.has_run:
+            self.has_run = True
+            self.plan = Plan(end_in_wf)
+        
+        """ 軌跡規劃 """
+        ref_p, ref_a, ref_varx = self.plan.plan(self.Tn)
+        
+        """ 膝上關節扭矩 """
+        tau_knee = Knee(
+            self.stance,
+            tauG,
+            jv,
+            (ref_p, ref_a),
+            (p_end_in_pf, a_end_in_pf),
+            w_from_Euler_to_geometry,
+            J
+        ).ctrl()
+        
+        """ 腳踝關節扭矩 """
+        x_cf2pel = end_in_wf['pel'][0] - end_in_wf[cf][0]
+
+        tau_ankle = {
+            cf: [
+                self.alipx.ctrl(ref_varx, x_cf2pel),
+                PD_Cf_AnkleX().ctrl(jp[cf][5], jv[cf][5])
+            ],
+            sf: PD_Sf_Ankle().ctrl(jp[sf][4:6])
+        }
+        
+        """ 更新時間 """
+        self.Tn += 1
+        
+        return np.hstack([tau_knee['lf'], tau_ankle['lf'], tau_knee['rf'], tau_ankle['rf']])
