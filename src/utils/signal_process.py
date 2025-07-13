@@ -1,15 +1,17 @@
-import numpy as np
-from numpy.typing import NDArray
+from typing import TypeVar, overload, Any
 from numbers import Number
-from typing import TypeVar
+
+import numpy as np
+from numpy.typing import NDArray, ArrayLike
 from scipy.signal import butter
+
 #================ import library ========================#
-from src.utils.config import Config
+from src.utils.config import Config, Vec, Mat, Arr
 #========================================================#
 
-NumberOrArray = TypeVar('NumberOrArray', Number, NDArray[np.float_])
+NumberOrArray = TypeVar('NumberOrArray', Number, NDArray[np.floating])
 
-def butter2(fn) -> tuple[np.ndarray]:
+def butter2(fn: float) -> tuple[Vec, Vec]:
     '''回傳z^-1的轉移函數係數 num, den'''
     fs = 1 / Config.Ts
     wn_nml = fn * 2 / fs
@@ -30,34 +32,44 @@ class Filter:
                 float | np.ndarray: 濾波後的輸出信號。
     """
     
-    def __init__(self, num: list, den: list):
+    def __init__(self, num: ArrayLike, den: ArrayLike):
         '''num, den 是以z^-1的係數'''
-        self.__num : NDArray = np.vstack(( num )) / den[0]
-        self.__den : NDArray = np.vstack(( den )) / den[0]
+        _den = np.array(den)
+        
+        self._num : Vec = np.array(num) / _den[0]
+        self._den : Vec = _den / _den[0]
 
-        self.__isStarted : bool = True
+        self._has_run: bool = False
         
         # pasts從左到右是新到舊 k, k-1, k-2
-        self.__u_pasts : NDArray = None
-        self.__y_pasts : NDArray = None
+        self._u_pasts : Mat
+        self._y_pasts : Mat
+    
+    def _vector_filt(self, input: Vec) -> Vec:
+        if not self._has_run:
+            self._has_run = True
+            self._u_pasts: Vec = np.zeros((len(input), len(self._num)-1))
+            self._y_pasts: Vec = np.zeros((len(input), len(self._den)-1))
+            
+        y: Vec = np.column_stack((input, self._u_pasts)) @ self._num - self._y_pasts @ self._den[1:]
+        
+        self._y_pasts = np.column_stack(( y, self._y_pasts[:,:-1] ))
+        self._u_pasts = np.column_stack(( input, self._u_pasts[:,:-1] ))
+        
+        return y
+    
+    @overload
+    def filt(self, input: float | np.floating) -> float: ...
+    
+    @overload
+    def filt(self, input: Vec) -> Vec: ...
+    
+    def filt(self, input):
+        if isinstance(input, Number):
+            return self._vector_filt(np.array([input])).item()
+        else:
+            return self._vector_filt(input)
 
-        
-    def filt(self, input: NumberOrArray) -> NumberOrArray :
-        ''' u只接受是column vector或num '''
-        is_input_num = isinstance(input, Number)
-        u : NDArray = np.array([[input]]) if is_input_num else input
-
-        if self.__isStarted:
-            self.__isStarted = False
-            self.__u_pasts = np.zeros(( len(u), len(self.__num)-1 ))
-            self.__y_pasts = np.zeros(( len(u), len(self.__den)-1 ))
-        
-        y = np.hstack(( u, self.__u_pasts )) @ self.__num - self.__y_pasts @ self.__den[1:]
-        self.__y_pasts = np.hstack(( y, self.__y_pasts[:,:-1] ))
-        self.__u_pasts = np.hstack(( u, self.__u_pasts[:,:-1] ))
-        
-        return y.item() if is_input_num else\
-               y
 
 class Diffter:
     """
@@ -71,16 +83,22 @@ class Diffter:
     """
     
     def __init__(self):
-        self.__isStarted = True
-        self.__u_p = None
-        
-    def diff(self, u : NumberOrArray ) ->  NumberOrArray:
-        if self.__isStarted:
-            self.__isStarted = False
-            self.__u_p = 0*u
+        self._has_run: bool = False
+        self._u_p: Any
+    
+    @overload
+    def diff(self, u: float) -> float: ...
+    
+    @overload
+    def diff(self, u: Vec) -> Vec: ...
+    
+    def diff(self, u):
+        if not self._has_run:
+            self._has_run = True
+            self._u_p = 0 * u
             
-        y = ( u - self.__u_p ) / Config.Ts
-        self.__u_p = u
+        y = ( u - self._u_p ) / Config.Ts
+        self._u_p = u
         return  y
     
 class Dsp:

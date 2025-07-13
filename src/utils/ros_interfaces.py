@@ -1,11 +1,12 @@
+from copy import deepcopy
+from typing import Callable, Sequence
+
 import numpy as np; np.set_printoptions(precision=2)
 from numpy.typing import NDArray
-from rclpy.node import Node
-from typing import Callable
-from copy import deepcopy
 from scipy.spatial.transform import Rotation as R
 
-from std_msgs.msg import Float64MultiArray 
+from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
 from gazebo_msgs.msg import ContactsState
 from nav_msgs.msg import Odometry
@@ -13,7 +14,7 @@ from trajectory_msgs.msg import JointTrajectory
 from geometry_msgs.msg import WrenchStamped
 
 #================ import other code =====================#
-from src.utils.config import Config
+from src.utils.config import Config, Vec, Mat
 from src.utils.signal_process import Dsp
 #========================================================#
 
@@ -62,7 +63,7 @@ class MyPublisher:
         self._msg_type = msg_type
         self._publisher = node.create_publisher(msg_type, topic, qos_profile)
         
-    def publish(self, msg):
+    def publish(self, msg: Sequence):
         """目前只支援 Float64MultiArray 直接用 msg: list 發布"""
         if self._msg_type == Float64MultiArray:
             self._publisher.publish(self._msg_type(data = msg))
@@ -80,14 +81,14 @@ class MySubscribers:
         self.rf_force = ForceSubscriber(node, '/rf_sensor/wrench')
         self.jp = JointSubsciber(node, main_callback)
 
-    def return_data(self) -> tuple[NDArray, NDArray, float, dict[str, bool], NDArray, NDArray, dict[str, float], dict[str, NDArray]]:
+    def return_data(self) -> tuple[Vec, Mat, float, dict[str, bool], Vec, Vec, dict[str, float], dict[str, Vec]]:
         #微分得到速度(飽和)，並濾波
         jp = Dsp.FILTER_JP.filt(self.jp.jp)
         _jv = np.clip( Dsp.DIFFTER_JP.diff(jp), -0.75, 0.75)
         jv = Dsp.FILTER_JV.filt(_jv)
         
         is_contact_ft = {'lf' : self.lf_contact.is_contact, 'rf' : self.rf_contact.is_contact}
-        force_ft = {'lf' : self.lf_force.force[2,0], 'rf' : self.rf_force.force[2,0]}
+        force_ft = {'lf' : self.lf_force.force[2], 'rf' : self.rf_force.force[2]}
         tau_ft = {'lf' : self.lf_force.tau, 'rf' : self.rf_force.tau}
         
         return tuple(deepcopy(i) for i in [ 
@@ -113,14 +114,14 @@ class BaseSubscriber(_AbstractSubscriber):
     """來自 bipedal_floation.xacro 的<libgazebo_ros_p3d.so>"""
     
     def __init__(self, node: Node):
-        self.p_base_in_wf: NDArray
-        self.r_base_to_wf: NDArray
+        self.p_base_in_wf: Vec
+        self.r_base_to_wf: Mat
         super().__init__(node, Odometry, '/odom')
                                                     
     def _callback(self, msg: Odometry):
         p = msg.pose.pose.position
         q = msg.pose.pose.orientation #四元數法
-        self.p_base_in_wf = np.vstack(( p.x, p.y, p.z ))
+        self.p_base_in_wf = np.array(( p.x, p.y, p.z ))
         self.r_base_to_wf = R.from_quat(( q.x, q.y, q.z, q.w )).as_matrix()
         
 class StateSubsciber(_AbstractSubscriber):
@@ -147,31 +148,31 @@ class ForceSubscriber(_AbstractSubscriber):
     """來自bipedal_floation.xacro的插件 <libgazebo_ros_ft_sensor.so>"""
     
     def __init__(self, node: Node, topic: str):
-        self.force: NDArray
-        self.tau: NDArray
+        self.force: Vec
+        self.tau: Vec
         super().__init__(node, WrenchStamped, topic)
         
     def _callback(self, msg: WrenchStamped):
         force = msg.wrench.force
         torque = msg.wrench.torque
         
-        self.force = np.vstack(( force.x, force.y, force.z ))
-        self.tau = np.vstack(( torque.x, torque.y, torque.z ))
+        self.force = np.array(( force.x, force.y, force.z ))
+        self.tau = np.array(( torque.x, torque.y, torque.z ))
 
 class JointSubsciber(_AbstractSubscriber):
     """來自bipedal_floation.xacro的插件 <libgazebo_ros2_control.so>, effort_controller.yaml"""
     
     def __init__(self, node: Node, main_callback: Callable):
         self.main_callback = main_callback #引入main_callback來持續呼叫
-        self.callback_count = 0 #每5次會呼叫一次maincallback
-        self.jp: NDArray
+        self.callback_count: int = 0 #每5次會呼叫一次maincallback
+        self.jp: Vec
         super().__init__(node, JointState, '/joint_states')
         
     def _callback(self, msg: JointState):
         '''訂閱jp, callback主程式'''
         if len(msg.name) == 12:
             # JointState不會按照順序訂閱也無法改，一定要比對 msg.name
-            jp_pair = {jnt: value for jnt, value in zip( msg.name, msg.position) }
+            jp_pair: dict[str, float] = dict(zip( msg.name, msg.position))
             self.jp = np.vstack([ jp_pair[jnt] for jnt in Config.JNT_ORDER_LITERAL ])
 
         self.callback_count += 1
