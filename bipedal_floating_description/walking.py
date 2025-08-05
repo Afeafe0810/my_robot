@@ -36,12 +36,12 @@ from scipy.spatial.transform import Rotation as R
 import pandas as pd
 import csv
 
-from linkattacher_msgs.srv import AttachLink
-from linkattacher_msgs.srv import DetachLink
 from config import Config
 from dataclasses import dataclass
 
 H = Config.IDEAL_Z_COM_IN_WF
+measure_data: list = []
+reference_data: list = []
 
 @dataclass
 class Ref:
@@ -52,9 +52,9 @@ class Ref:
     com : np.ndarray = None #沒有這麼重要
     need_push : bool = False #預設都是False
     
-    def to_csv(self, records: pd.DataFrame):
+    def export_data(self):
         
-        this_record = pd.DataFrame([{
+        return {
             'com_x': self.com[0, 0],
             'com_y': self.com[1, 0],
             'com_z': self.com[2, 0],
@@ -76,13 +76,7 @@ class Ref:
             'pel_x': self.pel[0, 0],
             'pel_y': self.pel[1, 0],
             'pel_z': self.pel[2, 0],
-        }])
-        
-        updated_records = pd.concat([records, this_record], ignore_index=True)
-        
-        updated_records.to_csv("real_planning.csv")
-        
-        return updated_records
+        }
 
 class Mea:
     def __init__(self, stance_num, mea_x_L, mea_x_R, mea_y_L, mea_y_R, p_com_in_wf, p_lf_in_wf, p_rf_in_wf, p_pel_in_wf):
@@ -105,9 +99,9 @@ class Mea:
         self.p_lf_in_wf = p_lf_in_wf
         self.p_rf_in_wf = p_rf_in_wf
 
-    def to_csv(self, records: pd.DataFrame):
+    def export_data(self):
         
-        this_record = pd.DataFrame([{
+        return {
             'com_x': self.p_com_in_wf[0,0],
             'com_y': self.p_com_in_wf[1,0],
             'com_z': self.p_com_in_wf[2,0],
@@ -129,13 +123,7 @@ class Mea:
             'pel_x': self.p_pel_in_wf[0,0],
             'pel_y': self.p_pel_in_wf[1,0],
             'pel_z': self.p_pel_in_wf[2,0],
-        }])
-        
-        new_records = pd.concat([records, this_record], ignore_index=True)
-        
-        records.to_csv("real_measure.csv")
-        
-        return new_records
+        }
         
 class AlipTraj:
     def __init__(self):
@@ -169,15 +157,15 @@ class AlipTraj:
         #==========踩第一步的時候, 拿取初值與預測==========#
         if self.isJustStarted: #如果剛從state 2啟動
             self.isJustStarted = False
-            p_pel_in_wf = np.vstack([0,  0.08, H])
+            p_com_in_wf = np.vstack([0,  0.08, H])
             self.p0_ft_in_wf = {
                 'lf' : np.vstack([0,  0.1 , 0]),
                 'rf' : np.vstack([0, -0.1 , 0])
             }
             
             self.p0_ftTocom_in_wf = {
-                'lf' : p_pel_in_wf - self.p0_ft_in_wf['lf'],
-                'rf' : p_pel_in_wf - self.p0_ft_in_wf['rf']
+                'lf' : p_com_in_wf - self.p0_ft_in_wf['lf'],
+                'rf' : p_com_in_wf - self.p0_ft_in_wf['rf']
             }
             
             self.var0 = {
@@ -187,26 +175,36 @@ class AlipTraj:
             
             self.var0['y'][1,0] = 0
             self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
-            print(f"{self.ref_xy_swTOcom_in_wf_T.T = }")
             
         else:
             if self.T_n == 0: #如果換腳
-                self.p0_ft_in_wf = copy.deepcopy(mea.p_ft_in_wf)
+                # self.p0_ft_in_wf = copy.deepcopy(mea.p_ft_in_wf)
+                self.p0_ft_in_wf = {
+                    'lf': self.ref.lf[:3],
+                    'rf': self.ref.rf[:3]
+                }
                 self.p0_ft_in_wf[cf][2, 0] = 0.0
                 
-                self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
+                # self.p0_ftTocom_in_wf = mea.p_ftTocom_in_wf
+                self.p0_ftTocom_in_wf = {
+                    'lf': self.ref.com[:3] - self.p0_ft_in_wf['lf'],
+                    'rf': self.ref.com[:3] - self.p0_ft_in_wf['rf']
+                }
                 
-                self.var0 = copy.deepcopy(mea.var)
-                self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
-                self.var0['x'][1,0] = 0 #x方向角動量設成0
+                self.var0 = {
+                    'x': np.vstack((0, 0)),
+                    'y': np.vstack((self.p0_ftTocom_in_wf[cf][1, 0], self.ref.var['y'][1, 0]))
+                }
+                # self.var0['y'][1,0] = self.ref.var['y'][1, 0] #現在的參考的角動量是前一個的支撐腳的結尾
+                # self.var0['x'][1,0] = 0 #x方向角動量設成0
                 
                 self.ref_xy_swTOcom_in_wf_T = self._sf_placement(stance, des_vx_com_in_wf_2T)
                 
                 self.T_n += 1
                 
-            else: # 只更新支撐腳就好
-                self.p0_ft_in_wf[cf] = copy.deepcopy(mea.p_ft_in_wf[cf])
-                self.p0_ft_in_wf[cf][2, 0] = 0.0
+            # else: # 只更新支撐腳就好
+            #     self.p0_ft_in_wf[cf] = copy.deepcopy(mea.p_ft_in_wf[cf])
+            #     self.p0_ft_in_wf[cf][2, 0] = 0.0
 
 
         #==========得到軌跡點==========#
@@ -265,7 +263,6 @@ class AlipTraj:
             'x': A['x'] @ self.var0['x'],
             'y': A['y'] @ self.var0['y'],
         }
-        print(ref_var)
         return np.vstack(( ref_var['x'][0,0], ref_var['y'][0,0], H )), ref_var
        
     def _sf_placement(self, stance: list[str], des_vx_com_in_wf_2T: float) -> np.ndarray:
@@ -592,8 +589,6 @@ class UpperLevelController(Node):
         self.touch = 0
  
         # Initialize the service client
-        self.attach_link_client = self.create_client(AttachLink, '/ATTACHLINK')
-        self.detach_link_client = self.create_client(DetachLink, '/DETACHLINK')
         
         self.alip = AlipTraj()
         self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values[0,0]
@@ -603,26 +598,61 @@ class UpperLevelController(Node):
 
         self.ref_record     = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
         self.measure_record = pd.DataFrame(columns = Config.ALIP_COLUMN_TITLE)
-        
     
-    def attach_links(self, model1_name, link1_name, model2_name, link2_name):
-        req = AttachLink.Request()
-        req.model1_name = model1_name
-        req.link1_name = link1_name
-        req.model2_name = model2_name
-        req.link2_name = link2_name
+    def calculate_angular_momentum_about_cf(self):
+        # 計算整體機器人對於腳底的角動量
+        stance = self.stance
+        if stance == 1:
+            support_foot = "l_foot"
+        elif stance == 0:
+            support_foot = "r_foot"
+        else:
+            return np.zeros((3,1))
 
-        self.future = self.attach_link_client.call_async(req)
+        # 取得支撐腳資訊
+        support_id = self.robot.model.getFrameId(support_foot)
+        
+        # 更新運動學
+        pin.forwardKinematics(self.robot.model, self.robot.data, self.jp_sub, self.jv_sub)
+        pin.computeJointJacobians(self.robot.model, self.robot.data, self.jp_sub)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        
+        # 支撐腳位置
+        support_foot_placement = self.robot.data.oMf[support_id]
+        support_foot_pos = support_foot_placement.translation.reshape(3,1)
 
-    def detach_links(self, model1_name, link1_name, model2_name, link2_name):
-        req = DetachLink.Request()
-        req.model1_name = model1_name
-        req.link1_name = link1_name
-        req.model2_name = model2_name
-        req.link2_name = link2_name
+        total_angular_momentum = np.zeros((3,1))
 
-        self.future = self.detach_link_client.call_async(req)
+        for i in range(1, self.robot.model.njoints):
+            # 連桿變換矩陣和慣性參數
+            oMi = self.robot.data.oMi[i]
+            ci_local = self.robot.model.inertias[i].lever
+            mi = self.robot.model.inertias[i].mass
+            Ic_local = self.robot.model.inertias[i].inertia
+            
+            # 質心世界座標位置
+            ci_world = oMi.act(ci_local).reshape(3,1)
+            
+            # 獲取連桿速度（世界座標系）
+            vi = self.robot.data.v[i]  # local frame 速度
+            R = oMi.rotation
+            v_ci = (R @ vi.linear).reshape(3,1)   # 轉換到世界座標系
+            w_ci = (R @ vi.angular).reshape(3,1)  # 轉換到世界座標系
+            
+            # 慣性張量轉換到世界座標系
+            Ic_world = R @ Ic_local @ R.T
+            
+            # 連桿對自身質心的角動量
+            H_link = Ic_world @ w_ci
+            
+            # 連桿質心對支撐腳的角動量
+            r = ci_world - support_foot_pos
+            H_cm = mi * np.cross(r.flatten(), v_ci.flatten()).reshape(3,1)
+            
+            total_angular_momentum += H_link + H_cm
 
+        return total_angular_momentum
+    
     def load_URDF(self, urdf_path):
         robot = pin.RobotWrapper.BuildFromURDF(
                         filename=urdf_path,
@@ -1039,14 +1069,14 @@ class UpperLevelController(Node):
                     self.LSS_time = 0
                     self.RSS_count = 0
         
-        if state == 30:
+        # if state == 30:
 
-            if ALIP_count % 100 <= 50:
-                stance = 1
-            elif ALIP_count % 100 > 50 and ALIP_count % 100 <= 100 :
-                stance = 0
-            else:
-                stance = 2
+        #     if ALIP_count % 100 <= 50:
+        #         stance = 1
+        #     elif ALIP_count % 100 > 50 and ALIP_count % 100 <= 100 :
+        #         stance = 0
+        #     else:
+        #         stance = 2
 
         self.stance = stance
 
@@ -1442,7 +1472,6 @@ class UpperLevelController(Node):
                 self.ref = self.ref
             else:
                 self.ref = self.alip.plan(stance, 0, self.mea)
-                print(self.ref)
             
             self.xc_ref = self.ref.var['x'][0,0]
             # self.xc_ref = pd.read_csv('/home/ldsc/matlab/ALIP/xc_ref.csv', header=None).values
@@ -2108,7 +2137,6 @@ class UpperLevelController(Node):
         return torque
    
     def walking_by_ALIP(self,joint_velocity,l_leg_vcmd,r_leg_vcmd,l_leg_gravity_compensate,r_leg_gravity_compensate,kl,kr):
-        print("ALIP_mode")
         self.tt += 0.0157
         jv = copy.deepcopy(joint_velocity)
         vl_cmd = copy.deepcopy(l_leg_vcmd)
@@ -2128,7 +2156,6 @@ class UpperLevelController(Node):
         R_pitch = R_euler[1]
         R_roll = R_euler[2]
 
-        print(L_pitch)
 
         torque = np.zeros((12,1))
 
@@ -2167,13 +2194,13 @@ class UpperLevelController(Node):
 
         #PD
         if R_pitch <0:
-            torque[10,0] = 0.1*(0-R_pitch) + 0.2
+            torque[10,0] = 0.1*(0-R_pitch)
         elif R_pitch >=0:
-            torque[10,0] = 0.1*(0-R_pitch) - 0.2
+            torque[10,0] = 0.1*(0-R_pitch)
         if R_roll <0:
-            torque[11,0] = 0.1*(0-R_roll) + 0.2
+            torque[11,0] = 0.1*(0-R_roll)
         elif R_roll >=0:
-            torque[11,0] = 0.1*(0-R_roll) - 0.2
+            torque[11,0] = 0.1*(0-R_roll)
 
         # # 直接不給
         # torque[10,0] = 0
@@ -2547,25 +2574,26 @@ class UpperLevelController(Node):
         state = self.state_collect()
         l_contact,r_contact = self.contact_collect()
 
-        if self.P_L_wf[2,0] <= 0.01:
-            l_contact == 1
+        if self.P_L_wf[2,0] <= 0.005:
+            l_contact = 1
         else:
-            l_contact == 0
-        if self.P_R_wf[2,0] <= 0.01:
-            r_contact == 1
+            l_contact = 0
+        if self.P_R_wf[2,0] <= 0.005:
+            r_contact = 1
         else:
-            r_contact == 0
+            r_contact = 0
 
         stance = self.stance_change(state,px_in_lf,px_in_rf,self.stance,self.ALIP_count)
         self.measure()
-        
+        total_angular_momentum = self.calculate_angular_momentum_about_cf()
+        print(total_angular_momentum)
         if state == 30:
             self.mea = Mea(stance, self.mea_x_L, self.mea_x_R, self.mea_y_L, self.mea_y_R, self.P_COM_wf, self.P_L_wf, self.P_R_wf, self.P_PV_wf)
             self.ref_cmd30(state,px_in_lf,px_in_rf,stance,self.ALIP_count,com_in_lf,com_in_rf)
             l_leg_gravity,r_leg_gravity,kl,kr = self.gravity_ALIP(joint_position,stance,px_in_lf,px_in_rf,l_contact,r_contact)
             
-            self.ref_record = self.ref.to_csv(self.ref_record)
-            self.measure_record = self.mea.to_csv(self.measure_record)
+            reference_data.append(self.ref.export_data())
+            measure_data.append(self.mea.export_data())
             
             self.ALIP_count_past = self.ALIP_count
             print(f"{self.ALIP_count = }")
@@ -2613,12 +2641,17 @@ class UpperLevelController(Node):
             # self.effort_publisher.publish(Float64MultiArray(data=torque_ALIP))
             
             #踩到地面才切換支撐腳
-            if self.ALIP_count%50 == 0:
-
-                if (
-                    self.stance == 1 and self.P_R_wf[2,0] <= 0.01 or
-                    self.stance == 0 and self.P_L_wf[2,0] <= 0.01
-                ):
+            if self.ALIP_count%50 == 0 and not self.ALIP_count == 0:
+                x1 = (self.stance == 1 and r_contact)
+                x2 = (self.stance == 0 and l_contact)
+                if x1:
+                    self.stance = 0
+                    print(f"{x1 = }. {self.P_R_wf[2,0] = }")
+                    self.ALIP_count += 1
+                    
+                if x2:
+                    self.stance = 1
+                    print(f"{x2 = }. {self.P_L_wf[2,0] = }")
                     self.ALIP_count += 1
             else:
                 self.ALIP_count += 1
@@ -2641,16 +2674,25 @@ class UpperLevelController(Node):
         #     self.effort_publisher.publish(Float64MultiArray(data=torque_test))
              
 def main(args=None):
-    rclpy.init(args=args)
+    try:
+        rclpy.init(args=args)
 
-    upper_level_controllers = UpperLevelController()
-    rclpy.spin(upper_level_controllers)
+        upper_level_controllers = UpperLevelController()
+        rclpy.spin(upper_level_controllers)
 
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    upper_level_controllers.destroy_node()
-    rclpy.shutdown()
+        # Destroy the node explicitly
+        # (optional - otherwise it will be done automatically
+        # when the garbage collector destroys the node object)
+        upper_level_controllers.destroy_node()
+        rclpy.shutdown()
+    except KeyboardInterrupt:
+        output_dir = os.path.join(os.path.dirname(__file__), 'output')
+        print("\nKeyboardInterrupt")
+        pd.DataFrame(reference_data).to_csv(os.path.join(output_dir,'reference_data.csv'))
+        pd.DataFrame(measure_data).to_csv((os.path.join(output_dir,'measure_data.csv')))
+        print("\nData has been saved")
+        
+
 
 
 if __name__ == '__main__':
